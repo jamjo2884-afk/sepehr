@@ -1,76 +1,52 @@
-import type { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 
-export type AppRole = 'owner' | 'admin' | 'editor' | 'writer' | 'viewer';
-
-export const ROLE_LABELS: Record<AppRole, string> = {
-  owner: 'مالک',
-  admin: 'مدیر',
-  editor: 'ویراستار',
-  writer: 'نویسنده',
-  viewer: 'بیننده',
-};
-
-export const ROLE_ORDER: AppRole[] = [
-  'owner',
-  'admin',
-  'editor',
-  'writer',
-  'viewer',
-];
-
-/** Raw row in the `workspaces` table. */
-export interface WorkspaceRow {
+export interface Project {
   id: string;
+  workspace_id: string;
   name: string;
-  slug: string;
-  logo_url: string | null;
-  created_at: string;
-}
-
-/** Raw row in the `profiles` table. */
-export interface ProfileRow {
-  id: string;
-  full_name: string;
-  avatar_url: string | null;
-  role: AppRole;
-  workspace_id: string | null;
+  description: string | null;
+  status: string;
+  created_by: string;
   created_at: string;
   updated_at: string;
 }
 
-/** Raw row in the `workspace_members` table. */
-export interface WorkspaceMemberRow {
-  id: string;
-  workspace_id: string;
-  user_id: string;
-  role: AppRole;
-  created_at: string;
+
+export async function getProjects(workspaceId: string) {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', {
+      ascending: false,
+    })
+    .returns<Project[]>();
+
+  if (error) throw error;
+
+  return data ?? [];
 }
 
-/** Normalized workspace used across the app. */
-export interface Workspace {
-  id: string;
+
+export async function createProject(input: {
+  workspaceId: string;
   name: string;
-  slug: string;
-  logoUrl: string | null;
-  createdAt: string;
-}
+  description?: string;
+  userId: string;
+}) {
+  const { data, error } = await supabase
+    .from('projects')
+    .insert({
+      workspace_id: input.workspaceId,
+      name: input.name,
+      description: input.description ?? null,
+      created_by: input.userId,
+      status: 'active',
+    })
+    .select()
+    .single<Project>();
 
-/** Normalized user profile used across the app. */
-export interface UserProfile {
-  id: string;
-  fullName: string;
-  email: string;
-  avatarUrl: string | null;
-  role: AppRole;
-  workspaceId: string | null;
-}
+  if (error) throw error;
 
-export interface AuthSession {
-  user: User;
-  session: Session;
-  profile: UserProfile | null;
-  workspace: Workspace | null;
+  return data;
 }
-
-export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';

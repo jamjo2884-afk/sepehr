@@ -2,7 +2,12 @@
 
 import { create } from 'zustand';
 import type { Session, User } from '@supabase/supabase-js';
-import type { AuthStatus, UserProfile, Workspace } from '@/types/auth';
+import type {
+  AuthStatus,
+  UserProfile,
+  Workspace,
+  AppRole,
+} from '@/types/auth';
 
 interface AuthState {
   status: AuthStatus;
@@ -10,12 +15,18 @@ interface AuthState {
   session: Session | null;
   profile: UserProfile | null;
   workspace: Workspace | null;
+  role: AppRole | null;
+
   setSession: (session: Session | null) => void;
+
   setContext: (payload: {
     profile: UserProfile | null;
     workspace: Workspace | null;
+    role: AppRole | null;
   }) => void;
+
   setStatus: (status: AuthStatus) => void;
+
   reset: () => void;
 }
 
@@ -25,14 +36,27 @@ export const useAuthStore = create<AuthState>((set) => ({
   session: null,
   profile: null,
   workspace: null,
+  role: null,
+
   setSession: (session) =>
     set({
       session,
       user: session?.user ?? null,
       status: session ? 'authenticated' : 'unauthenticated',
     }),
-  setContext: ({ profile, workspace }) => set({ profile, workspace }),
-  setStatus: (status) => set({ status }),
+
+  setContext: ({ profile, workspace, role }) =>
+    set({
+      profile,
+      workspace,
+      role,
+    }),
+
+  setStatus: (status) =>
+    set({
+      status,
+    }),
+
   reset: () =>
     set({
       status: 'unauthenticated',
@@ -40,5 +64,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       session: null,
       profile: null,
       workspace: null,
+      role: null,
     }),
 }));
