@@ -2,6 +2,6 @@
 
 import type { ReactNode } from 'react';
 
-export function RouteGuard({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
