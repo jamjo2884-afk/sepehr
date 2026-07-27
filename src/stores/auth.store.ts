@@ -1,5 +1,3 @@
-'use client';
-
 import { create } from 'zustand';
 import type { Session, User } from '@supabase/supabase-js';
 import type {
@@ -31,18 +29,26 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  status: 'loading',
+  // ورود آزمایشی بدون لاگین
+  status: 'authenticated',
+
   user: null,
   session: null,
   profile: null,
-  workspace: null,
-  role: null,
+  workspace: {
+    id: 'demo',
+    name: 'MediaOS Demo Workspace',
+    slug: 'mediaos-demo',
+    logoUrl: null,
+    createdAt: new Date().toISOString(),
+  },
+  role: 'owner',
 
   setSession: (session) =>
     set({
       session,
       user: session?.user ?? null,
-      status: session ? 'authenticated' : 'unauthenticated',
+      status: 'authenticated',
     }),
 
   setContext: ({ profile, workspace, role }) =>
@@ -50,20 +56,27 @@ export const useAuthStore = create<AuthState>((set) => ({
       profile,
       workspace,
       role,
+      status: 'authenticated',
     }),
 
-  setStatus: (status) =>
+  setStatus: () =>
     set({
-      status,
+      status: 'authenticated',
     }),
 
   reset: () =>
     set({
-      status: 'unauthenticated',
+      status: 'authenticated',
       user: null,
       session: null,
       profile: null,
-      workspace: null,
-      role: null,
+      workspace: {
+        id: 'demo',
+        name: 'MediaOS Demo Workspace',
+        slug: 'mediaos-demo',
+        logoUrl: null,
+        createdAt: new Date().toISOString(),
+      },
+      role: 'owner',
     }),
 }));
