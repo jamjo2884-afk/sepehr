@@ -7,6 +7,8 @@ import type {
   AudienceSegment,
   Automation,
   AnalyticsReport,
+  SocialAccount,
+  SocialTrendSeries,
 } from '@/types/domain';
 import type { Notification } from '@/types/index';
 
@@ -261,4 +263,156 @@ export const mockNotifications: Notification[] = [
     read: true,
     createdAt: days(1),
   },
+];
+
+/** Headline metrics for each connected social-media account. */
+export const mockSocialAccounts: SocialAccount[] = [
+  {
+    id: 'soc-instagram',
+    platform: 'instagram',
+    handle: '@mediaos.ir',
+    followers: 184_500,
+    posts: 842,
+    avgEngagement: 4_320,
+    engagementRate: 2.34,
+    followersGrowth: 4.8,
+    secondaryMetricLabel: 'بازدید رییلز',
+    secondaryMetricValue: 312_000,
+    createdAt: days(120),
+    updatedAt: hours(4),
+  },
+  {
+    id: 'soc-telegram',
+    platform: 'telegram',
+    handle: '@mediaos_channel',
+    followers: 96_800,
+    posts: 1_540,
+    avgEngagement: 2_180,
+    engagementRate: 2.25,
+    followersGrowth: 3.1,
+    secondaryMetricLabel: 'بازدید پست',
+    secondaryMetricValue: 145_000,
+    createdAt: days(200),
+    updatedAt: hours(6),
+  },
+  {
+    id: 'soc-youtube',
+    platform: 'youtube',
+    handle: 'MediaOS',
+    followers: 42_300,
+    posts: 168,
+    avgEngagement: 1_640,
+    engagementRate: 3.88,
+    followersGrowth: 6.2,
+    secondaryMetricLabel: 'ساعت تماشا',
+    secondaryMetricValue: 8_900,
+    createdAt: days(300),
+    updatedAt: days(1),
+  },
+  {
+    id: 'soc-twitter',
+    platform: 'twitter',
+    handle: '@mediaos',
+    followers: 28_700,
+    posts: 3_120,
+    avgEngagement: 980,
+    engagementRate: 3.41,
+    followersGrowth: 2.4,
+    secondaryMetricLabel: 'ایمپرشن',
+    secondaryMetricValue: 540_000,
+    createdAt: days(220),
+    updatedAt: hours(8),
+  },
+  {
+    id: 'soc-eita',
+    platform: 'eita',
+    handle: '@mediaos',
+    followers: 15_200,
+    posts: 640,
+    avgEngagement: 540,
+    engagementRate: 3.55,
+    followersGrowth: 5.9,
+    secondaryMetricLabel: 'پیام ارسالی',
+    secondaryMetricValue: 12_400,
+    createdAt: days(90),
+    updatedAt: hours(3),
+  },
+  {
+    id: 'soc-rubika',
+    platform: 'rubika',
+    handle: '@mediaos',
+    followers: 11_400,
+    posts: 510,
+    avgEngagement: 430,
+    engagementRate: 3.77,
+    followersGrowth: 7.1,
+    secondaryMetricLabel: 'بازدید',
+    secondaryMetricValue: 38_000,
+    createdAt: days(75),
+    updatedAt: hours(5),
+  },
+  {
+    id: 'soc-soroushplus',
+    platform: 'soroushplus',
+    handle: '@mediaos',
+    followers: 8_900,
+    posts: 420,
+    avgEngagement: 310,
+    engagementRate: 3.48,
+    followersGrowth: 4.2,
+    secondaryMetricLabel: 'بازدید',
+    secondaryMetricValue: 22_500,
+    createdAt: days(60),
+    updatedAt: days(1),
+  },
+  {
+    id: 'soc-bale',
+    platform: 'bale',
+    handle: '@mediaos',
+    followers: 6_300,
+    posts: 380,
+    avgEngagement: 240,
+    engagementRate: 3.81,
+    followersGrowth: 3.6,
+    secondaryMetricLabel: 'بازدید',
+    secondaryMetricValue: 18_200,
+    createdAt: days(50),
+    updatedAt: hours(2),
+  },
+];
+
+/**
+ * Deterministic pseudo-random trend generator. Keeps the mock chart stable
+ * across renders (avoids hydration mismatches) while looking organic.
+ */
+function buildTrend(
+  platform: SocialTrendSeries['platform'],
+  label: string,
+  base: number,
+  amplitude: number,
+): SocialTrendSeries {
+  const points = Array.from({ length: 30 }, (_, i) => {
+    const day = 29 - i; // 29 = oldest, 0 = today
+    // Pseudo-random but deterministic: a sine wave + a hash of the day.
+    const wave = Math.sin((i / 30) * Math.PI * 3) * amplitude;
+    const noise = (((day * 9301 + 49297) % 233280) / 233280) * amplitude * 0.6;
+    const engagement = Math.round(base + wave + noise);
+    return {
+      date: days(day),
+      engagement: Math.max(0, engagement),
+    };
+  });
+  return { platform, label, points };
+}
+
+/** 30-day engagement time series, one entry per platform. */
+export const mockSocialTrends: SocialTrendSeries[] = [
+  buildTrend('instagram', 'اینستاگرام', 4200, 1400),
+  buildTrend('telegram', 'تلگرام', 2100, 700),
+  buildTrend('youtube', 'یوتیوب', 1600, 600),
+  buildTrend('twitter', 'توییتر / ایکس', 980, 350),
+  buildTrend('eita', 'ایتا', 540, 220),
+  buildTrend('rubika', 'روبیکا', 430, 180),
+  buildTrend('soroushplus', 'سروش‌پلاس', 310, 130),
+  buildTrend('bale', 'بله', 240, 110),
 ];

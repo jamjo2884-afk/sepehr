@@ -169,3 +169,86 @@ export interface AnalyticsReport {
   summary: string;
   createdAt: Timestamp;
 }
+
+/** A social-media platform supported by the dashboard. */
+export type SocialPlatform =
+  | 'instagram'
+  | 'telegram'
+  | 'youtube'
+  | 'twitter'
+  | 'bale'
+  | 'eita'
+  | 'rubika'
+  | 'soroushplus';
+
+export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
+  instagram: 'اینستاگرام',
+  telegram: 'تلگرام',
+  youtube: 'یوتیوب',
+  twitter: 'توییتر / ایکس',
+  bale: 'بله',
+  eita: 'ایتا',
+  rubika: 'روبیکا',
+  soroushplus: 'سروش‌پلاس',
+};
+
+/** Brand metadata used for icons and accent colors. */
+export interface SocialPlatformBrand {
+  /** Latin name shown as a fallback / tooltip. */
+  name: string;
+  /** Brand hex color for icons and accents. */
+  color: string;
+}
+
+export const SOCIAL_PLATFORM_BRAND: Record<
+  SocialPlatform,
+  SocialPlatformBrand
+> = {
+  instagram: { name: 'Instagram', color: '#E1306C' },
+  telegram: { name: 'Telegram', color: '#229ED9' },
+  youtube: { name: 'YouTube', color: '#FF0000' },
+  twitter: { name: 'X', color: '#1D1D1D' },
+  bale: { name: 'Bale', color: '#FF8200' },
+  eita: { name: 'Eitaa', color: '#FC4F62' },
+  rubika: { name: 'Rubika', color: '#7B61FF' },
+  soroushplus: { name: 'SoroushPlus', color: '#2EB67D' },
+};
+
+/** A connected account on a social-media platform and its headline metrics. */
+export interface SocialAccount {
+  id: ID;
+  platform: SocialPlatform;
+  /** Display name of the channel / page / account. */
+  handle: string;
+  /** Primary audience size (followers / subscribers / members). */
+  followers: number;
+  /** Total published posts / videos / messages. */
+  posts: number;
+  /** Average engagement per post (likes + comments + shares). */
+  avgEngagement: number;
+  /** Engagement rate as a percentage (0–100). */
+  engagementRate: number;
+  /** Percentage change of followers over the last 30 days. */
+  followersGrowth: number;
+  /** Platform-specific secondary metric label, e.g. "بازدید" or "پیام". */
+  secondaryMetricLabel: string;
+  /** Platform-specific secondary metric value (views / reach / etc). */
+  secondaryMetricValue: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+/** A single point in a time series of social engagement. */
+export interface SocialMetricPoint {
+  /** ISO date string. */
+  date: Timestamp;
+  /** Total engagement on that day across the selected platform(s). */
+  engagement: number;
+}
+
+/** A named time-series of engagement for one or more platforms. */
+export interface SocialTrendSeries {
+  platform: SocialPlatform;
+  label: string;
+  points: SocialMetricPoint[];
+}
