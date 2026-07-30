@@ -4,6 +4,7 @@ import {
   ClipboardList,
   Package,
   Rocket,
+  Share2,
   Megaphone,
   Users,
   BarChart3,
@@ -57,6 +58,13 @@ export const navItems: NavItem[] = [
     href: '/distribution',
     icon: Rocket,
     description: 'انتشار محتوا در کانال‌ها و پلتفرم‌های مختلف',
+  },
+  {
+    id: 'social',
+    label: 'شبکه‌های اجتماعی',
+    href: '/social',
+    icon: Share2,
+    description: 'مدیریت و آمار اکانت‌های شبکه‌های اجتماعی',
   },
   {
     id: 'campaigns',

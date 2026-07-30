@@ -28,6 +28,7 @@ const QUICK_ACCESS_IDS = [
   'assets',
   'campaigns',
   'distribution',
+  'social',
   'analytics',
 ];
 
