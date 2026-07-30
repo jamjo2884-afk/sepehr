@@ -1,52 +1,64 @@
-import { supabase } from '@/lib/supabase';
+import type { ID, Timestamp } from '@/types/index';
 
-export interface Project {
-  id: string;
-  workspace_id: string;
+/** Application-level roles used across workspace membership. */
+export type AppRole = 'owner' | 'admin' | 'editor' | 'viewer';
+
+/** Human-readable Persian labels for each role. */
+export const ROLE_LABELS: Record<AppRole, string> = {
+  owner: 'مالک',
+  admin: 'مدیر',
+  editor: 'ویراستار',
+  viewer: 'بیننده',
+};
+
+/** Lifecycle of an auth session. */
+export type AuthStatus =
+  | 'loading'
+  | 'authenticated'
+  | 'unauthenticated';
+
+/** A workspace (tenant) in the system. */
+export interface Workspace {
+  id: ID;
   name: string;
-  description: string | null;
-  status: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
+  slug: string;
+  logoUrl: string | null;
+  createdAt: Timestamp;
 }
 
-
-export async function getProjects(workspaceId: string) {
-  const { data, error } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('workspace_id', workspaceId)
-    .order('created_at', {
-      ascending: false,
-    })
-    .returns<Project[]>();
-
-  if (error) throw error;
-
-  return data ?? [];
+/** The authenticated user's profile, separate from the Supabase auth User. */
+export interface UserProfile {
+  id: ID;
+  fullName: string;
+  email: string;
+  avatarUrl?: string;
+  role: AppRole;
+  workspaceId: ID;
 }
 
-
-export async function createProject(input: {
-  workspaceId: string;
+/** Raw Supabase row shape for the `workspaces` table. */
+export interface WorkspaceRow {
+  id: ID;
   name: string;
-  description?: string;
-  userId: string;
-}) {
-  const { data, error } = await supabase
-    .from('projects')
-    .insert({
-      workspace_id: input.workspaceId,
-      name: input.name,
-      description: input.description ?? null,
-      created_by: input.userId,
-      status: 'active',
-    })
-    .select()
-    .single<Project>();
+  slug: string;
+  logo_url: string | null;
+  created_at: Timestamp;
+}
 
-  if (error) throw error;
+/** Raw Supabase row shape for the `profiles` table. */
+export interface ProfileRow {
+  id: ID;
+  full_name: string;
+  avatar_url: string | null;
+  role: AppRole;
+  workspace_id: ID;
+}
 
-  return data;
+/** Raw Supabase row shape for the `workspace_members` table. */
+export interface WorkspaceMemberRow {
+  id: ID;
+  workspace_id: ID;
+  user_id: ID;
+  role: AppRole;
+  created_at: Timestamp;
 }

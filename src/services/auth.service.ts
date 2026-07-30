@@ -23,7 +23,7 @@ function mapProfile(row: ProfileRow, email: string): UserProfile {
     id: row.id,
     fullName: row.full_name,
     email,
-    avatarUrl: row.avatar_url,
+    avatarUrl: row.avatar_url ?? undefined,
     role: row.role,
     workspaceId: row.workspace_id,
   };
