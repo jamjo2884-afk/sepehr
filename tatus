@@ -1,0 +1,17 @@
+ package-lock.json                              | 8822 [32m+++++++++++++++++++++++[m[31m-[m
+ package.json                                   |   79 [32m+[m[31m-[m
+ src/app/(app)/command-center/page.tsx          |    1 [32m+[m
+ src/app/(app)/social/page.tsx                  |  118 [32m+[m
+ src/components/common/route-guard.tsx          |    8 [32m+[m[31m-[m
+ src/components/common/social-platform-icon.tsx |  130 [32m+[m
+ src/components/social/account-card.tsx         |   77 [32m+[m
+ src/components/social/engagement-chart.tsx     |  135 [32m+[m
+ src/components/social/platform-breakdown.tsx   |   83 [32m+[m
+ src/components/social/summary-cards.tsx        |   98 [32m+[m
+ src/config/navigation.config.ts                |    8 [32m+[m
+ src/features/mock-data/index.ts                |  154 [32m+[m
+ src/services/auth.service.ts                   |    2 [32m+[m[31m-[m
+ src/services/social.service.ts                 |   86 [32m+[m
+ src/types/auth.ts                              |  100 [32m+[m[31m-[m
+ src/types/domain.ts                            |   83 [32m+[m
+ 16 files changed, 9932 insertions(+), 52 deletions(-)

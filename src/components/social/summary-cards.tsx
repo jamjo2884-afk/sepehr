@@ -1,6 +1,6 @@
 'use client';
 
-import { Users, Heart, Percent, TrendingUp } from 'lucide-react';
+import { Users, Hash, TrendingUp, Calendar } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { SocialPlatform } from '@/types/domain';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
@@ -21,19 +21,19 @@ export function SocialSummaryCards({
         icon={Users}
         label="کل فالوور"
         value={formatNumber(summary.totalFollowers)}
-        sub={`میانگین رشد ${formatNumber(summary.avgFollowersGrowth)}٪ در ۳۰ روز`}
+        sub={`${formatNumber(summary.totalAccounts)} اکانت در ${formatNumber(summary.totalBrands)} برند`}
       />
       <SummaryCard
-        icon={Heart}
-        label="کل تعامل"
-        value={formatNumber(summary.totalEngagement)}
-        sub="میانگین لایک و کامنت هر پست"
+        icon={TrendingUp}
+        label="میانگین رشد"
+        value={`${formatNumber(Math.round(summary.avgGrowthPct * 10) / 10)}٪`}
+        sub="از اولین تا آخرین اندازه‌گیری"
       />
       <SummaryCard
-        icon={Percent}
-        label="میانگین نرخ تعامل"
-        value={`${formatNumber(summary.avgEngagementRate)}٪`}
-        sub="نسبت تعامل به فالوور"
+        icon={Calendar}
+        label="بازهٔ زمانی"
+        value={`${formatNumber(summary.monthCount)} ماه`}
+        sub="دادهٔ ماهانه از شمسی"
       />
       <TopPlatformCard platform={summary.topPlatform} />
     </div>
@@ -69,14 +69,10 @@ function SummaryCard({
 
 function TopPlatformCard({ platform }: { platform: SocialPlatform }) {
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-2 rounded-xl border border-border bg-surface/60 p-4',
-      )}
-    >
+    <div className={cn('flex flex-col gap-2 rounded-xl border border-border bg-surface/60 p-4')}>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">بزرگ‌ترین مخاطب</span>
-        <TrendingUp className="h-4 w-4 text-primary" />
+        <Hash className="h-4 w-4 text-primary" />
       </div>
       <div className="flex items-center gap-2">
         <SocialPlatformIcon
@@ -89,7 +85,7 @@ function TopPlatformCard({ platform }: { platform: SocialPlatform }) {
             {SOCIAL_PLATFORM_LABELS[platform]}
           </span>
           <span className="text-[11px] text-muted-foreground">
-            بیشترین تعداد فالوور
+            بیشترین مجموع فالوور
           </span>
         </div>
       </div>

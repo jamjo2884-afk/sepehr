@@ -1,35 +1,43 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { SocialAccount } from '@/types/domain';
+import type { SocialAccountRow } from '@/services/social.service';
+import { platformTotals } from '@/services/social.service';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { SOCIAL_PLATFORM_BRAND } from '@/types/domain';
 import { formatNumber } from '@/utils/persian';
-import { cn } from '@/lib/utils';
 
 /**
  * Audience share across platforms as a horizontal proportional bar plus a
- * ranked list. Each platform's width is its share of total followers.
+ * ranked list. Each platform's width is its share of total followers (latest).
  */
 export function PlatformBreakdown({
   accounts,
 }: {
-  accounts: SocialAccount[];
+  accounts: SocialAccountRow[];
 }) {
   const ranked = useMemo(() => {
-    const total = accounts.reduce((sum, a) => sum + a.followers, 0) || 1;
-    return [...accounts]
-      .sort((a, b) => b.followers - a.followers)
-      .map((a) => ({
-        platform: a.platform,
-        followers: a.followers,
-        share: (a.followers / total) * 100,
-      }));
+    const totals = platformTotals(accounts);
+    const total = totals.reduce((sum, t) => sum + t.total, 0) || 1;
+    return totals
+      .map((t) => ({
+        platform: t.platform,
+        followers: t.total,
+        share: (t.total / total) * 100,
+      }))
+      .sort((a, b) => b.followers - a.followers);
   }, [accounts]);
+
+  if (ranked.length === 0) {
+    return (
+      <p className="py-6 text-center text-sm text-muted-foreground">
+        داده‌ای برای نمایش وجود ندارد.
+      </p>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Proportional bar */}
       <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
         {ranked.map((item) => (
           <div
@@ -46,7 +54,6 @@ export function PlatformBreakdown({
         ))}
       </div>
 
-      {/* Ranked list */}
       <ul className="flex flex-col gap-2">
         {ranked.map((item, index) => (
           <li
@@ -68,11 +75,7 @@ export function PlatformBreakdown({
             <span className="text-sm text-muted-foreground">
               {formatNumber(item.followers)}
             </span>
-            <span
-              className={cn(
-                'w-14 text-left text-xs font-semibold text-foreground',
-              )}
-            >
+            <span className="w-14 text-left text-xs font-semibold text-foreground">
               {formatNumber(Math.round(item.share))}٪
             </span>
           </li>

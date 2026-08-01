@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { LineChart, PieChart, Share2 } from 'lucide-react';
+import { LineChart, PieChart, Share2, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { getSocialOverview } from '@/services/social.service';
 import type { SocialOverview } from '@/services/social.service';
@@ -10,24 +10,37 @@ import { SocialSummaryCards } from '@/components/social/summary-cards';
 import { EngagementChart } from '@/components/social/engagement-chart';
 import { SocialAccountCard } from '@/components/social/account-card';
 import { PlatformBreakdown } from '@/components/social/platform-breakdown';
+import { cn } from '@/lib/utils';
 
 export default function SocialPage() {
   const [data, setData] = useState<SocialOverview | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<string>('instagram');
+  const [selectedBrand, setSelectedBrand] = useState<string>('all');
 
   useEffect(() => {
     let active = true;
     getSocialOverview().then((overview) => {
-      if (active) {
-        setData(overview);
-        // Default to the platform with the largest audience.
-        setSelectedPlatform(overview.summary.topPlatform);
-      }
+      if (!active) return;
+      setData(overview);
+      setSelectedPlatform(overview.summary.topPlatform);
     });
     return () => {
       active = false;
     };
   }, []);
+
+  const filteredAccounts = useMemo(() => {
+    if (!data) return [];
+    const accounts =
+      selectedBrand === 'all'
+        ? data.accounts
+        : data.accounts.filter((a) => a.brand === selectedBrand);
+    return [...accounts].sort((a, b) => {
+      const av = a.latest?.value ?? 0;
+      const bv = b.latest?.value ?? 0;
+      return bv - av;
+    });
+  }, [data, selectedBrand]);
 
   if (!data) {
     return (
@@ -37,7 +50,7 @@ export default function SocialPage() {
     );
   }
 
-  const { accounts, trends, summary } = data;
+  const { summary } = data;
 
   return (
     <motion.div
@@ -52,7 +65,8 @@ export default function SocialPage() {
           شبکه‌های اجتماعی
         </h1>
         <p className="text-sm text-muted-foreground">
-          نمای کلی عملکرد اکانت‌ها در ۸ پلتفرم — {accounts.length} اکانت متصل
+          {formatCount(summary.totalBrands)} برند در {formatCount(summary.platforms.length)}{' '}
+          پلتفرم — {formatCount(summary.totalAccounts)} اکانت
         </p>
       </header>
 
@@ -61,15 +75,33 @@ export default function SocialPage() {
         <SocialSummaryCards summary={summary} />
       </section>
 
-      {/* Engagement trend chart */}
+      {/* Brand selector */}
       <section>
-        <SectionTitle
-          icon={LineChart}
-          title="روند تعامل ۳۰ روز اخیر"
-        />
+        <SectionTitle icon={Users} title="برند" />
+        <div className="flex flex-wrap gap-2">
+          <BrandChip
+            label="همه برندها"
+            active={selectedBrand === 'all'}
+            onClick={() => setSelectedBrand('all')}
+          />
+          {data.brands.map((brand) => (
+            <BrandChip
+              key={brand}
+              label={brand}
+              active={selectedBrand === brand}
+              onClick={() => setSelectedBrand(brand)}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* Follower trend chart */}
+      <section>
+        <SectionTitle icon={LineChart} title="روند فالوور در طول زمان" />
         <div className="rounded-xl border border-border bg-surface/60 p-4">
           <EngagementChart
-            trends={trends}
+            accounts={filteredAccounts}
+            months={data.months}
             selected={selectedPlatform}
             onSelect={setSelectedPlatform}
           />
@@ -78,22 +110,22 @@ export default function SocialPage() {
 
       {/* Per-account cards */}
       <section>
-        <SectionTitle icon={Share2} title="اکانت‌های متصل" />
+        <SectionTitle icon={Share2} title="اکانت‌ها" />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {accounts.map((account) => (
-            <SocialAccountCard key={account.id} account={account} />
+          {filteredAccounts.map((account, i) => (
+            <SocialAccountCard
+              key={`${account.brand}-${account.platform}-${account.handle}-${i}`}
+              account={account}
+            />
           ))}
         </div>
       </section>
 
       {/* Audience breakdown */}
       <section>
-        <SectionTitle
-          icon={PieChart}
-          title="سهم مخاطب میان شبکه‌ها"
-        />
+        <SectionTitle icon={PieChart} title="سهم مخاطب میان شبکه‌ها" />
         <div className="rounded-xl border border-border bg-surface/60 p-4">
-          <PlatformBreakdown accounts={accounts} />
+          <PlatformBreakdown accounts={filteredAccounts} />
         </div>
       </section>
     </motion.div>
@@ -115,4 +147,33 @@ function SectionTitle({
       </h2>
     </div>
   );
+}
+
+function BrandChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+        active
+          ? 'border-transparent bg-primary text-primary-foreground'
+          : 'border-border bg-surface/60 text-muted-foreground hover:border-primary/40',
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function formatCount(n: number): string {
+  return n.toLocaleString('fa-IR');
 }

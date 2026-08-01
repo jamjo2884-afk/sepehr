@@ -2,69 +2,85 @@
 
 import { useMemo } from 'react';
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
-import type { SocialTrendSeries } from '@/types/domain';
-import { SOCIAL_PLATFORM_BRAND } from '@/types/domain';
+import type { SocialAccountRow } from '@/services/social.service';
+import type { SocialPlatform } from '@/types/domain';
+import { SOCIAL_PLATFORM_LABELS, SOCIAL_PLATFORM_BRAND } from '@/types/domain';
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
-import { formatNumber, toJalali } from '@/utils/persian';
+import { formatNumber } from '@/utils/persian';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { cn } from '@/lib/utils';
 
 /**
- * 30-day engagement line chart with a platform selector.
- * The first series in `trends` is selected by default.
+ * Monthly follower-trend line chart with a platform selector.
+ * For the selected platform, sums followers across all brands per month
+ * and draws the trajectory over the full data range.
  */
 export function EngagementChart({
-  trends,
+  accounts,
+  months,
   selected,
   onSelect,
 }: {
-  trends: SocialTrendSeries[];
+  accounts: SocialAccountRow[];
+  months: string[];
   selected: string;
   onSelect: (platform: string) => void;
 }) {
-  const active = useMemo(
-    () =>
-      trends.find((t) => t.platform === selected) ?? trends[0] ?? {
-        platform: 'instagram' as const,
-        label: '',
-        points: [],
-      },
-    [trends, selected],
-  );
+  const platformsWith = useMemo(() => {
+    const set = new Set<SocialPlatform>();
+    for (const a of accounts) set.add(a.platform);
+    return [...set];
+  }, [accounts]);
 
-  const brand = SOCIAL_PLATFORM_BRAND[active.platform];
-  const chartData = useMemo(
-    () =>
-      active.points.map((p) => ({
-        date: p.date,
-        engagement: p.engagement,
-        label: toJalali(new Date(p.date)).day.toString(),
-      })),
-    [active],
-  );
+  const active = (platformsWith.find((p) => p === selected) ??
+    platformsWith[0]) as SocialPlatform | undefined;
+  const brand = active ? SOCIAL_PLATFORM_BRAND[active] : null;
 
-  const chartConfig: ChartConfig = {
-    engagement: {
-      label: active.label,
-      color: brand.color,
-    },
-  };
+  const chartData = useMemo(() => {
+    if (!active) return [];
+    const series = accounts.filter((a) => a.platform === active);
+    return months.map((m) => {
+      let total = 0;
+      for (const a of series) {
+        const point = a.series.find((p) => p.month === m);
+        if (point) total += point.value;
+      }
+      return { month: m, total };
+    });
+  }, [accounts, months, active]);
+
+  const chartConfig: ChartConfig = active
+    ? {
+        total: {
+          label: SOCIAL_PLATFORM_LABELS[active],
+          color: brand?.color,
+        },
+      }
+    : {};
+
+  if (!active) {
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        داده‌ای برای نمایش وجود ندارد.
+      </p>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        {trends.map((series) => {
-          const isActive = series.platform === active.platform;
+        {platformsWith.map((platform) => {
+          const isActive = platform === active;
           return (
             <button
-              key={series.platform}
+              key={platform}
               type="button"
-              onClick={() => onSelect(series.platform)}
+              onClick={() => onSelect(platform)}
               className={cn(
                 'flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                 isActive
@@ -73,45 +89,41 @@ export function EngagementChart({
               )}
             >
               <SocialPlatformIcon
-                platform={series.platform}
+                platform={platform}
                 className="h-5 w-5 rounded-full"
                 iconClassName="h-3 w-3"
               />
-              {series.label}
+              {SOCIAL_PLATFORM_LABELS[platform]}
             </button>
           );
         })}
       </div>
 
-      <ChartContainer config={chartConfig} className="h-[260px] w-full">
+      <ChartContainer config={chartConfig} className="h-[280px] w-full">
         <LineChart data={chartData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis
-            dataKey="label"
+            dataKey="month"
             tickLine={false}
             axisLine={false}
             tickMargin={8}
-            interval={4}
+            interval={3}
             tick={{ fontSize: 11 }}
           />
           <YAxis
             tickLine={false}
             axisLine={false}
             tickMargin={8}
-            width={48}
+            width={52}
             tick={{ fontSize: 11 }}
             tickFormatter={(v: number) => formatNumber(v)}
           />
           <ChartTooltip
             content={
               <ChartTooltipContent
-                labelFormatter={(_, payload) => {
-                  const raw = payload?.[0]?.payload?.date as string | undefined;
-                  return raw ? toJalali(new Date(raw)).day.toString() : '';
-                }}
                 formatter={(value) => (
                   <div className="flex w-full items-center justify-between gap-3 text-xs">
-                    <span className="text-muted-foreground">تعامل</span>
+                    <span className="text-muted-foreground">فالوور</span>
                     <span className="font-semibold text-foreground">
                       {formatNumber(Number(value))}
                     </span>
@@ -122,8 +134,8 @@ export function EngagementChart({
           />
           <Line
             type="monotone"
-            dataKey="engagement"
-            stroke={brand.color}
+            dataKey="total"
+            stroke={brand!.color}
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4 }}
