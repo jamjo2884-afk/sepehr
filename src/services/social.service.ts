@@ -56,7 +56,7 @@ export interface SocialSummary {
   totalFollowers: number;
   totalAccounts: number;
   totalBrands: number;
-  /** Mean growth percentage across accounts (0–100). */
+  /** Portfolio growth from first to latest measurement, weighted by account size (%). */
   avgGrowthPct: number;
   /** Platform with the largest total audience. */
   topPlatform: SocialPlatform;
@@ -140,8 +140,16 @@ export function summarizeAccounts(accounts: SocialAccountRow[]): SocialSummary {
     (sum, a) => sum + (a.latest?.value ?? 0),
     0,
   );
+  const totalFirst = accounts.reduce(
+    (sum, a) => sum + (a.first?.value ?? 0),
+    0,
+  );
+  // Weighted portfolio growth: total followers now vs. total at first
+  // measurement. A plain mean of per-account percentages is dominated by
+  // tiny accounts (e.g. 265 -> 16,900 = +6,278%) and produces a headline
+  // KPI that misrepresents the portfolio (~730% vs the real ~77%).
   const avgGrowthPct =
-    accounts.reduce((sum, a) => sum + a.growthPct, 0) / accounts.length;
+    totalFirst > 0 ? ((totalFollowers - totalFirst) / totalFirst) * 100 : 0;
   const byPlatform = new Map<SocialPlatform, number>();
   for (const a of accounts) {
     byPlatform.set(a.platform, (byPlatform.get(a.platform) ?? 0) + (a.latest?.value ?? 0));

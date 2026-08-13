@@ -65,7 +65,7 @@ export default function SocialPage() {
           شبکه‌های اجتماعی
         </h1>
         <p className="text-sm text-muted-foreground">
-          {formatCount(summary.totalBrands)} برند در {formatCount(summary.platforms.length)}{' '}
+          {formatCount(summary.totalBrands)} برند در {formatCount(data.platforms.length)}{' '}
           پلتفرم — {formatCount(summary.totalAccounts)} اکانت
         </p>
       </header>

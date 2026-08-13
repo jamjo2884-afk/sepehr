@@ -42,7 +42,7 @@ export function SocialAccountCard({ account }: { account: SocialAccountRow }) {
           )}
         >
           <GrowthIcon className="h-3 w-3" />
-          {formatNumber(Math.abs(account.growthPct).toFixed(1))}٪
+          {formatNumber(Math.round(Math.abs(account.growthPct) * 10) / 10)}٪
         </span>
       </div>
 
