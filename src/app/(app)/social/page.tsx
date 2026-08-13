@@ -2,13 +2,26 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { LineChart, PieChart, Plus, RotateCcw, Share2, Trash2, Users } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  LineChart,
+  PieChart,
+  Plus,
+  RotateCcw,
+  Share2,
+  Trash2,
+  Users,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { getSocialOverview, summarizeAccounts } from '@/services/social.service';
-import type { SocialOverview } from '@/services/social.service';
+import type { SocialAccountRow, SocialOverview } from '@/services/social.service';
+import type { SocialPlatform } from '@/types/domain';
+import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { SocialSummaryCards } from '@/components/social/summary-cards';
 import { EngagementChart } from '@/components/social/engagement-chart';
 import { SocialAccountCard } from '@/components/social/account-card';
+import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { PlatformBreakdown } from '@/components/social/platform-breakdown';
 import { useSocialBrandEdits } from '@/stores/social-brands.store';
 import { Button } from '@/components/ui/button';
@@ -30,6 +43,7 @@ export default function SocialPage() {
   const [manageOpen, setManageOpen] = useState(false);
   const [newBrandName, setNewBrandName] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
+  const [sortAscending, setSortAscending] = useState(false);
 
   const { added, removed, setEdits } = useSocialBrandEdits();
 
@@ -79,9 +93,29 @@ export default function SocialPage() {
     return [...accounts].sort((a, b) => {
       const av = a.latest?.value ?? 0;
       const bv = b.latest?.value ?? 0;
-      return bv - av;
+      return sortAscending ? av - bv : bv - av;
     });
-  }, [visibleAccounts, selectedBrand]);
+  }, [visibleAccounts, selectedBrand, sortAscending]);
+
+  // Accounts grouped by platform; platforms ordered by total followers.
+  const groupedAccounts = useMemo(() => {
+    const byPlatform = new Map<SocialPlatform, SocialAccountRow[]>();
+    for (const account of filteredAccounts) {
+      const list = byPlatform.get(account.platform) ?? [];
+      list.push(account);
+      byPlatform.set(account.platform, list);
+    }
+    const totals = new Map<SocialPlatform, number>();
+    for (const [platform, list] of byPlatform) {
+      totals.set(
+        platform,
+        list.reduce((sum, a) => sum + (a.latest?.value ?? 0), 0),
+      );
+    }
+    return [...byPlatform.entries()].sort(
+      (a, b) => (totals.get(b[0]) ?? 0) - (totals.get(a[0]) ?? 0),
+    );
+  }, [filteredAccounts]);
 
   // If the selected brand was removed, fall back to "all".
   const activeBrand =
@@ -312,17 +346,60 @@ export default function SocialPage() {
         </div>
       </section>
 
-      {/* Per-account cards */}
+      {/* Per-account cards, grouped by platform */}
       <section>
-        <SectionTitle icon={Share2} title="اکانت‌ها" />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {filteredAccounts.map((account, i) => (
-            <SocialAccountCard
-              key={`${account.brand}-${account.platform}-${account.handle}-${i}`}
-              account={account}
-            />
-          ))}
+        <div className="mb-3 flex items-center justify-between">
+          <SectionTitle icon={Share2} title="اکانت‌ها" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => setSortAscending((v) => !v)}
+          >
+            {sortAscending ? (
+              <ArrowDown className="h-3.5 w-3.5" />
+            ) : (
+              <ArrowUp className="h-3.5 w-3.5" />
+            )}
+            {sortAscending ? 'کمترین فالوور' : 'بیشترین فالوور'}
+          </Button>
         </div>
+
+        {groupedAccounts.length === 0 ? (
+          <div className="rounded-xl border border-border bg-surface/60 p-4">
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              داده‌ای برای نمایش وجود ندارد.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {groupedAccounts.map(([platform, accounts]) => (
+              <div key={platform} className="flex flex-col gap-3">
+                <div className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-2">
+                  <SocialPlatformIcon
+                    platform={platform}
+                    className="h-6 w-6 rounded-md"
+                    iconClassName="h-3.5 w-3.5"
+                  />
+                  <span className="text-xs font-semibold text-foreground">
+                    {SOCIAL_PLATFORM_LABELS[platform]}
+                  </span>
+                  <span className="mr-auto text-[11px] text-muted-foreground">
+                    {formatCount(accounts.length)} اکانت
+                  </span>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {accounts.map((account, i) => (
+                    <SocialAccountCard
+                      key={`${account.brand}-${account.platform}-${account.handle}-${i}`}
+                      account={account}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Audience breakdown */}
