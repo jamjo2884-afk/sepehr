@@ -19,11 +19,12 @@ export type {
 /**
  * Social-media data service.
  *
- * Today the source is a TypeScript snapshot generated from the real
- * "گزارش ماهیانه سپهر" CSV (monthly follower counts per brand × platform,
- * Jalali months YYYY-MM). The function signatures are async so a future
- * implementation can swap in Google Sheets / platform APIs without touching
- * the UI.
+ * `getSocialOverview` reads monthly follower snapshots from the
+ * `social_followers` Supabase table (see supabase/migrations) and rebuilds
+ * the same nested brand tree the dashboard consumes, so the UI does not
+ * change. If Supabase is unreachable / the table is missing or empty, it
+ * falls back to the bundled TypeScript snapshot generated from the real
+ * "گزارش ماهیانه سپهر" CSV (Jalali months YYYY-MM).
  */
 
 export const SUPPORTED_PLATFORMS: SocialPlatform[] = [
@@ -74,6 +75,67 @@ export interface SocialOverview {
 
 function platformOf(id: string): id is SocialPlatform {
   return id in SOCIAL_PLATFORM_LABELS;
+}
+
+/** A flat `social_followers` row: one brand × platform × handle × month. */
+export interface SocialFollowersRow {
+  brand: string;
+  platform: string;
+  handle: string | null;
+  month: string;
+  followers: number;
+}
+
+/** Rebuild the nested brand tree from flat table rows. */
+export function rowsToBrandNodes(
+  rows: SocialFollowersRow[],
+): SocialBrandNode[] {
+  const brands = new Map<string, SocialBrandNode>();
+  for (const row of rows) {
+    if (!platformOf(row.platform)) continue;
+    let brand = brands.get(row.brand);
+    if (!brand) {
+      brand = { name: row.brand, platforms: {} };
+      brands.set(row.brand, brand);
+    }
+    const platform = (brand.platforms[row.platform] ??= {});
+    const handleKey = row.handle ?? '';
+    const account = (platform[handleKey] ??= {
+      handle: row.handle,
+      series: [],
+    });
+    account.series.push({ month: row.month, value: row.followers });
+  }
+  return [...brands.values()];
+}
+
+/**
+ * Fetch all rows from the `social_followers` table and rebuild the brand
+ * tree. Returns null (never throws) when Supabase is unavailable, the table
+ * is missing, or the table is empty so callers can fall back to the bundled
+ * snapshot.
+ */
+async function fetchSocialOverviewFromSupabase(): Promise<SocialBrandNode[] | null> {
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    const { data, error } = await supabase
+      .from('social_followers')
+      .select('brand, platform, handle, month, followers')
+      .order('brand', { ascending: true })
+      .order('platform', { ascending: true })
+      .order('handle', { ascending: true })
+      .order('month', { ascending: true });
+    if (error) throw error;
+    if (!data || data.length === 0) return null;
+    return rowsToBrandNodes(data as SocialFollowersRow[]);
+  } catch (err) {
+    console.warn(
+      '[social] Could not read social_followers from Supabase, ' +
+        'falling back to the bundled snapshot.',
+      err,
+    );
+    return null;
+  }
 }
 
 function growthPct(first: number, latest: number): number {
@@ -193,12 +255,15 @@ export function platformTotals(
 }
 
 /**
- * Fetch the full social overview from the real data snapshot.
- * Replace the implementation below with live fetches when sources are wired up.
+ * Fetch the full social overview. Reads the `social_followers` Supabase
+ * table when available, otherwise falls back to the bundled snapshot so the
+ * dashboard keeps working without a configured backend.
  */
 export async function getSocialOverview(): Promise<SocialOverview> {
-  const accounts = flattenAccounts();
-  const months = collectMonths();
+  const nodes =
+    (await fetchSocialOverviewFromSupabase()) ?? socialBrandData;
+  const accounts = flattenAccounts(nodes);
+  const months = collectMonths(nodes);
   const brands = [...new Set(accounts.map((a) => a.brand))].sort(
     (a, b) => a.localeCompare(b, 'fa'),
   );
