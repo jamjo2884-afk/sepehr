@@ -29,14 +29,20 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  // Start unknown until AuthProvider restores the Supabase session.
-  status: 'loading',
+  // ورود آزمایشی بدون لاگین
+  status: 'authenticated',
 
   user: null,
   session: null,
   profile: null,
-  workspace: null,
-  role: null,
+  workspace: {
+    id: 'demo',
+    name: 'MediaOS Demo Workspace',
+    slug: 'mediaos-demo',
+    logoUrl: null,
+    createdAt: new Date().toISOString(),
+  },
+  role: 'owner',
 
   setSession: (session) =>
     set({
