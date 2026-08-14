@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Calendar, TrendingUp, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  Calendar,
+  ExternalLink,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -13,7 +19,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { getAccountByKey } from '@/services/social.service';
+import { getAccountByKey, socialAccountUrl } from '@/services/social.service';
 import type { SocialAccountRow } from '@/services/social.service';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
@@ -69,6 +75,9 @@ export default function AccountDetailPage() {
   const growthPct = account.growthPct;
   const growthPositive = growthPct >= 0;
 
+  // Deep link to the public page of this account on its platform.
+  const externalUrl = socialAccountUrl(account.platform, account.handle);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -103,6 +112,21 @@ export default function AccountDetailPage() {
             </p>
           </div>
         </div>
+
+        {externalUrl ? (
+          <div className="mt-4">
+            <a
+              href={externalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button className="gap-2">
+                <ExternalLink className="h-4 w-4" />
+                مشاهده در {SOCIAL_PLATFORM_LABELS[account.platform]}
+              </Button>
+            </a>
+          </div>
+        ) : null}
       </header>
 
       {/* KPI Cards */}

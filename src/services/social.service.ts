@@ -283,6 +283,40 @@ export function platformLabel(platform: SocialPlatform): string {
 }
 
 /**
+ * Build the public web URL of an account on its platform, from its handle.
+ * Returns null when the platform has no public web profile or the handle is
+ * missing. Used to deep-link out to the real account page.
+ */
+export function socialAccountUrl(
+  platform: SocialPlatform,
+  handle: string | null,
+): string | null {
+  if (!handle) return null;
+  const h = encodeURIComponent(handle.replace(/^@/, ''));
+  switch (platform) {
+    case 'instagram':
+      return `https://instagram.com/${h}`;
+    case 'telegram':
+      return `https://t.me/${h}`;
+    case 'youtube':
+      return `https://youtube.com/@${h}`;
+    case 'twitter':
+      return `https://x.com/${h}`;
+    case 'bale':
+      return `https://ble.ir/${h}`;
+    case 'eita':
+      return `https://eitaa.com/${h}`;
+    case 'soroushplus':
+      return `https://sapp.ir/${h}`;
+    case 'rubika':
+      // Rubika has no public per-channel web page.
+      return null;
+    default:
+      return null;
+  }
+}
+
+/**
  * Encode a SocialAccountRow's composite key into a URL-safe string.
  * Format: `brand|platform|handle` (handle may be empty).
  */
