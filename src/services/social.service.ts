@@ -394,6 +394,53 @@ export async function getAccountByKey(
   );
 }
 
+/** Full account detail: legacy dashboard row + normalized account + latest metric. */
+export interface SocialAccountDetail {
+  /** Legacy dashboard row (follower series + growth). */
+  row: SocialAccountRow;
+  /** Normalized account record (stable uuid id, url, status). */
+  account: SocialAccount | null;
+  /** Latest metric of the normalized account, when available. */
+  latestMetric: SocialMetric | null;
+}
+
+/**
+ * Fetch everything the account detail page needs in one call: the legacy
+ * follower row for the chart/table, plus the normalized account and its
+ * latest metric so platform-specific indicators (story views, channel
+ * members, retweets, subscribers) can be shown.
+ */
+export async function getAccountDetail(
+  key: string,
+): Promise<SocialAccountDetail | null> {
+  const row = await getAccountByKey(key);
+  if (!row) return null;
+
+  const parsed = decodeAccountKey(key);
+  if (!parsed) {
+    return { row, account: null, latestMetric: null };
+  }
+
+  const accounts = await getSocialAccounts();
+  const account =
+    accounts.find(
+      (a) =>
+        a.brand === parsed.brand &&
+        a.platform === parsed.platform &&
+        a.username === (parsed.handle ?? ''),
+    ) ?? null;
+  if (!account) {
+    return { row, account: null, latestMetric: null };
+  }
+
+  const metrics = await getAccountMetrics(account.id);
+  return {
+    row,
+    account,
+    latestMetric: latestMetric(metrics),
+  };
+}
+
 /* =========================================================================
  * Normalized API (new) — social_accounts + social_metrics
  * ========================================================================= */

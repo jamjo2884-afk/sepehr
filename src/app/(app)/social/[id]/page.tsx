@@ -7,9 +7,13 @@ import {
   ArrowLeft,
   Calendar,
   ExternalLink,
+  Eye,
+  Repeat2,
   TrendingUp,
   Users,
+  Youtube,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -19,8 +23,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { getAccountByKey, socialAccountUrl } from '@/services/social.service';
+import { getAccountDetail, socialAccountUrl } from '@/services/social.service';
 import type { SocialAccountRow } from '@/services/social.service';
+import type { SocialMetric } from '@/types/social';
+import type { SocialPlatform } from '@/types/domain';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { formatNumber } from '@/utils/persian';
@@ -30,6 +36,7 @@ export default function AccountDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [account, setAccount] = useState<SocialAccountRow | null>(null);
+  const [latestMetric, setLatestMetric] = useState<SocialMetric | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,8 +44,9 @@ export default function AccountDetailPage() {
     if (!id) return;
 
     setLoading(true);
-    getAccountByKey(id).then((acc) => {
-      setAccount(acc);
+    getAccountDetail(id).then((detail) => {
+      setAccount(detail?.row ?? null);
+      setLatestMetric(detail?.latestMetric ?? null);
       setLoading(false);
     });
   }, [params.id]);
@@ -115,11 +123,7 @@ export default function AccountDetailPage() {
 
         {externalUrl ? (
           <div className="mt-4">
-            <a
-              href={externalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <a href={externalUrl} target="_blank" rel="noopener noreferrer">
               <Button className="gap-2">
                 <ExternalLink className="h-4 w-4" />
                 مشاهده در {SOCIAL_PLATFORM_LABELS[account.platform]}
@@ -154,6 +158,9 @@ export default function AccountDetailPage() {
         />
       </section>
 
+      {/* Platform-specific metric cards */}
+      <PlatformMetricCards platform={account.platform} metric={latestMetric} />
+
       {/* Follower Trend Chart */}
       <section>
         <h2 className="mb-3 text-sm font-semibold text-foreground">
@@ -163,7 +170,10 @@ export default function AccountDetailPage() {
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(var(--border))"
+                />
                 <XAxis
                   dataKey="month"
                   tick={{ fontSize: 12 }}
@@ -221,7 +231,8 @@ export default function AccountDetailPage() {
               </thead>
               <tbody>
                 {account.series.map((point, index) => {
-                  const prev = index > 0 ? account.series[index - 1].value : null;
+                  const prev =
+                    index > 0 ? account.series[index - 1].value : null;
                   const change = prev !== null ? point.value - prev : null;
                   return (
                     <tr
@@ -275,9 +286,63 @@ function KPICard({
         <Icon className="h-4 w-4 text-muted-foreground" />
         <span className="text-xs text-muted-foreground">{label}</span>
       </div>
-      <p className={`mt-2 text-xl font-bold ${valueClassName ?? 'text-foreground'}`}>
+      <p
+        className={`mt-2 text-xl font-bold ${valueClassName ?? 'text-foreground'}`}
+      >
         {value}
       </p>
     </div>
+  );
+}
+
+/**
+ * Platform-specific indicators for one account, read from the latest
+ * metric row. Only cards whose platform has a dedicated metric (and whose
+ * value is present) are rendered.
+ */
+interface PlatformMetricSpec {
+  key: keyof SocialMetric;
+  label: string;
+  icon: LucideIcon;
+}
+
+const PLATFORM_SPECIFIC_METRICS: Partial<
+  Record<SocialPlatform, PlatformMetricSpec[]>
+> = {
+  instagram: [{ key: 'storyViews', label: 'بازدید استوری', icon: Eye }],
+  telegram: [{ key: 'channelMembers', label: 'اعضای کانال', icon: Users }],
+  bale: [{ key: 'channelMembers', label: 'اعضای کانال', icon: Users }],
+  eita: [{ key: 'channelMembers', label: 'اعضای کانال', icon: Users }],
+  rubika: [{ key: 'channelMembers', label: 'اعضای کانال', icon: Users }],
+  soroushplus: [{ key: 'channelMembers', label: 'اعضای کانال', icon: Users }],
+  twitter: [{ key: 'retweets', label: 'بازتوییت', icon: Repeat2 }],
+  youtube: [{ key: 'subscribers', label: 'مشترکین', icon: Youtube }],
+};
+
+function PlatformMetricCards({
+  platform,
+  metric,
+}: {
+  platform: SocialPlatform;
+  metric: SocialMetric | null;
+}) {
+  const specs = PLATFORM_SPECIFIC_METRICS[platform] ?? [];
+  const cards = specs.filter((spec) => {
+    const value = metric?.[spec.key];
+    return typeof value === 'number' && value > 0;
+  });
+  if (cards.length === 0) return null;
+
+  return (
+    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {cards.map((spec) => (
+        <KPICard
+          key={spec.key}
+          icon={spec.icon}
+          label={spec.label}
+          value={formatNumber(metric?.[spec.key] as number)}
+        />
+      ))}
+    </section>
   );
 }
