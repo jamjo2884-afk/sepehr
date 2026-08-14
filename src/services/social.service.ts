@@ -1019,10 +1019,16 @@ export async function recordSocialMetrics(
   accountId: string,
   period: SocialMetricPeriod,
   values: SocialMetricValues,
-  options: { date?: Date; periodLabel?: string } = {},
+  options: {
+    date?: Date;
+    periodLabel?: string;
+    /** Pre-resolved client (the sync service shares one across a run). */
+    supabase?: import('@supabase/supabase-js').SupabaseClient;
+  } = {},
 ): Promise<SocialMetric | null> {
   try {
-    const { supabase } = await import('@/lib/supabase');
+    const supabase =
+      options.supabase ?? (await import('@/lib/supabase')).supabase;
     const date = options.date ?? new Date();
     const periodLabel = options.periodLabel ?? periodLabelForDate(date, period);
     // Weekly labels can't be converted back to a range without an anchor

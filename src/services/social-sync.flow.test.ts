@@ -11,11 +11,11 @@ import type {
  * validate → upsert → log → account state) can be exercised without a live
  * database. The connector + credential are injected via the options
  * parameter, so no env vars or real API calls are involved.
- */
-
-const { state } = vi.hoisted(() => ({
+ */ const { state } = vi.hoisted(() => ({
   state: {
     account: null as Record<string, unknown> | null,
+    accountsList: [] as Array<Record<string, unknown>>,
+    logsList: [] as Array<Record<string, unknown>>,
     existingMetric: null as Record<string, unknown> | null,
     metricSingleData: null as Record<string, unknown> | null,
     insertedLogs: [] as Array<Record<string, unknown>>,
@@ -26,17 +26,37 @@ const { state } = vi.hoisted(() => ({
 
 vi.mock('@/lib/supabase', () => {
   function chain(table: string) {
+    const filters: Array<{ col: string; val: unknown }> = [];
     const q: Record<string, (...a: unknown[]) => unknown> = {
       select: () => q,
-      eq: () => q,
       order: () => q,
-      limit: () => q,
       in: () => q,
       range: () => q,
     };
-    q.maybeSingle = async () => {
+    q.eq = (col: unknown, val: unknown) => {
+      filters.push({ col: String(col), val });
+      return q;
+    };
+    q.limit = async () => {
       if (table === 'social_accounts')
+        return { data: state.accountsList, error: null };
+      if (table === 'social_sync_logs')
+        return { data: state.logsList, error: null };
+      return { data: [], error: null };
+    };
+    q.maybeSingle = async () => {
+      if (process.env.DEBUG_MOCK) {
+        console.log('MOCK maybeSingle', table, JSON.stringify(filters));
+      }
+      if (table === 'social_accounts') {
+        const idFilter = filters.find((f) => f.col === 'id');
+        if (idFilter && state.accountsList.length > 0) {
+          const found = state.accountsList.find((a) => a.id === idFilter.val);
+          if (found) return { data: found, error: null };
+        }
+        // Single-sync tests use `state.account`; sync-all uses the list.
         return { data: state.account, error: null };
+      }
       if (table === 'social_metrics')
         return { data: state.existingMetric, error: null };
       return { data: null, error: null };
@@ -77,7 +97,15 @@ vi.mock('@/lib/supabase', () => {
   return { supabase: { from: (table: string) => chain(table) } };
 });
 
-import { syncSocialAccount } from '@/services/social-sync.service';
+import {
+  calculateSyncHealth,
+  formatSyncDuration,
+  getLatestSyncLogs,
+  getSyncOverview,
+  SYNC_ALL_CONCURRENCY,
+  syncAllConnectedAccounts,
+  syncSocialAccount,
+} from '@/services/social-sync.service';
 import { recordSocialMetrics } from '@/services/social.service';
 
 function telegramAccount(): SocialAccount {
@@ -120,6 +148,25 @@ function metric(
   };
 }
 
+function accountRow(id: string, connected: boolean): Record<string, unknown> {
+  return {
+    id,
+    brand: 'تست',
+    platform: 'telegram',
+    username: id,
+    display_name: null,
+    url: null,
+    external_id: null,
+    status: 'active',
+    connection_status: connected ? 'connected' : 'disconnected',
+    last_sync_at: null,
+    last_sync_status: null,
+    last_successful_sync_at: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
 function makeConnector(
   overrides: Partial<SocialPlatformConnector> = {},
 ): SocialPlatformConnector {
@@ -154,12 +201,15 @@ function makeConnector(
 
 beforeEach(() => {
   state.account = null;
+  state.accountsList = [];
+  state.logsList = [];
   state.existingMetric = null;
   state.metricSingleData = null;
   state.insertedLogs = [];
   state.accountUpdates = [];
   state.upsertCalls = [];
   delete process.env.SOCIAL_TELEGRAM_BOT_TOKEN;
+  delete process.env.INSTAGRAM_ACCESS_TOKEN;
 });
 
 describe('syncSocialAccount — failure paths', () => {
@@ -274,6 +324,206 @@ describe('syncSocialAccount — success path', () => {
     expect(result.recordsFetched).toBe(2);
     expect(result.recordsWritten).toBe(1);
     expect(result.errorCode).toBe('partial_validation');
+  });
+});
+
+describe('syncSocialAccount — concurrent run prevention', () => {
+  it('rejects a second sync while one is in flight', async () => {
+    state.account = telegramAccount() as unknown as Record<string, unknown>;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const connector = makeConnector({
+      verifyConnection: async () => {
+        await gate;
+        return {
+          ok: true,
+          account: {
+            platform: 'telegram',
+            externalId: 'chat-1',
+            username: 'test_channel',
+            displayName: null,
+            url: null,
+          },
+        };
+      },
+      fetchAccountMetrics: async () => [metric()],
+    });
+    const first = syncSocialAccount('acc-tg-1', {
+      connector,
+      credential: credential(),
+    });
+    // Let the first run acquire the in-flight lock.
+    await new Promise((r) => setTimeout(r, 10));
+    const second = await syncSocialAccount('acc-tg-1', {
+      connector,
+      credential: credential(),
+    });
+    expect(second.ok).toBe(false);
+    expect(second.errorCode).toBe('already_running');
+    expect(second.errorMessage).toContain('در حال انجام');
+    release();
+    const firstResult = await first;
+    expect(firstResult.ok).toBe(true);
+  });
+});
+
+describe('syncAllConnectedAccounts — concurrency & partial failure', () => {
+  it('syncs only connected accounts with bounded concurrency', async () => {
+    state.accountsList = [
+      accountRow('a1', true),
+      accountRow('a2', true),
+      accountRow('a3', true),
+      accountRow('a4', true),
+      accountRow('a5', true),
+      accountRow('a6', false),
+    ];
+    let active = 0;
+    let maxActive = 0;
+    const connector = makeConnector({
+      verifyConnection: async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((r) => setTimeout(r, 20));
+        active -= 1;
+        return {
+          ok: true,
+          account: {
+            platform: 'telegram',
+            externalId: 'chat-x',
+            username: 'x',
+            displayName: null,
+            url: null,
+          },
+        };
+      },
+      fetchAccountMetrics: async () => [metric()],
+    });
+    const result = await syncAllConnectedAccounts({
+      connector,
+      credential: credential(),
+    });
+    expect(result.success).toBe(5);
+    expect(result.failed).toBe(0);
+    // The disconnected account is skipped, never attempted.
+    expect(result.skipped).toBe(1);
+    expect(result.total).toBe(6);
+    // Bounded concurrency: never more than SYNC_ALL_CONCURRENCY at once.
+    expect(maxActive).toBeLessThanOrEqual(SYNC_ALL_CONCURRENCY);
+    expect(maxActive).toBe(SYNC_ALL_CONCURRENCY);
+  });
+
+  it('reports partial failure without failing the whole run', async () => {
+    state.accountsList = [accountRow('a1', true), accountRow('a2', true)];
+    let calls = 0;
+    const connector = makeConnector({
+      verifyConnection: async () => {
+        calls += 1;
+        if (calls === 2) {
+          return {
+            ok: false,
+            errorCode: 'invalid_credential',
+            errorMessage: 'اعتبار اتصال نامعتبر است.',
+          };
+        }
+        return {
+          ok: true,
+          account: {
+            platform: 'telegram',
+            externalId: 'chat-x',
+            username: 'x',
+            displayName: null,
+            url: null,
+          },
+        };
+      },
+      fetchAccountMetrics: async () => [metric()],
+    });
+    const result = await syncAllConnectedAccounts({
+      connector,
+      credential: credential(),
+    });
+    expect(result.success).toBe(1);
+    expect(result.failed).toBe(1);
+    expect(
+      result.results.some((r) => !r.ok && r.errorCode === 'invalid_credential'),
+    ).toBe(true);
+  });
+});
+
+describe('sync health & duration', () => {
+  it('health is null below the minimum sample', () => {
+    const h = calculateSyncHealth([
+      { status: 'success' as const },
+      { status: 'error' as const },
+    ]);
+    expect(h.rate).toBeNull();
+    expect(h.total).toBe(2);
+  });
+
+  it('health is the success percentage over recent runs', () => {
+    const h = calculateSyncHealth([
+      { status: 'success' as const },
+      { status: 'success' as const },
+      { status: 'success' as const },
+      { status: 'error' as const },
+    ]);
+    expect(h.rate).toBe(75);
+    expect(h.success).toBe(3);
+    expect(h.failed).toBe(1);
+  });
+
+  it('formats durations in Persian', () => {
+    expect(formatSyncDuration(2400)).toBe('۲٫۴ ثانیه');
+    expect(formatSyncDuration(500)).toBe('۵۰۰ میلی‌ثانیه');
+    expect(formatSyncDuration(null)).toBeNull();
+    expect(formatSyncDuration(0)).toBe('۰ میلی‌ثانیه');
+  });
+});
+
+describe('sync overview — platform summary & history', () => {
+  it('summarizes accounts per platform with credential state', async () => {
+    state.accountsList = [
+      { ...accountRow('t1', true), platform: 'telegram' },
+      { ...accountRow('t2', false), platform: 'telegram' },
+      { ...accountRow('i1', false), platform: 'instagram' },
+    ];
+    const overview = await getSyncOverview();
+    const telegram = overview.platforms.find((p) => p.platform === 'telegram');
+    const instagram = overview.platforms.find(
+      (p) => p.platform === 'instagram',
+    );
+    expect(telegram?.accounts).toBe(2);
+    expect(telegram?.connected).toBe(1);
+    // Credential env is not set in tests ⇒ not-configured accounts counted.
+    expect(telegram?.credentialConfigured).toBe(false);
+    expect(telegram?.notConfigured).toBe(1);
+    expect(instagram?.accounts).toBe(1);
+    expect(instagram?.notConfigured).toBe(1);
+  });
+
+  it('maps sync history rows with duration', async () => {
+    const start = '2026-08-14T12:00:00.000Z';
+    state.logsList = [
+      {
+        id: 1,
+        social_account_id: 't1',
+        platform: 'telegram',
+        started_at: start,
+        finished_at: '2026-08-14T12:00:02.400Z',
+        status: 'success',
+        records_fetched: 2,
+        records_written: 2,
+        error_code: null,
+        error_message: null,
+      },
+    ];
+    const logs = await getLatestSyncLogs(['t1'], 5);
+    expect(logs['t1']).toHaveLength(1);
+    expect(logs['t1'][0].status).toBe('success');
+    expect(logs['t1'][0].recordsFetched).toBe(2);
+    expect(logs['t1'][0].durationMs).toBe(2400);
   });
 });
 
