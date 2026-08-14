@@ -281,3 +281,48 @@ export async function getSocialOverview(): Promise<SocialOverview> {
 export function platformLabel(platform: SocialPlatform): string {
   return SOCIAL_PLATFORM_LABELS[platform];
 }
+
+/**
+ * Encode a SocialAccountRow's composite key into a URL-safe string.
+ * Format: `brand|platform|handle` (handle may be empty).
+ */
+export function encodeAccountKey(account: SocialAccountRow): string {
+  const parts = [account.brand, account.platform, account.handle ?? ''];
+  return encodeURIComponent(parts.join('|'));
+}
+
+/**
+ * Decode a URL-safe account key back to its components.
+ */
+export function decodeAccountKey(
+  key: string,
+): { brand: string; platform: SocialPlatform; handle: string | null } | null {
+  try {
+    const decoded = decodeURIComponent(key);
+    const [brand, platform, handle] = decoded.split('|');
+    if (!brand || !platform) return null;
+    if (!platformOf(platform)) return null;
+    return { brand, platform: platform as SocialPlatform, handle: handle || null };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Find a single account by its encoded key. Returns null if not found.
+ */
+export async function getAccountByKey(
+  key: string,
+): Promise<SocialAccountRow | null> {
+  const parsed = decodeAccountKey(key);
+  if (!parsed) return null;
+  const overview = await getSocialOverview();
+  return (
+    overview.accounts.find(
+      (a) =>
+        a.brand === parsed.brand &&
+        a.platform === parsed.platform &&
+        a.handle === parsed.handle,
+    ) ?? null
+  );
+}
