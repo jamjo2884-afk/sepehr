@@ -105,6 +105,58 @@ export async function getProjects(): Promise<Project[]> {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+/** A single project by id. Returns null when missing (or mock fallback miss). */
+export async function getProjectById(id: string): Promise<Project | null> {
+  const projects = await getProjects();
+  return projects.find((p) => p.id === id) ?? null;
+}
+
+/** Operations that belong to a project. Falls back to mock filtering. */
+export async function getOperationsByProject(
+  projectId: string,
+): Promise<Operation[]> {
+  const all = await getOperations();
+  return all.filter((o) => o.projectId === projectId);
+}
+
+/** Media assets that belong to a project. Falls back to mock filtering. */
+export async function getAssetsByProject(
+  projectId: string,
+): Promise<MediaAsset[]> {
+  const all = await getMediaAssets();
+  return all.filter((a) => a.projectId === projectId);
+}
+
+/** Campaigns that belong to a project. Falls back to mock filtering. */
+export async function getCampaignsByProject(
+  projectId: string,
+): Promise<Campaign[]> {
+  const all = await getCampaigns();
+  return all.filter((c) => c.projectId === projectId);
+}
+
+/** A single operation by id. */
+export async function getOperationById(
+  id: string,
+): Promise<Operation | null> {
+  const all = await getOperations();
+  return all.find((o) => o.id === id) ?? null;
+}
+
+/** A single media asset by id. */
+export async function getAssetById(id: string): Promise<MediaAsset | null> {
+  const all = await getMediaAssets();
+  return all.find((a) => a.id === id) ?? null;
+}
+
+/** A single campaign by id. */
+export async function getCampaignById(
+  id: string,
+): Promise<Campaign | null> {
+  const all = await getCampaigns();
+  return all.find((c) => c.id === id) ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Activity feed
 // ---------------------------------------------------------------------------
