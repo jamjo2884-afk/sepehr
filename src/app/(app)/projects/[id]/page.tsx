@@ -19,6 +19,7 @@ import {
   getAssetsByProject,
   getCampaignsByProject,
 } from '@/services/data.service';
+import { OperationForm } from '@/components/forms/operation-form';
 import {
   CAMPAIGN_STATUS_LABELS,
   MEDIA_ASSET_TYPE_LABELS,
@@ -188,10 +189,20 @@ export default function ProjectDetailPage() {
       </div>
 
       <section className="flex flex-col gap-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <ListTodo className="h-4 w-4 text-primary" />
-          عملیات‌ها
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <ListTodo className="h-4 w-4 text-primary" />
+            عملیات‌ها
+          </h2>
+          <OperationForm
+            projectId={project.id}
+            onCreated={() => {
+              getOperationsByProject(project.id).then((ops) =>
+                setOperations(ops),
+              );
+            }}
+          />
+        </div>
         {operations.length === 0 ? (
           <EmptyRow text="عملیاتی برای این پروژه ثبت نشده است." />
         ) : (

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowLeft, FolderKanban, Search } from 'lucide-react';
 import { getProjects } from '@/services/data.service';
+import { ProjectForm } from '@/components/forms/project-form';
 import {
   PROJECT_STATUS_LABELS,
   type Project,
@@ -80,13 +81,20 @@ export default function ProjectsPage() {
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="flex flex-col gap-6"
     >
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          پروژه‌ها
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          پروژه‌های رسانه‌ای شما — {formatNumber(projects.length)} پروژه
-        </p>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            پروژه‌ها
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            پروژه‌های رسانه‌ای شما — {formatNumber(projects.length)} پروژه
+          </p>
+        </div>
+        <ProjectForm
+          onCreated={() => {
+            getProjects().then((p) => setProjects(p));
+          }}
+        />
       </header>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

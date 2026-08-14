@@ -4,13 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ListTodo, Search } from 'lucide-react';
-import { getOperations } from '@/services/data.service';
+import { getOperations, getProjects } from '@/services/data.service';
+import { OperationForm } from '@/components/forms/operation-form';
 import {
   OPERATION_STATUS_LABELS,
   OPERATION_TYPE_LABELS,
   type Operation,
   type OperationStatus,
   type OperationType,
+  type Project,
 } from '@/types/domain';
 import { formatJalaliDate, formatNumber } from '@/utils/persian';
 import { cn } from '@/lib/utils';
@@ -32,6 +34,7 @@ const STATUS_FILTERS: Array<{ id: OperationStatus | 'all'; label: string }> = [
 
 export default function OperationsPage() {
   const [operations, setOperations] = useState<Operation[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<OperationStatus | 'all'>(
     'all',
@@ -50,6 +53,9 @@ export default function OperationsPage() {
       .catch(() => {
         if (active) setLoading(false);
       });
+    getProjects().then((p) => {
+      if (active) setProjects(p);
+    });
     return () => {
       active = false;
     };
@@ -83,13 +89,23 @@ export default function OperationsPage() {
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="flex flex-col gap-6"
     >
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          عملیات‌ها
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          کارهای عملیاتی پروژه‌ها — {formatNumber(operations.length)} عملیات
-        </p>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            عملیات‌ها
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            کارهای عملیاتی پروژه‌ها — {formatNumber(operations.length)} عملیات
+          </p>
+        </div>
+        {projects.length > 0 ? (
+          <OperationForm
+            projectId={projects[0].id}
+            onCreated={() => {
+              getOperations().then((ops) => setOperations(ops));
+            }}
+          />
+        ) : null}
       </header>
 
       <div className="flex flex-col gap-3">

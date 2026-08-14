@@ -58,6 +58,52 @@ async function fetchTable<T extends SupabaseRow>(
   }
 }
 
+/** Throw a readable error for a failed write. */
+function writeError(action: string, table: string, error: unknown): Error {
+  const msg =
+    error && typeof error === 'object' && 'message' in error
+      ? String((error as { message: unknown }).message)
+      : 'خطای ناشناخته';
+  return new Error(`${action} در «${table}» ناموفق بود: ${msg}`);
+}
+
+/**
+ * Insert a row into a table via the Supabase client. Returns the new
+ * row's id. Throws when Supabase is unavailable or the insert fails.
+ */
+async function insertRow(
+  table: string,
+  payload: Record<string, unknown>,
+): Promise<string> {
+  const { supabase } = await import('@/lib/supabase');
+  const { data, error } = await supabase
+    .from(table)
+    .insert(payload)
+    .select('id')
+    .single();
+  if (error) throw writeError('ثبت', table, error);
+  if (!data) throw new Error(`ثبت در «${table}» پاسخی برنگرداند.`);
+  return data.id as string;
+}
+
+/** Update a row by id. Throws on failure. */
+async function updateRow(
+  table: string,
+  id: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const { supabase } = await import('@/lib/supabase');
+  const { error } = await supabase.from(table).update(payload).eq('id', id);
+  if (error) throw writeError('به‌روزرسانی', table, error);
+}
+
+/** Delete a row by id. Throws on failure. */
+async function deleteRow(table: string, id: string): Promise<void> {
+  const { supabase } = await import('@/lib/supabase');
+  const { error } = await supabase.from(table).delete().eq('id', id);
+  if (error) throw writeError('حذف', table, error);
+}
+
 // ---------------------------------------------------------------------------
 // Projects
 // ---------------------------------------------------------------------------
@@ -103,6 +149,116 @@ export async function getProjects(): Promise<Project[]> {
   return rows
     .map(projectFromRow)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/**
+ * Create a new project. Generates a unique id and slug from the name.
+ * Returns the new project id. Throws on failure.
+ */
+export async function createProject(input: {
+  name: string;
+  description?: string;
+  status?: Project['status'];
+  progress?: number;
+}): Promise<string> {
+  const slugBase =
+    input.name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-') || 'project';
+  const id = `prj-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  // Strip leading/trailing dashes so Persian names don't yield '--abc'.
+  const slug = `${slugBase}-${id.slice(4, 9)}`.replace(/^-+|-+$/g, '');
+  return insertRow('projects', {
+    id,
+    workspace_id: 'demo',
+    name: input.name.trim(),
+    slug,
+    description: input.description ?? '',
+    status: input.status ?? 'planning',
+    progress: input.progress ?? 0,
+    owner_id: 'demo',
+  });
+}
+
+/** Update a project's mutable fields. Throws on failure. */
+export async function updateProject(
+  id: string,
+  payload: {
+    name?: string;
+    description?: string;
+    status?: Project['status'];
+    progress?: number;
+  },
+): Promise<void> {
+  const clean: Record<string, unknown> = {};
+  if (payload.name !== undefined) clean.name = payload.name.trim();
+  if (payload.description !== undefined)
+    clean.description = payload.description;
+  if (payload.status !== undefined) clean.status = payload.status;
+  if (payload.progress !== undefined)
+    clean.progress = Math.min(100, Math.max(0, Math.round(payload.progress)));
+  if (Object.keys(clean).length === 0) return;
+  await updateRow('projects', id, clean);
+}
+
+/** Delete a project and its dependents (FK cascade). Throws on failure. */
+export async function deleteProject(id: string): Promise<void> {
+  await deleteRow('projects', id);
+}
+
+/**
+ * Create a new operation. Returns the new operation id. Throws on failure.
+ */
+export async function createOperation(input: {
+  projectId: string;
+  title: string;
+  description?: string;
+  type?: Operation['type'];
+  status?: Operation['status'];
+  assigneeId?: string | null;
+  dueDate?: string | null;
+}): Promise<string> {
+  const id = `op-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  return insertRow('operations', {
+    id,
+    project_id: input.projectId,
+    title: input.title.trim(),
+    description: input.description ?? '',
+    type: input.type ?? 'planning',
+    status: input.status ?? 'todo',
+    assignee_id: input.assigneeId ?? null,
+    due_date: input.dueDate ?? null,
+  });
+}
+
+/** Update an operation's mutable fields. Throws on failure. */
+export async function updateOperation(
+  id: string,
+  payload: {
+    title?: string;
+    description?: string;
+    type?: Operation['type'];
+    status?: Operation['status'];
+    assigneeId?: string | null;
+    dueDate?: string | null;
+  },
+): Promise<void> {
+  const clean: Record<string, unknown> = {};
+  if (payload.title !== undefined) clean.title = payload.title.trim();
+  if (payload.description !== undefined)
+    clean.description = payload.description;
+  if (payload.type !== undefined) clean.type = payload.type;
+  if (payload.status !== undefined) clean.status = payload.status;
+  if (payload.assigneeId !== undefined) clean.assignee_id = payload.assigneeId;
+  if (payload.dueDate !== undefined) clean.due_date = payload.dueDate;
+  if (Object.keys(clean).length === 0) return;
+  await updateRow('operations', id, clean);
+}
+
+/** Delete an operation. Throws on failure. */
+export async function deleteOperation(id: string): Promise<void> {
+  await deleteRow('operations', id);
 }
 
 /** A single project by id. Returns null when missing (or mock fallback miss). */
