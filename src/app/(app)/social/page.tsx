@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import {
   AlertTriangle,
   BarChart3,
   CalendarRange,
+  Database,
   GitCompareArrows,
   Inbox,
   PieChart,
@@ -523,9 +525,22 @@ export default function SocialPage() {
         <p className="text-sm text-muted-foreground">
           داشبورد تحلیل و مقایسه برندها و شبکه‌های اجتماعی
         </p>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          شبکه‌های اجتماعی
-        </h1>
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            شبکه‌های اجتماعی
+          </h1>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 gap-1.5 text-xs"
+            asChild
+          >
+            <Link href="/social/accounts">
+              <Database className="h-3.5 w-3.5" />
+              مدیریت آمار
+            </Link>
+          </Button>
+        </div>
         <p className="text-sm text-muted-foreground">
           {formatNumber(brandCount)} برند در {formatNumber(platformCount)}{' '}
           پلتفرم — {formatNumber(filteredAccounts.length)} اکانت

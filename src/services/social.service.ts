@@ -15,6 +15,7 @@ import type {
   SocialMetric,
   SocialMetricPeriod,
   SocialMetricSummary,
+  SocialMetricValues,
   SocialPeriodComparison,
 } from '@/types/social';
 import {
@@ -27,6 +28,7 @@ import {
   periodRangeForLabel,
   sortMetricsByPeriod,
   summarizeMetrics,
+  weeklyRangeForDate,
 } from '@/services/social-metrics';
 
 // Re-export generated types for convenience.
@@ -818,45 +820,57 @@ export async function getMetricsForDateRange(
   return metricsInRange(metrics, start, end);
 }
 
+/** snake_case column for each input key. */
+const METRIC_COLUMN_BY_KEY: Record<keyof SocialMetricValues, string> = {
+  followers: 'followers',
+  following: 'following',
+  posts: 'posts',
+  views: 'views',
+  likes: 'likes',
+  comments: 'comments',
+  shares: 'shares',
+  saves: 'saves',
+  reach: 'reach',
+  impressions: 'impressions',
+  engagementRate: 'engagement_rate',
+  storyViews: 'story_views',
+  channelMembers: 'channel_members',
+  retweets: 'retweets',
+  subscribers: 'subscribers',
+};
+
 /**
  * Upsert a metrics row for one account and period. The period label is
  * generated from `date` (default now) when not provided, so callers can
- * record a snapshot without thinking about label formats. Returns the
- * stored row on success, null on failure (already logged).
+ * record a snapshot without thinking about label formats. Duplicate rows
+ * are prevented by the `UNIQUE (account_id, period, period_label)`
+ * constraint — re-recording the same period updates the existing row.
+ * Returns the stored row on success, null on failure (already logged).
  */
 export async function recordSocialMetrics(
   accountId: string,
   period: SocialMetricPeriod,
-  values: {
-    followers?: number;
-    following?: number | null;
-    posts?: number | null;
-    views?: number | null;
-    likes?: number | null;
-    comments?: number | null;
-    shares?: number | null;
-    saves?: number | null;
-    reach?: number | null;
-    impressions?: number | null;
-    engagementRate?: number | null;
-    storyViews?: number | null;
-    channelMembers?: number | null;
-    retweets?: number | null;
-    subscribers?: number | null;
-  },
+  values: SocialMetricValues,
   options: { date?: Date; periodLabel?: string } = {},
 ): Promise<SocialMetric | null> {
   try {
     const { supabase } = await import('@/lib/supabase');
     const date = options.date ?? new Date();
     const periodLabel = options.periodLabel ?? periodLabelForDate(date, period);
-    const range = periodRangeForLabel(period, periodLabel);
+    // Weekly labels can't be converted back to a range without an anchor
+    // date; use the anchor date directly for daily/weekly rows.
+    const range =
+      period === 'weekly' && options.date
+        ? weeklyRangeForDate(options.date)
+        : periodRangeForLabel(period, periodLabel);
     const row = {
       account_id: accountId,
       period,
       period_label: periodLabel,
       period_start: range?.start ?? null,
       period_end: range?.end ?? null,
+      // `followers` is NOT NULL in the schema → empty input is stored as 0.
+      // Every other column stays NULL when not provided.
       followers: values.followers ?? 0,
       following: values.following ?? null,
       posts: values.posts ?? null,
@@ -873,6 +887,27 @@ export async function recordSocialMetrics(
       retweets: values.retweets ?? null,
       subscribers: values.subscribers ?? null,
     };
+    // Re-recording an existing period must not wipe previously entered
+    // values: empty inputs are stored as NULL, so before upserting we merge
+    // the row over the existing one — NULL payload keys keep the stored
+    // value, while explicit numbers (including 0) overwrite it.
+    const { data: existing } = await supabase
+      .from('social_metrics')
+      .select('*')
+      .eq('account_id', accountId)
+      .eq('period', period)
+      .eq('period_label', periodLabel)
+      .maybeSingle();
+    if (existing) {
+      const rowRecord = row as Record<string, number | string | null>;
+      const existingRecord = existing as Record<string, unknown>;
+      for (const key of Object.keys(rowRecord)) {
+        const stored = existingRecord[key];
+        if (rowRecord[key] === null && stored !== undefined) {
+          rowRecord[key] = stored as number | string | null;
+        }
+      }
+    }
     const { data, error } = await supabase
       .from('social_metrics')
       .upsert(row, { onConflict: 'account_id,period,period_label' })
@@ -884,6 +919,46 @@ export async function recordSocialMetrics(
     console.warn('[social] Could not record social metric.', err);
     return null;
   }
+}
+
+/**
+ * Update an existing metric row by id. Only the keys present in `values`
+ * are written; `null` clears a nullable column, `followers` falls back to 0
+ * (NOT NULL schema). Returns the updated row, or null on failure.
+ */
+export async function updateSocialMetric(
+  metricId: string | number,
+  values: SocialMetricValues,
+): Promise<SocialMetric | null> {
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    const row: Record<string, number | null> = {};
+    for (const key of Object.keys(values) as Array<keyof SocialMetricValues>) {
+      const value = values[key];
+      row[METRIC_COLUMN_BY_KEY[key]] =
+        value ?? (key === 'followers' ? 0 : null);
+    }
+    const { data, error } = await supabase
+      .from('social_metrics')
+      .update(row)
+      .eq('id', metricId)
+      .select()
+      .single();
+    if (error) throw error;
+    return toSocialMetric(data as unknown as MetricRow);
+  } catch (err) {
+    console.warn('[social] Could not update social metric.', err);
+    return null;
+  }
+}
+
+/** Latest metric of one account (by period), or null when none exist. */
+export async function getLatestMetric(
+  accountId: string,
+  period?: SocialMetricPeriod,
+): Promise<SocialMetric | null> {
+  const metrics = await getAccountMetrics(accountId, period);
+  return latestMetric(metrics);
 }
 
 /**

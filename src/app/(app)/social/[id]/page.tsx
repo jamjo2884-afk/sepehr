@@ -8,6 +8,7 @@ import {
   Calendar,
   ExternalLink,
   Eye,
+  Plus,
   Repeat2,
   TrendingUp,
   Users,
@@ -32,7 +33,9 @@ import {
 } from '@/services/social.service';
 import type { SocialAccountRow } from '@/services/social.service';
 import { latestMetric as latestMetricOf } from '@/services/social-metrics';
-import type { SocialMetric } from '@/types/social';
+import type { SocialAccount, SocialMetric } from '@/types/social';
+import { MetricFormDialog } from '@/components/social/metric-form-dialog';
+import { MetricHistoryTable } from '@/components/social/metric-history-table';
 import type { SocialPlatform } from '@/types/domain';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
@@ -43,8 +46,17 @@ export default function AccountDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [account, setAccount] = useState<SocialAccountRow | null>(null);
+  const [accountRecord, setAccountRecord] = useState<SocialAccount | null>(
+    null,
+  );
   const [latestMetric, setLatestMetric] = useState<SocialMetric | null>(null);
+  const [metricsAll, setMetricsAll] = useState<SocialMetric[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Metric record / edit dialog.
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editMetric, setEditMetric] = useState<SocialMetric | null>(null);
 
   useEffect(() => {
     const id = params.id as string;
@@ -56,7 +68,9 @@ export default function AccountDetailPage() {
     const parsed = decodeAccountKey(id);
     if (!parsed) {
       setAccount(null);
+      setAccountRecord(null);
       setLatestMetric(null);
+      setMetricsAll([]);
       setLoading(false);
       return;
     }
@@ -72,19 +86,31 @@ export default function AccountDetailPage() {
       );
       if (!account) {
         setAccount(null);
+        setAccountRecord(null);
         setLatestMetric(null);
+        setMetricsAll([]);
         setLoading(false);
         return;
       }
       const rows = buildAccountRows([account], metrics);
       setAccount(rows[0] ?? null);
+      setAccountRecord(account);
+      setMetricsAll(metrics);
       setLatestMetric(
         latestMetricOf(metrics.filter((m) => m.accountId === account.id)) ??
           null,
       );
       setLoading(false);
     });
-  }, [params.id]);
+  }, [params.id, refreshKey]);
+
+  const accountMetrics = useMemo(
+    () =>
+      accountRecord
+        ? metricsAll.filter((m) => m.accountId === accountRecord.id)
+        : [],
+    [metricsAll, accountRecord],
+  );
 
   // Prepare chart data (declared before any early returns — Rules of Hooks).
   const chartData = useMemo(() => {
@@ -156,16 +182,26 @@ export default function AccountDetailPage() {
           </div>
         </div>
 
-        {externalUrl ? (
-          <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button
+            className="gap-2"
+            onClick={() => {
+              setEditMetric(null);
+              setDialogOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            ثبت آمار جدید
+          </Button>
+          {externalUrl ? (
             <a href={externalUrl} target="_blank" rel="noopener noreferrer">
-              <Button className="gap-2">
+              <Button variant="outline" className="gap-2">
                 <ExternalLink className="h-4 w-4" />
                 مشاهده در {SOCIAL_PLATFORM_LABELS[account.platform]}
               </Button>
             </a>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </header>
 
       {/* KPI Cards */}
@@ -243,63 +279,38 @@ export default function AccountDetailPage() {
         </div>
       </section>
 
-      {/* Monthly Data Table */}
+      {/* Metric history */}
       <section>
         <h2 className="mb-3 text-sm font-semibold text-foreground">
-          جزئیات ماهانه
+          تاریخچه آمار
         </h2>
         <div className="rounded-xl border border-border bg-surface/60 p-4">
-          <div className="max-h-96 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="py-2 text-right font-medium text-muted-foreground">
-                    ماه
-                  </th>
-                  <th className="py-2 text-right font-medium text-muted-foreground">
-                    فالوور
-                  </th>
-                  <th className="py-2 text-right font-medium text-muted-foreground">
-                    تغییر
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {account.series.map((point, index) => {
-                  const prev =
-                    index > 0 ? account.series[index - 1].value : null;
-                  const change = prev !== null ? point.value - prev : null;
-                  return (
-                    <tr
-                      key={point.month}
-                      className="border-b border-border/50 last:border-0"
-                    >
-                      <td className="py-2 text-foreground">{point.month}</td>
-                      <td className="py-2 font-medium text-foreground">
-                        {formatNumber(point.value)}
-                      </td>
-                      <td className="py-2">
-                        {change !== null ? (
-                          <span
-                            className={
-                              change >= 0 ? 'text-success' : 'text-destructive'
-                            }
-                          >
-                            {change >= 0 ? '+' : ''}
-                            {formatNumber(change)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <MetricHistoryTable
+            metrics={accountMetrics}
+            onEdit={(m) => {
+              setEditMetric(m);
+              setDialogOpen(true);
+            }}
+            onRecordNew={() => {
+              setEditMetric(null);
+              setDialogOpen(true);
+            }}
+          />
         </div>
       </section>
+
+      {/* Record / edit dialog */}
+      <MetricFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        accounts={accountRecord ? [accountRecord] : []}
+        metric={editMetric}
+        onSaved={() => {
+          setDialogOpen(false);
+          setEditMetric(null);
+          setRefreshKey((k) => k + 1);
+        }}
+      />
     </motion.div>
   );
 }

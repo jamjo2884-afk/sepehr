@@ -245,3 +245,27 @@ export interface SocialBrandStat extends SocialEntityStat {
 export interface SocialPlatformStat extends SocialEntityStat {
   platform: SocialPlatform;
 }
+
+/**
+ * Input values for creating / updating a metric row through the service.
+ * Only the keys present are written (partial update); `null` clears a
+ * nullable column, while an absent key leaves it untouched. `followers` is
+ * NOT NULL in the schema, so it defaults to 0 when empty.
+ */
+export type SocialMetricValues = Partial<{
+  followers: number;
+  following: number | null;
+  posts: number | null;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  reach: number | null;
+  impressions: number | null;
+  engagementRate: number | null;
+  storyViews: number | null;
+  channelMembers: number | null;
+  retweets: number | null;
+  subscribers: number | null;
+}>;
