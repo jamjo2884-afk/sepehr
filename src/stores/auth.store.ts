@@ -29,20 +29,14 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  // ورود آزمایشی بدون لاگین
-  status: 'authenticated',
+  // Start unknown until AuthProvider restores the Supabase session.
+  status: 'loading',
 
   user: null,
   session: null,
   profile: null,
-  workspace: {
-    id: 'demo',
-    name: 'MediaOS Demo Workspace',
-    slug: 'mediaos-demo',
-    logoUrl: null,
-    createdAt: new Date().toISOString(),
-  },
-  role: 'owner',
+  workspace: null,
+  role: null,
 
   setSession: (session) =>
     set({
@@ -59,24 +53,18 @@ export const useAuthStore = create<AuthState>((set) => ({
       status: 'authenticated',
     }),
 
-  setStatus: () =>
+  setStatus: (status) =>
     set({
-      status: 'authenticated',
+      status,
     }),
 
   reset: () =>
     set({
-      status: 'authenticated',
+      status: 'unauthenticated',
       user: null,
       session: null,
       profile: null,
-      workspace: {
-        id: 'demo',
-        name: 'MediaOS Demo Workspace',
-        slug: 'mediaos-demo',
-        logoUrl: null,
-        createdAt: new Date().toISOString(),
-      },
-      role: 'owner',
+      workspace: null,
+      role: null,
     }),
 }));
