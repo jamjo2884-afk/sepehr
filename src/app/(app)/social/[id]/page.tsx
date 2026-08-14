@@ -18,6 +18,11 @@ import {
   jalaliMonthName,
   latestBrandPeriods,
 } from '@/services/social-analytics';
+import {
+  calculatePlatformScores,
+  calculateSocialScore,
+} from '@/services/social-score';
+import type { SocialPlatformScore, SocialScore } from '@/types/social';
 import type { SocialBrandTrendMetric } from '@/services/social-analytics';
 import type { SocialAccount, SocialMetric } from '@/types/social';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,6 +31,7 @@ import { MetricHistoryTable } from '@/components/social/metric-history-table';
 import { MetricPeriodComparison } from '@/components/social/metric-period-comparison';
 import { BrandHeader } from '@/components/social/brand/brand-header';
 import { BrandKpis } from '@/components/social/brand/brand-kpis';
+import { BrandScoreCard } from '@/components/social/brand/brand-score-card';
 import { BrandTrendChart } from '@/components/social/brand/brand-trend-chart';
 import {
   BestWorstPlatforms,
@@ -117,6 +123,17 @@ export default function BrandPerformancePage() {
     return buildBrandTrendSeries(accounts, allMetrics, brand, trendMetric);
   }, [accounts, allMetrics, brand, trendMetric]);
 
+  // Social Performance Score + per-platform scores.
+  const brandScore = useMemo<SocialScore | null>(() => {
+    if (!brand) return null;
+    return calculateSocialScore(accounts, allMetrics, brand);
+  }, [accounts, allMetrics, brand]);
+
+  const platformScores = useMemo<SocialPlatformScore[]>(() => {
+    if (!brand) return [];
+    return calculatePlatformScores(accounts, allMetrics, brand);
+  }, [accounts, allMetrics, brand]);
+
   if (loading) {
     return (
       <div className="flex flex-col gap-6">
@@ -178,6 +195,11 @@ export default function BrandPerformancePage() {
 
       {/* KPI overview */}
       <BrandKpis overview={analytics.overview} />
+
+      {/* Social Performance Score */}
+      {brandScore ? (
+        <BrandScoreCard score={brandScore} platformScores={platformScores} />
+      ) : null}
 
       {/* Trend chart */}
       <BrandTrendChart

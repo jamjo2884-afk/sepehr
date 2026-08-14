@@ -39,6 +39,7 @@ import {
   monthRangeOfPreset,
   previousMonthRange,
 } from '@/services/social-analytics';
+import { rankBrandsByScore } from '@/services/social-score';
 import type {
   SocialAccount,
   SocialMetric,
@@ -56,6 +57,7 @@ import { BrandComparisonTable } from '@/components/social/analytics/brand-compar
 import { PlatformComparisonTable } from '@/components/social/analytics/platform-comparison-table';
 import { PeriodComparison } from '@/components/social/analytics/period-comparison';
 import { SectionTitle } from '@/components/social/analytics/shared';
+import { ScoreRankingTable } from '@/components/social/score-ranking-table';
 import { SocialAccountCard } from '@/components/social/account-card';
 import { BulkMetricFormDialog } from '@/components/social/bulk-metric-form-dialog';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
@@ -244,6 +246,15 @@ export default function SocialPage() {
   const platformStats = useMemo(
     () => buildPlatformStats(filteredAccounts, metricsAll, range, prevRange),
     [filteredAccounts, metricsAll, range, prevRange],
+  );
+
+  // Brand ranking by Social Performance Score (over the full history, on
+  // the FULL dataset so it stays consistent with the brand pages, which
+  // score against every brand — the local "removed brand" filter is a UI
+  // visibility concern only and must not skew scores).
+  const brandRanking = useMemo(
+    () => rankBrandsByScore(accountsAll, metricsAll),
+    [accountsAll, metricsAll],
   );
 
   const singleBrand = selectedBrands.length === 1 ? selectedBrands[0] : null;
@@ -673,6 +684,9 @@ export default function SocialPage() {
               />
             </div>
           </section>
+
+          {/* Brand ranking by Social Performance Score */}
+          <ScoreRankingTable rows={brandRanking} accounts={accountsAll} />
         </>
       )}
 

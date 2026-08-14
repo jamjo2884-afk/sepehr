@@ -359,6 +359,94 @@ export interface SocialBrandRanking {
   total: number;
 }
 
+/* =========================================================================
+ * Social Performance Score (social-score service)
+ * ========================================================================= */
+
+/** The five components a brand score can be built from. */
+export type SocialScoreComponentKey =
+  | 'growth'
+  | 'engagement'
+  | 'audience'
+  | 'views'
+  | 'publishing';
+
+/** How much real data backs the score. */
+export type SocialScoreConfidence = 'high' | 'medium' | 'low';
+
+/** One component of the score with its own sub-score and effective weight. */
+export interface SocialScoreComponent {
+  key: SocialScoreComponentKey;
+  /** Persian label, e.g. 'رشد'. */
+  label: string;
+  /** 0–100; null when the component has NO real data (unavailable). */
+  score: number | null;
+  /** Effective weight in % after redistribution among available components. */
+  weight: number | null;
+  /** Short Persian tooltip explaining what the component measures. */
+  tooltip: string;
+  /** One-line rule-based explanation, or null when unavailable. */
+  explanation: string | null;
+}
+
+/** A brand's Social Performance Score with its full breakdown. */
+export interface SocialScore {
+  brand: string;
+  /** Overall 0–100, or null when nothing can be computed. */
+  score: number | null;
+  /** Performance band label (عالی / خوب / …), or null. */
+  band: string | null;
+  confidence: SocialScoreConfidence;
+  components: SocialScoreComponent[];
+  /** Score of the previous period, or null when not computable. */
+  previousScore: number | null;
+  /** current - previous, or null. */
+  trend: number | null;
+  /** 1-based rank among all ranked brands, or null. */
+  rank: number | null;
+  /** How many brands were ranked. */
+  rankTotal: number;
+  /** Average score of the other brands, or null. */
+  peersAverage: number | null;
+  /** brand score - peers average, or null. */
+  peersDifference: number | null;
+  /** Distinct period count used. */
+  periodCount: number;
+  /** Persian warning when some components are missing real data. */
+  dataQualityNote: string | null;
+}
+
+/** Per-platform performance score of one brand. */
+export interface SocialPlatformScore {
+  platform: SocialPlatform;
+  score: number | null;
+  band: string | null;
+  confidence: SocialScoreConfidence;
+  components: SocialScoreComponent[];
+  /** Score trend vs the previous period, or null. */
+  trend: number | null;
+}
+
+/** One row of the brand ranking table in /social. */
+export interface SocialBrandScoreRow {
+  brand: string;
+  /** Overall 0–100, or null when the brand has no computable data. */
+  score: number | null;
+  confidence: SocialScoreConfidence;
+  /** Latest-period follower growth %, or null. */
+  growth: number | null;
+  /** Latest-period engagement, or null. */
+  engagement: number | null;
+  /** Latest follower total. */
+  followers: number;
+  /** Score trend vs the previous period, or null. */
+  trend: number | null;
+  /** 1-based rank. */
+  rank: number;
+  /** Number of ranked brands. */
+  rankTotal: number;
+}
+
 /**
  * Input values for creating / updating a metric row through the service.
  * Only the keys present are written (partial update); `null` clears a
