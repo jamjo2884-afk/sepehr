@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -12,13 +12,14 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { navItems } from '@/config/navigation.config';
-import { PROJECT_STATUS_LABELS } from '@/types/domain';
+import { PROJECT_STATUS_LABELS, type Project } from '@/types/domain';
+import type { Notification } from '@/types/index';
+import type { ActivityItem } from '@/features/mock-data';
 import {
-  mockProjects,
-  mockActivity,
-  mockNotifications,
-  type ActivityItem,
-} from '@/features/mock-data';
+  getProjects,
+  getActivity,
+  getNotifications,
+} from '@/services/data.service';
 import { formatJalaliDate, formatRelativeTime } from '@/utils/persian';
 import { cn } from '@/lib/utils';
 
@@ -48,12 +49,33 @@ export default function CommandCenterPage() {
     [today],
   );
 
-  const recentProjects = mockProjects.slice(0, 4);
-  const continueWorking = mockProjects
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([getProjects(), getActivity(), getNotifications()])
+      .then(([p, a, n]) => {
+        if (!active) return;
+        setProjects(p);
+        setActivity(a);
+        setNotifications(n);
+      })
+      .catch(() => {
+        // services already fall back; nothing else to do
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const recentProjects = projects.slice(0, 4);
+  const continueWorking = projects
     .filter((p) => p.status === 'active' || p.status === 'planning')
     .slice(0, 3);
-  const recentActivity = mockActivity.slice(0, 5);
-  const unreadNotifications = mockNotifications.filter((n) => !n.read);
+  const recentActivity = activity.slice(0, 5);
+  const unreadNotifications = notifications.filter((n) => !n.read);
 
   const quickAccess = useMemo(() => {
     const byId = new Map(navItems.map((i) => [i.id, i]));
