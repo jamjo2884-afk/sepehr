@@ -7,6 +7,21 @@ import type {
 } from '@/features/mock-data/social-data.generated';
 import type { SocialPlatform } from '@/types/domain';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
+import type {
+  SocialAccount,
+  SocialAccountStatus,
+  SocialMetric,
+  SocialMetricPeriod,
+  SocialMetricSummary,
+  SocialPeriodComparison,
+} from '@/types/social';
+import {
+  comparePeriods as compareMetricPeriods,
+  firstMetric,
+  latestMetric,
+  sortMetricsByPeriod,
+  summarizeMetrics,
+} from '@/services/social-metrics';
 
 // Re-export generated types for convenience.
 export type {
@@ -19,12 +34,18 @@ export type {
 /**
  * Social-media data service.
  *
- * `getSocialOverview` reads monthly follower snapshots from the
- * `social_followers` Supabase table (see supabase/migrations) and rebuilds
- * the same nested brand tree the dashboard consumes, so the UI does not
- * change. If Supabase is unreachable / the table is missing or empty, it
- * falls back to the bundled TypeScript snapshot generated from the real
- * "گزارش ماهیانه سپهر" CSV (Jalali months YYYY-MM).
+ * Two layers:
+ *
+ * 1. **Legacy dashboard API** (`getSocialOverview` + helpers) — rebuilds
+ *    the nested brand tree the `/social` dashboard consumes. Reads the
+ *    `social_followers` Supabase table (the raw import), falls back to the
+ *    bundled snapshot. Kept unchanged so the UI keeps working.
+ *
+ * 2. **Normalized API** (new) — reads `social_accounts` + `social_metrics`
+ *    (see supabase/migrations/20260814130000_create_social_accounts_metrics.sql)
+ *    and returns the standardized `SocialAccount` / `SocialMetric` /
+ *    `SocialMetricSummary` types. UI never talks to Supabase directly; it
+ *    goes through these functions. Supabase first, bundled mock fallback.
  */
 
 export const SUPPORTED_PLATFORMS: SocialPlatform[] = [
@@ -115,7 +136,9 @@ export function rowsToBrandNodes(
  * is missing, or the table is empty so callers can fall back to the bundled
  * snapshot.
  */
-async function fetchSocialOverviewFromSupabase(): Promise<SocialBrandNode[] | null> {
+async function fetchSocialOverviewFromSupabase(): Promise<
+  SocialBrandNode[] | null
+> {
   try {
     const { supabase } = await import('@/lib/supabase');
     const { data, error } = await supabase
@@ -138,7 +161,7 @@ async function fetchSocialOverviewFromSupabase(): Promise<SocialBrandNode[] | nu
   }
 }
 
-function growthPct(first: number, latest: number): number {
+function legacyGrowthPct(first: number, latest: number): number {
   if (first <= 0) return 0;
   return ((latest - first) / first) * 100;
 }
@@ -164,7 +187,7 @@ export function flattenAccounts(
           latest,
           first,
           growthPct:
-            first && latest ? growthPct(first.value, latest.value) : 0,
+            first && latest ? legacyGrowthPct(first.value, latest.value) : 0,
           series: sorted,
         });
       }
@@ -174,7 +197,9 @@ export function flattenAccounts(
 }
 
 /** All distinct Jalali months present in the data, sorted ascending. */
-export function collectMonths(data: SocialBrandNode[] = socialBrandData): string[] {
+export function collectMonths(
+  data: SocialBrandNode[] = socialBrandData,
+): string[] {
   const set = new Set<string>();
   for (const brand of data) {
     for (const handles of Object.values(brand.platforms)) {
@@ -214,7 +239,10 @@ export function summarizeAccounts(accounts: SocialAccountRow[]): SocialSummary {
     totalFirst > 0 ? ((totalFollowers - totalFirst) / totalFirst) * 100 : 0;
   const byPlatform = new Map<SocialPlatform, number>();
   for (const a of accounts) {
-    byPlatform.set(a.platform, (byPlatform.get(a.platform) ?? 0) + (a.latest?.value ?? 0));
+    byPlatform.set(
+      a.platform,
+      (byPlatform.get(a.platform) ?? 0) + (a.latest?.value ?? 0),
+    );
   }
   let topPlatform: SocialPlatform = 'instagram';
   let topVal = -1;
@@ -245,9 +273,7 @@ export function platformTotals(
     let total = 0;
     for (const a of accounts) {
       if (a.platform !== platform) continue;
-      const point = month
-        ? a.series.find((p) => p.month === month)
-        : a.latest;
+      const point = month ? a.series.find((p) => p.month === month) : a.latest;
       total += point?.value ?? 0;
     }
     return { platform, total };
@@ -260,12 +286,11 @@ export function platformTotals(
  * dashboard keeps working without a configured backend.
  */
 export async function getSocialOverview(): Promise<SocialOverview> {
-  const nodes =
-    (await fetchSocialOverviewFromSupabase()) ?? socialBrandData;
+  const nodes = (await fetchSocialOverviewFromSupabase()) ?? socialBrandData;
   const accounts = flattenAccounts(nodes);
   const months = collectMonths(nodes);
-  const brands = [...new Set(accounts.map((a) => a.brand))].sort(
-    (a, b) => a.localeCompare(b, 'fa'),
+  const brands = [...new Set(accounts.map((a) => a.brand))].sort((a, b) =>
+    a.localeCompare(b, 'fa'),
   );
   const summary = summarizeAccounts(accounts);
   return {
@@ -336,7 +361,11 @@ export function decodeAccountKey(
     const [brand, platform, handle] = decoded.split('|');
     if (!brand || !platform) return null;
     if (!platformOf(platform)) return null;
-    return { brand, platform: platform as SocialPlatform, handle: handle || null };
+    return {
+      brand,
+      platform: platform as SocialPlatform,
+      handle: handle || null,
+    };
   } catch {
     return null;
   }
@@ -359,4 +388,329 @@ export async function getAccountByKey(
         a.handle === parsed.handle,
     ) ?? null
   );
+}
+
+/* =========================================================================
+ * Normalized API (new) — social_accounts + social_metrics
+ * ========================================================================= */
+
+/**
+ * Build a fallback `SocialAccount` list from the bundled snapshot. Used only
+ * when Supabase is unreachable so the normalized API never returns nothing.
+ * The id is the encoded brand|platform|handle key (stable across runs).
+ */
+export function accountsFromSnapshot(): SocialAccount[] {
+  const now = new Date().toISOString();
+  const rows = flattenAccounts(socialBrandData);
+  return rows.map((row) => ({
+    id: encodeURIComponent(
+      [row.brand, row.platform, row.handle ?? ''].join('|'),
+    ),
+    brand: row.brand,
+    platform: row.platform,
+    username: row.handle ?? '',
+    displayName: row.handle,
+    url: socialAccountUrl(row.platform, row.handle),
+    status: 'active' as SocialAccountStatus,
+    createdAt: now,
+    updatedAt: now,
+  }));
+}
+
+/** Build fallback metrics for one account from the snapshot. */
+export function metricsFromSnapshot(account: SocialAccount): SocialMetric[] {
+  const row = flattenAccounts(socialBrandData).find(
+    (r) =>
+      r.brand === account.brand &&
+      r.platform === account.platform &&
+      r.handle === account.username,
+  );
+  if (!row) return [];
+  const now = new Date().toISOString();
+  return row.series.map((point) => ({
+    id: encodeURIComponent([account.id, 'monthly', point.month].join('|')),
+    accountId: account.id,
+    period: 'monthly' as SocialMetricPeriod,
+    periodLabel: point.month,
+    periodStart: null,
+    periodEnd: null,
+    followers: point.value,
+    following: null,
+    posts: null,
+    views: null,
+    likes: null,
+    comments: null,
+    shares: null,
+    saves: null,
+    reach: null,
+    impressions: null,
+    engagementRate: null,
+    storyViews: null,
+    channelMembers: null,
+    retweets: null,
+    subscribers: null,
+    createdAt: now,
+    updatedAt: now,
+  }));
+}
+
+interface AccountRow {
+  id: string;
+  brand: string;
+  platform: SocialPlatform;
+  username: string;
+  display_name: string | null;
+  url: string | null;
+  status: SocialAccountStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+interface MetricRow {
+  id: string | number;
+  account_id: string;
+  period: SocialMetricPeriod;
+  period_label: string;
+  period_start: string | null;
+  period_end: string | null;
+  followers: number;
+  following: number | null;
+  posts: number | null;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  reach: number | null;
+  impressions: number | null;
+  engagement_rate: number | null;
+  story_views: number | null;
+  channel_members: number | null;
+  retweets: number | null;
+  subscribers: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function toSocialAccount(row: AccountRow): SocialAccount {
+  return {
+    id: row.id,
+    brand: row.brand,
+    platform: row.platform,
+    username: row.username,
+    displayName: row.display_name,
+    url: row.url,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toSocialMetric(row: MetricRow): SocialMetric {
+  return {
+    id: String(row.id),
+    accountId: row.account_id,
+    period: row.period,
+    periodLabel: row.period_label,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
+    followers: row.followers,
+    following: row.following,
+    posts: row.posts,
+    views: row.views,
+    likes: row.likes,
+    comments: row.comments,
+    shares: row.shares,
+    saves: row.saves,
+    reach: row.reach,
+    impressions: row.impressions,
+    engagementRate: row.engagement_rate,
+    storyViews: row.story_views,
+    channelMembers: row.channel_members,
+    retweets: row.retweets,
+    subscribers: row.subscribers,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** All social accounts (Supabase first, snapshot fallback). */
+export async function getSocialAccounts(): Promise<SocialAccount[]> {
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    const { data, error } = await supabase
+      .from('social_accounts')
+      .select(
+        'id, brand, platform, username, display_name, url, status, created_at, updated_at',
+      )
+      .order('brand', { ascending: true })
+      .order('platform', { ascending: true })
+      .order('username', { ascending: true });
+    if (error) throw error;
+    if (!data || data.length === 0) return accountsFromSnapshot();
+    return (data as unknown as AccountRow[]).map(toSocialAccount);
+  } catch (err) {
+    console.warn(
+      '[social] Could not read social_accounts from Supabase, ' +
+        'falling back to the bundled snapshot.',
+      err,
+    );
+    return accountsFromSnapshot();
+  }
+}
+
+/**
+ * Metrics for one or more accounts, filtered by period granularity.
+ * Supabase first, snapshot fallback.
+ */
+export async function getSocialMetrics(
+  accountIds?: string[],
+  period?: SocialMetricPeriod,
+): Promise<SocialMetric[]> {
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    let query = supabase
+      .from('social_metrics')
+      .select(
+        'id, account_id, period, period_label, period_start, period_end, ' +
+          'followers, following, posts, views, likes, comments, shares, saves, ' +
+          'reach, impressions, engagement_rate, story_views, channel_members, ' +
+          'retweets, subscribers, created_at, updated_at',
+      )
+      .order('period_label', { ascending: true });
+    if (accountIds && accountIds.length > 0) {
+      query = query.in('account_id', accountIds);
+    }
+    if (period) {
+      query = query.eq('period', period);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      // Fall back to the snapshot when the table is empty so callers never
+      // get an empty result from a misconfigured backend.
+      const accounts =
+        accountIds && accountIds.length > 0
+          ? (await getSocialAccounts()).filter((a) => accountIds.includes(a.id))
+          : await getSocialAccounts();
+      return accounts.flatMap((account) => metricsFromSnapshot(account));
+    }
+    return (data as unknown as MetricRow[]).map(toSocialMetric);
+  } catch (err) {
+    console.warn(
+      '[social] Could not read social_metrics from Supabase, ' +
+        'falling back to the bundled snapshot.',
+      err,
+    );
+    const accounts =
+      accountIds && accountIds.length > 0
+        ? (await getSocialAccounts()).filter((a) => accountIds.includes(a.id))
+        : await getSocialAccounts();
+    return accounts.flatMap((account) => metricsFromSnapshot(account));
+  }
+}
+
+/** Metrics for a single account, sorted by periodLabel. */
+export async function getAccountMetrics(
+  accountId: string,
+  period?: SocialMetricPeriod,
+): Promise<SocialMetric[]> {
+  const metrics = await getSocialMetrics([accountId], period);
+  return sortMetricsByPeriod(metrics);
+}
+
+/** Metrics summary for a single account. */
+export async function getAccountSummary(
+  accountId: string,
+  period: SocialMetricPeriod = 'monthly',
+): Promise<SocialMetricSummary> {
+  const metrics = await getAccountMetrics(accountId, period);
+  return summarizeMetrics(metrics, period);
+}
+
+/** Metrics for every account of a brand, aggregated. */
+export async function getBrandMetrics(
+  brand: string,
+  period?: SocialMetricPeriod,
+): Promise<SocialMetric[]> {
+  const accounts = (await getSocialAccounts()).filter((a) => a.brand === brand);
+  const ids = accounts.map((a) => a.id);
+  if (ids.length === 0) return [];
+  return getSocialMetrics(ids, period);
+}
+
+/** Metrics summary for a brand across all its accounts. */
+export async function getBrandSummary(
+  brand: string,
+  period: SocialMetricPeriod = 'monthly',
+): Promise<SocialMetricSummary> {
+  const metrics = await getBrandMetrics(brand, period);
+  return summarizeMetrics(metrics, period);
+}
+
+/** Metrics for all accounts on a platform, aggregated. */
+export async function getPlatformMetrics(
+  platform: SocialPlatform,
+  period?: SocialMetricPeriod,
+): Promise<SocialMetric[]> {
+  const accounts = (await getSocialAccounts()).filter(
+    (a) => a.platform === platform,
+  );
+  const ids = accounts.map((a) => a.id);
+  if (ids.length === 0) return [];
+  return getSocialMetrics(ids, period);
+}
+
+/** Metrics summary for a platform across all its accounts. */
+export async function getPlatformSummary(
+  platform: SocialPlatform,
+  period: SocialMetricPeriod = 'monthly',
+): Promise<SocialMetricSummary> {
+  const metrics = await getPlatformMetrics(platform, period);
+  return summarizeMetrics(metrics, period);
+}
+
+/** Compare the latest vs. previous period for one account. */
+export async function getAccountPeriodComparison(
+  accountId: string,
+  period: SocialMetricPeriod = 'monthly',
+): Promise<SocialPeriodComparison | null> {
+  const metrics = await getAccountMetrics(accountId, period);
+  return compareMetricPeriods(metrics);
+}
+
+/** Latest metric per account in a group (brand or platform). */
+export function latestMetricsByAccount(
+  metrics: SocialMetric[],
+): Map<string, SocialMetric> {
+  const byAccount = new Map<string, SocialMetric[]>();
+  for (const m of metrics) {
+    const list = byAccount.get(m.accountId) ?? [];
+    list.push(m);
+    byAccount.set(m.accountId, list);
+  }
+  const out = new Map<string, SocialMetric>();
+  for (const [id, list] of byAccount) {
+    const latest = latestMetric(list);
+    if (latest) out.set(id, latest);
+  }
+  return out;
+}
+
+/** First metric per account in a group (brand or platform). */
+export function firstMetricsByAccount(
+  metrics: SocialMetric[],
+): Map<string, SocialMetric> {
+  const byAccount = new Map<string, SocialMetric[]>();
+  for (const m of metrics) {
+    const list = byAccount.get(m.accountId) ?? [];
+    list.push(m);
+    byAccount.set(m.accountId, list);
+  }
+  const out = new Map<string, SocialMetric>();
+  for (const [id, list] of byAccount) {
+    const first = firstMetric(list);
+    if (first) out.set(id, first);
+  }
+  return out;
 }
