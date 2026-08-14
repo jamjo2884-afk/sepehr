@@ -16,9 +16,13 @@ import type {
   SocialPeriodComparison,
 } from '@/types/social';
 import {
+  aggregateWindow,
   comparePeriods as compareMetricPeriods,
   firstMetric,
   latestMetric,
+  metricsInRange,
+  periodLabelForDate,
+  periodRangeForLabel,
   sortMetricsByPeriod,
   summarizeMetrics,
 } from '@/services/social-metrics';
@@ -713,4 +717,152 @@ export function firstMetricsByAccount(
     if (first) out.set(id, first);
   }
   return out;
+}
+
+/**
+ * Metrics for one account within an ISO date range [start, end] (inclusive).
+ * Filters client-side after fetching so the snapshot fallback path works
+ * identically; the data set is small (one account's history).
+ */
+export async function getMetricsForDateRange(
+  accountId: string,
+  start: string,
+  end: string,
+  period?: SocialMetricPeriod,
+): Promise<SocialMetric[]> {
+  const metrics = await getAccountMetrics(accountId, period);
+  return metricsInRange(metrics, start, end);
+}
+
+/**
+ * Upsert a metrics row for one account and period. The period label is
+ * generated from `date` (default now) when not provided, so callers can
+ * record a snapshot without thinking about label formats. Returns the
+ * stored row on success, null on failure (already logged).
+ */
+export async function recordSocialMetrics(
+  accountId: string,
+  period: SocialMetricPeriod,
+  values: {
+    followers?: number;
+    following?: number | null;
+    posts?: number | null;
+    views?: number | null;
+    likes?: number | null;
+    comments?: number | null;
+    shares?: number | null;
+    saves?: number | null;
+    reach?: number | null;
+    impressions?: number | null;
+    engagementRate?: number | null;
+    storyViews?: number | null;
+    channelMembers?: number | null;
+    retweets?: number | null;
+    subscribers?: number | null;
+  },
+  options: { date?: Date; periodLabel?: string } = {},
+): Promise<SocialMetric | null> {
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    const date = options.date ?? new Date();
+    const periodLabel = options.periodLabel ?? periodLabelForDate(date, period);
+    const range = periodRangeForLabel(period, periodLabel);
+    const row = {
+      account_id: accountId,
+      period,
+      period_label: periodLabel,
+      period_start: range?.start ?? null,
+      period_end: range?.end ?? null,
+      followers: values.followers ?? 0,
+      following: values.following ?? null,
+      posts: values.posts ?? null,
+      views: values.views ?? null,
+      likes: values.likes ?? null,
+      comments: values.comments ?? null,
+      shares: values.shares ?? null,
+      saves: values.saves ?? null,
+      reach: values.reach ?? null,
+      impressions: values.impressions ?? null,
+      engagement_rate: values.engagementRate ?? null,
+      story_views: values.storyViews ?? null,
+      channel_members: values.channelMembers ?? null,
+      retweets: values.retweets ?? null,
+      subscribers: values.subscribers ?? null,
+    };
+    const { data, error } = await supabase
+      .from('social_metrics')
+      .upsert(row, { onConflict: 'account_id,period,period_label' })
+      .select()
+      .single();
+    if (error) throw error;
+    return toSocialMetric(data as unknown as MetricRow);
+  } catch (err) {
+    console.warn('[social] Could not record social metric.', err);
+    return null;
+  }
+}
+
+/**
+ * Aggregate an account's metrics into a coarser granularity. E.g. daily
+ * rows into weekly (or monthly) buckets. Returns the aggregated rows
+ * (one per bucket), or an empty list when there is nothing to aggregate.
+ */
+export async function getAggregatedMetrics(
+  accountId: string,
+  targetPeriod: SocialMetricPeriod,
+  sourcePeriod?: SocialMetricPeriod,
+): Promise<SocialMetric[]> {
+  const source =
+    sourcePeriod ??
+    (targetPeriod === 'monthly'
+      ? 'weekly'
+      : targetPeriod === 'weekly'
+        ? 'daily'
+        : 'daily');
+  const metrics = await getAccountMetrics(accountId, source);
+  return aggregateToPeriod(metrics, targetPeriod);
+}
+
+/** Group metrics into buckets by a target period label, then aggregate. */
+function aggregateToPeriod(
+  metrics: SocialMetric[],
+  targetPeriod: SocialMetricPeriod,
+): SocialMetric[] {
+  const buckets = new Map<string, SocialMetric[]>();
+  for (const m of sortMetricsByPeriod(metrics)) {
+    const label = bucketLabel(m, targetPeriod);
+    const list = buckets.get(label) ?? [];
+    list.push(m);
+    buckets.set(label, list);
+  }
+  const out: SocialMetric[] = [];
+  for (const list of buckets.values()) {
+    const aggregated = aggregateWindow(list);
+    if (aggregated) {
+      out.push({
+        ...aggregated,
+        period: targetPeriod,
+        periodLabel: bucketLabel(aggregated, targetPeriod),
+        periodStart: aggregated.periodStart,
+        periodEnd: aggregated.periodEnd,
+      });
+    }
+  }
+  return sortMetricsByPeriod(out);
+}
+
+/** Compute the target-period label for a metric (by date when possible). */
+function bucketLabel(
+  metric: SocialMetric,
+  targetPeriod: SocialMetricPeriod,
+): string {
+  if (metric.periodStart) {
+    const d = new Date(metric.periodStart);
+    if (!Number.isNaN(d.getTime())) {
+      return periodLabelForDate(d, targetPeriod);
+    }
+  }
+  // Fallback: keep the source label when it already matches the target
+  // granularity (e.g. monthly input for a monthly target).
+  return metric.periodLabel;
 }
