@@ -23,8 +23,15 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { getAccountDetail, socialAccountUrl } from '@/services/social.service';
+import {
+  buildAccountRows,
+  decodeAccountKey,
+  getSocialAccounts,
+  getSocialMetrics,
+  socialAccountUrl,
+} from '@/services/social.service';
 import type { SocialAccountRow } from '@/services/social.service';
+import { latestMetric as latestMetricOf } from '@/services/social-metrics';
 import type { SocialMetric } from '@/types/social';
 import type { SocialPlatform } from '@/types/domain';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
@@ -44,9 +51,37 @@ export default function AccountDetailPage() {
     if (!id) return;
 
     setLoading(true);
-    getAccountDetail(id).then((detail) => {
-      setAccount(detail?.row ?? null);
-      setLatestMetric(detail?.latestMetric ?? null);
+    // Read from the normalized tables (social_accounts + social_metrics)
+    // through the service layer; never touch Supabase directly.
+    const parsed = decodeAccountKey(id);
+    if (!parsed) {
+      setAccount(null);
+      setLatestMetric(null);
+      setLoading(false);
+      return;
+    }
+    Promise.all([
+      getSocialAccounts(),
+      getSocialMetrics(undefined, 'monthly'),
+    ]).then(([accounts, metrics]) => {
+      const account = accounts.find(
+        (a) =>
+          a.brand === parsed.brand &&
+          a.platform === parsed.platform &&
+          a.username === (parsed.handle ?? ''),
+      );
+      if (!account) {
+        setAccount(null);
+        setLatestMetric(null);
+        setLoading(false);
+        return;
+      }
+      const rows = buildAccountRows([account], metrics);
+      setAccount(rows[0] ?? null);
+      setLatestMetric(
+        latestMetricOf(metrics.filter((m) => m.accountId === account.id)) ??
+          null,
+      );
       setLoading(false);
     });
   }, [params.id]);

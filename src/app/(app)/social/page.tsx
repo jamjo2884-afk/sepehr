@@ -14,8 +14,16 @@ import {
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { getSocialOverview, summarizeAccounts } from '@/services/social.service';
-import type { SocialAccountRow, SocialOverview } from '@/services/social.service';
+import {
+  buildSocialOverview,
+  getSocialAccounts,
+  getSocialMetrics,
+  summarizeAccounts,
+} from '@/services/social.service';
+import type {
+  SocialAccountRow,
+  SocialOverview,
+} from '@/services/social.service';
 import type { SocialPlatform } from '@/types/domain';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { SocialSummaryCards } from '@/components/social/summary-cards';
@@ -54,8 +62,14 @@ export default function SocialPage() {
 
   useEffect(() => {
     let active = true;
-    getSocialOverview().then((overview) => {
+    // Read from the normalized tables (social_accounts + social_metrics)
+    // through the service layer; never touch Supabase directly.
+    Promise.all([
+      getSocialAccounts(),
+      getSocialMetrics(undefined, 'monthly'),
+    ]).then(([accounts, metrics]) => {
       if (!active) return;
+      const overview = buildSocialOverview(accounts, metrics);
       setData(overview);
       setSelectedPlatform(overview.summary.topPlatform);
     });
@@ -118,8 +132,9 @@ export default function SocialPage() {
   }, [filteredAccounts]);
 
   // If the selected brand was removed, fall back to "all".
-  const activeBrand =
-    visibleBrands.includes(selectedBrand) ? selectedBrand : 'all';
+  const activeBrand = visibleBrands.includes(selectedBrand)
+    ? selectedBrand
+    : 'all';
 
   // Draft-visible brands inside the dialog: base minus draft-removed, plus
   // draft-added. Declared before the early return (hooks rules).
@@ -191,8 +206,9 @@ export default function SocialPage() {
           شبکه‌های اجتماعی
         </h1>
         <p className="text-sm text-muted-foreground">
-          {formatCount(summary.totalBrands)} برند در {formatCount(data.platforms.length)}{' '}
-          پلتفرم — {formatCount(summary.totalAccounts)} اکانت
+          {formatCount(summary.totalBrands)} برند در{' '}
+          {formatCount(data.platforms.length)} پلتفرم —{' '}
+          {formatCount(summary.totalAccounts)} اکانت
         </p>
       </header>
 
@@ -207,11 +223,7 @@ export default function SocialPage() {
           <SectionTitle icon={Users} title="برند" />
           <Dialog open={manageOpen} onOpenChange={handleOpenManage}>
             <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 text-xs"
-              >
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs">
                 <Plus className="h-3.5 w-3.5" />
                 مدیریت برندها
               </Button>
