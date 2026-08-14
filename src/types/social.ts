@@ -276,6 +276,89 @@ export interface SocialPlatformStat extends SocialEntityStat {
   platform: SocialPlatform;
 }
 
+/* =========================================================================
+ * Brand performance analytics (account-detail / brand page)
+ * ========================================================================= */
+
+/**
+ * Brand-level headline stats. `views` / `engagement` / `posts` /
+ * `engagementRate` are null when NO real data exists in the window (never
+ * a fabricated zero) — the UI renders '—' in that case.
+ */
+export interface SocialBrandOverview {
+  brand: string;
+  /** Accounts of the brand with at least one metric. */
+  activeAccounts: number;
+  /** Sum of the latest follower snapshot per account (latest available). */
+  followers: number;
+  /** Absolute follower growth (latest period vs the previous one). */
+  growth: number | null;
+  /** Percentage follower growth, null when previous is missing/zero. */
+  growthPct: number | null;
+  views: number | null;
+  engagement: number | null;
+  engagementRate: number | null;
+  posts: number | null;
+  /** Period label of the newest metric across the brand, or null. */
+  latestPeriodLabel: string | null;
+  latestAccountName: string | null;
+}
+
+/** Per-platform performance row for one brand. */
+export interface SocialBrandPlatformRow {
+  platform: SocialPlatform;
+  followers: number;
+  growth: number | null;
+  growthPct: number | null;
+  views: number | null;
+  engagement: number | null;
+  engagementRate: number | null;
+  posts: number | null;
+  /** Period label of the newest metric of this platform, or null. */
+  latestPeriodLabel: string | null;
+  accounts: number;
+}
+
+export type SocialDataFreshness = 'up-to-date' | 'stale' | 'no-data';
+
+export interface SocialBrandPlatformTimelineRow {
+  platform: SocialPlatform;
+  latestPeriodLabel: string | null;
+  freshness: SocialDataFreshness;
+}
+
+/** Brand vs the average of all other brands, per indicator. */
+export interface SocialPeerComparisonItem {
+  key: SocialKpiKey;
+  label: string;
+  /** Brand value (null = no real data for the brand). */
+  brand: number | null;
+  /** Average of the other brands that have real data for this indicator. */
+  peersAverage: number | null;
+  /** How many other brands contributed to the average. */
+  peersCount: number;
+  /** brand - peersAverage. */
+  difference: number | null;
+}
+
+/** Rule-based growth insight (no AI). */
+export interface SocialGrowthDriver {
+  type: 'positive' | 'negative' | 'info';
+  text: string;
+}
+
+/** Rank of a brand for one indicator among all brands. */
+export interface SocialBrandRanking {
+  key: SocialKpiKey;
+  label: string;
+  /** Brand value for the indicator. */
+  value: number | null;
+  /** 1-based rank (1 = best / highest). */
+  rank: number | null;
+  /** How many brands were ranked. */
+  total: number;
+}
+
 /**
  * Input values for creating / updating a metric row through the service.
  * Only the keys present are written (partial update); `null` clears a

@@ -17,10 +17,16 @@ import type {
   SocialAccount,
   SocialAccountInput,
   SocialAccountStatus,
+  SocialBrandOverview,
+  SocialBrandPlatformRow,
+  SocialBrandPlatformTimelineRow,
+  SocialBrandRanking,
+  SocialGrowthDriver,
   SocialMetric,
   SocialMetricPeriod,
   SocialMetricSummary,
   SocialMetricValues,
+  SocialPeerComparisonItem,
   SocialPeriodComparison,
 } from '@/types/social';
 import {
@@ -629,6 +635,56 @@ export async function getSocialAccounts(): Promise<SocialAccount[]> {
       err,
     );
     return accountsFromSnapshot();
+  }
+}
+
+/**
+ * Everything the brand performance page needs, computed from one shared
+ * accounts + metrics dataset (two Supabase round trips total).
+ */
+export interface BrandSocialAnalytics {
+  overview: SocialBrandOverview;
+  platforms: SocialBrandPlatformRow[];
+  peers: SocialPeerComparisonItem[];
+  rankings: SocialBrandRanking[];
+  drivers: SocialGrowthDriver[];
+  timeline: SocialBrandPlatformTimelineRow[];
+}
+
+/**
+ * Brand-level analytics for the account-detail page. The brand is resolved
+ * from the account's `brand` field; every analysis (overview, per-platform
+ * performance, peer comparison, rankings, growth drivers, freshness
+ * timeline) is derived from the same dataset in the analytics layer.
+ */
+export async function getBrandSocialAnalytics(
+  brand: string,
+): Promise<BrandSocialAnalytics | null> {
+  try {
+    const accounts = await getSocialAccounts();
+    const metrics = await getSocialMetrics(undefined, 'monthly');
+    if (!accounts.some((a) => a.brand === brand)) return null;
+    const {
+      buildBrandOverview,
+      buildBrandPlatformPerformance,
+      buildBrandPeerComparison,
+      buildBrandRankings,
+      buildBrandGrowthDrivers,
+      buildBrandPlatformTimeline,
+    } = await import('@/services/social-analytics');
+    return {
+      overview: buildBrandOverview(accounts, metrics, brand),
+      platforms: buildBrandPlatformPerformance(accounts, metrics, brand),
+      peers: buildBrandPeerComparison(accounts, metrics, brand),
+      rankings: buildBrandRankings(accounts, metrics, brand),
+      drivers: buildBrandGrowthDrivers(
+        buildBrandPlatformPerformance(accounts, metrics, brand),
+      ),
+      timeline: buildBrandPlatformTimeline(accounts, metrics, brand),
+    };
+  } catch (err) {
+    console.warn('[social] Could not build brand social analytics.', err);
+    return null;
   }
 }
 

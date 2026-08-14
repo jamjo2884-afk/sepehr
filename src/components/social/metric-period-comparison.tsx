@@ -9,7 +9,7 @@ import { formatNumber, toPersianDigits } from '@/utils/persian';
 import { cn } from '@/lib/utils';
 
 function isPercentField(key: SocialMetricFieldKey): boolean {
-  return SOCIAL_METRIC_FIELDS[key].kind === 'percent';
+  return SOCIAL_METRIC_FIELDS[key]?.kind === 'percent';
 }
 
 /** Format one side of the comparison (the stored value). */

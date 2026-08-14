@@ -1,177 +1,154 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { AlertTriangle, History, Plus, Settings2 } from 'lucide-react';
+import Link from 'next/link';
 import {
-  ArrowLeft,
-  Calendar,
-  ExternalLink,
-  Eye,
-  Plus,
-  Repeat2,
-  TrendingUp,
-  Users,
-  Youtube,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
-import {
-  buildAccountRows,
   decodeAccountKey,
+  getBrandSocialAnalytics,
   getSocialAccounts,
   getSocialMetrics,
-  socialAccountUrl,
 } from '@/services/social.service';
-import type { SocialAccountRow } from '@/services/social.service';
+import type { BrandSocialAnalytics } from '@/services/social.service';
 import {
-  compareMetricValues,
-  latestMetric as latestMetricOf,
-  sortMetricsByPeriod,
-} from '@/services/social-metrics';
-import { PLATFORM_METRIC_FIELDS } from '@/constants/social-fields';
-import { jalaliMonthName } from '@/services/social-analytics';
+  buildBrandTrendSeries,
+  compareBrandPeriods,
+  jalaliMonthName,
+  latestBrandPeriods,
+} from '@/services/social-analytics';
+import type { SocialBrandTrendMetric } from '@/services/social-analytics';
 import type { SocialAccount, SocialMetric } from '@/types/social';
+import { Skeleton } from '@/components/ui/skeleton';
 import { MetricFormDialog } from '@/components/social/metric-form-dialog';
 import { MetricHistoryTable } from '@/components/social/metric-history-table';
 import { MetricPeriodComparison } from '@/components/social/metric-period-comparison';
-import type { SocialPlatform } from '@/types/domain';
+import { BrandHeader } from '@/components/social/brand/brand-header';
+import { BrandKpis } from '@/components/social/brand/brand-kpis';
+import { BrandTrendChart } from '@/components/social/brand/brand-trend-chart';
+import {
+  BestWorstPlatforms,
+  PlatformPerformance,
+} from '@/components/social/brand/platform-performance';
+import {
+  BrandRankings,
+  GrowthDrivers,
+  PeerComparison,
+} from '@/components/social/brand/peer-comparison';
+import { PlatformTimeline } from '@/components/social/brand/platform-timeline';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
-import { formatNumber } from '@/utils/persian';
 import { Button } from '@/components/ui/button';
 
-export default function AccountDetailPage() {
+export default function BrandPerformancePage() {
   const params = useParams();
-  const router = useRouter();
-  const [account, setAccount] = useState<SocialAccountRow | null>(null);
-  const [accountRecord, setAccountRecord] = useState<SocialAccount | null>(
-    null,
-  );
-  const [latestMetric, setLatestMetric] = useState<SocialMetric | null>(null);
-  const [metricsAll, setMetricsAll] = useState<SocialMetric[]>([]);
+
+  const [analytics, setAnalytics] = useState<BrandSocialAnalytics | null>(null);
+  const [brand, setBrand] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [allMetrics, setAllMetrics] = useState<SocialMetric[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Metric record / edit dialog.
+  // Trend chart state.
+  const [trendMetric, setTrendMetric] =
+    useState<SocialBrandTrendMetric>('followers');
+  const [trendRange, setTrendRange] = useState(12);
+
+  // Metric record / edit dialog (per account).
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMetric, setEditMetric] = useState<SocialMetric | null>(null);
+  const [dialogAccountId, setDialogAccountId] = useState<string | null>(null);
 
   useEffect(() => {
     const id = params.id as string;
     if (!id) return;
 
     setLoading(true);
-    // Read from the normalized tables (social_accounts + social_metrics)
-    // through the service layer; never touch Supabase directly.
+    setError(false);
     const parsed = decodeAccountKey(id);
     if (!parsed) {
-      setAccount(null);
-      setAccountRecord(null);
-      setLatestMetric(null);
-      setMetricsAll([]);
+      setBrand(null);
       setLoading(false);
       return;
     }
+    setBrand(parsed.brand);
+
     Promise.all([
+      getBrandSocialAnalytics(parsed.brand),
       getSocialAccounts(),
       getSocialMetrics(undefined, 'monthly'),
-    ]).then(([accounts, metrics]) => {
-      const account = accounts.find(
-        (a) =>
-          a.brand === parsed.brand &&
-          a.platform === parsed.platform &&
-          a.username === (parsed.handle ?? ''),
-      );
-      if (!account) {
-        setAccount(null);
-        setAccountRecord(null);
-        setLatestMetric(null);
-        setMetricsAll([]);
+    ])
+      .then(([analytics, accounts, metrics]) => {
+        setAnalytics(analytics);
+        setAccounts(accounts);
+        setAllMetrics(metrics);
         setLoading(false);
-        return;
-      }
-      const rows = buildAccountRows([account], metrics);
-      setAccount(rows[0] ?? null);
-      setAccountRecord(account);
-      setMetricsAll(metrics);
-      setLatestMetric(
-        latestMetricOf(metrics.filter((m) => m.accountId === account.id)) ??
-          null,
-      );
-      setLoading(false);
-    });
+      })
+      .catch(() => {
+        setError(true);
+        setLoading(false);
+      });
   }, [params.id, refreshKey]);
 
-  const accountMetrics = useMemo(
-    () =>
-      accountRecord
-        ? metricsAll.filter((m) => m.accountId === accountRecord.id)
-        : [],
-    [metricsAll, accountRecord],
-  );
+  const brandAccounts = useMemo(
+    () => accounts.filter((a) => a.brand === brand),
+    [accounts, brand],
+  ); // Brand-level this-month vs last-month comparison (all fields).
+  const brandComparison = useMemo(() => {
+    if (!brand) return [];
+    return compareBrandPeriods(accounts, allMetrics, brand);
+  }, [accounts, allMetrics, brand]);
 
-  // This month vs last month, per recorded field.
-  const periodComparison = useMemo(() => {
-    if (!accountRecord) return [];
-    return compareMetricValues(
-      accountMetrics,
-      PLATFORM_METRIC_FIELDS[accountRecord.platform],
+  const brandPeriodLabels = useMemo(() => {
+    if (!brand) return { current: '', previous: '' };
+    const { latest, previous } = latestBrandPeriods(
+      accounts,
+      allMetrics,
+      brand,
     );
-  }, [accountRecord, accountMetrics]);
+    return { current: latest ?? '', previous: previous ?? '' };
+  }, [accounts, allMetrics, brand]);
 
-  const periodLabels = useMemo(() => {
-    const sorted = sortMetricsByPeriod(accountMetrics);
-    const cur = sorted[sorted.length - 1]?.periodLabel;
-    const prev = sorted[sorted.length - 2]?.periodLabel;
-    return {
-      current: cur ? jalaliMonthName(cur) : '',
-      previous: prev ? jalaliMonthName(prev) : '',
-    };
-  }, [accountMetrics]);
-
-  // Prepare chart data (declared before any early returns — Rules of Hooks).
-  const chartData = useMemo(() => {
-    return (account?.series ?? []).map((point) => ({
-      month: point.month,
-      value: point.value,
-    }));
-  }, [account]);
+  const trendSeries = useMemo(() => {
+    if (!brand) return [];
+    return buildBrandTrendSeries(accounts, allMetrics, brand, trendMetric);
+  }, [accounts, allMetrics, brand, trendMetric]);
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Skeleton className="h-24 rounded-xl" />
+          <Skeleton className="h-24 rounded-xl" />
+          <Skeleton className="h-24 rounded-xl" />
+          <Skeleton className="h-24 rounded-xl" />
+        </div>
+        <Skeleton className="h-80 rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
       </div>
     );
   }
 
-  if (!account) {
+  if (error || (!loading && !analytics)) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
-        <p className="text-muted-foreground">اکانت یافت نشد.</p>
-        <Button variant="outline" onClick={() => router.push('/social')}>
-          بازگشت به شبکه‌های اجتماعی
+        <AlertTriangle className="h-8 w-8 text-destructive" />
+        <p className="text-muted-foreground">
+          اطلاعات این برند یافت نشد یا دریافت نشد.
+        </p>
+        <Button variant="outline" asChild>
+          <Link href="/social">بازگشت به شبکه‌های اجتماعی</Link>
         </Button>
       </div>
     );
   }
 
-  const latest = account.latest?.value ?? 0;
-  const first = account.first?.value ?? 0;
-  const growthPct = account.growthPct;
-  const growthPositive = growthPct >= 0;
-
-  // Deep link to the public page of this account on its platform.
-  const externalUrl = socialAccountUrl(account.platform, account.handle);
+  if (!brand || !analytics) return null;
 
   return (
     <motion.div
@@ -180,248 +157,164 @@ export default function AccountDetailPage() {
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="flex flex-col gap-6"
     >
-      {/* Header */}
-      <header className="flex flex-col gap-1">
-        <Button
-          variant="ghost"
-          className="w-fit gap-2 text-muted-foreground"
-          onClick={() => router.push('/social')}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          بازگشت
+      {/* Brand header */}
+      <BrandHeader brand={brand} overview={analytics.overview} />
+
+      {/* Navigation */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+          <Link href="/social/accounts">
+            <Settings2 className="h-3.5 w-3.5" />
+            مدیریت حساب‌ها
+          </Link>
         </Button>
+        <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+          <Link href="/social">
+            <History className="h-3.5 w-3.5" />
+            داشبورد شبکه‌های اجتماعی
+          </Link>
+        </Button>
+      </div>
 
-        <div className="flex items-center gap-4">
-          <SocialPlatformIcon
-            platform={account.platform}
-            className="h-16 w-16 shrink-0 rounded-2xl"
-            iconClassName="h-8 w-8"
-          />
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              {account.brand}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {SOCIAL_PLATFORM_LABELS[account.platform]}
-              {account.handle ? ` · ${account.handle}` : ''}
-            </p>
-          </div>
-        </div>
+      {/* KPI overview */}
+      <BrandKpis overview={analytics.overview} />
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button
-            className="gap-2"
-            onClick={() => {
-              setEditMetric(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" />
-            ثبت آمار جدید
-          </Button>
-          {externalUrl ? (
-            <a href={externalUrl} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" className="gap-2">
-                <ExternalLink className="h-4 w-4" />
-                مشاهده در {SOCIAL_PLATFORM_LABELS[account.platform]}
-              </Button>
-            </a>
-          ) : null}
-        </div>
-      </header>
-
-      {/* KPI Cards */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPICard
-          icon={Users}
-          label="فالوور فعلی"
-          value={formatNumber(latest)}
-        />
-        <KPICard
-          icon={Calendar}
-          label="فالوور اولیه"
-          value={formatNumber(first)}
-        />
-        <KPICard
-          icon={TrendingUp}
-          label="رشد"
-          value={`${growthPositive ? '+' : ''}${formatNumber(Math.round(Math.abs(growthPct) * 10) / 10)}٪`}
-          valueClassName={growthPositive ? 'text-success' : 'text-destructive'}
-        />
-        <KPICard
-          icon={Calendar}
-          label="مدت زمان"
-          value={`${formatNumber(account.series.length)} ماه`}
-        />
-      </section>
-
-      {/* Platform-specific metric cards */}
-      <PlatformMetricCards platform={account.platform} metric={latestMetric} />
-
-      {/* This month vs last month, per metric field */}
-      <MetricPeriodComparison
-        items={periodComparison}
-        currentPeriodLabel={periodLabels.current}
-        previousPeriodLabel={periodLabels.previous}
+      {/* Trend chart */}
+      <BrandTrendChart
+        series={trendSeries}
+        metric={trendMetric}
+        onMetricChange={setTrendMetric}
+        range={trendRange}
+        onRangeChange={setTrendRange}
       />
 
-      {/* Follower Trend Chart */}
-      <section>
-        <h2 className="mb-3 text-sm font-semibold text-foreground">
-          روند فالوور در طول زمان
-        </h2>
-        <div className="rounded-xl border border-border bg-surface/60 p-4">
-          {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="hsl(var(--border))"
-                />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 12 }}
-                  stroke="hsl(var(--muted-foreground))"
-                />
-                <YAxis
-                  tick={{ fontSize: 12 }}
-                  stroke="hsl(var(--muted-foreground))"
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={{ fill: 'hsl(var(--primary))' }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              داده‌ای برای نمایش وجود ندارد.
-            </p>
-          )}
-        </div>
-      </section>
+      {/* Platform performance */}
+      <PlatformPerformance rows={analytics.platforms} />
 
-      {/* Metric history */}
+      {/* Best / worst platforms */}
+      <BestWorstPlatforms rows={analytics.platforms} />
+
+      {/* Period comparison (brand level) */}
+      {brandPeriodLabels.current && brandPeriodLabels.previous ? (
+        <MetricPeriodComparison
+          items={brandComparison}
+          currentPeriodLabel={jalaliMonthName(brandPeriodLabels.current)}
+          previousPeriodLabel={jalaliMonthName(brandPeriodLabels.previous)}
+        />
+      ) : null}
+
+      {/* Peer comparison + rankings */}
+      <PeerComparison items={analytics.peers} />
+      <BrandRankings items={analytics.rankings} brand={brand} />
+
+      {/* Growth drivers (rule-based) */}
+      <GrowthDrivers drivers={analytics.drivers} />
+
+      {/* Freshness timeline */}
+      <PlatformTimeline rows={analytics.timeline} />
+
+      {/* Per-account record / history */}
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-foreground">
-          تاریخچه آمار
-        </h2>
-        <div className="rounded-xl border border-border bg-surface/60 p-4">
-          <MetricHistoryTable
-            metrics={accountMetrics}
-            onEdit={(m) => {
-              setEditMetric(m);
-              setDialogOpen(true);
-            }}
-            onRecordNew={() => {
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">
+            ثبت آمار و تاریخچه حساب‌ها
+          </h2>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => {
               setEditMetric(null);
+              setDialogAccountId(brandAccounts[0]?.id ?? null);
               setDialogOpen(true);
             }}
-          />
+            disabled={brandAccounts.length === 0}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            ثبت آمار جدید
+          </Button>
         </div>
+
+        {brandAccounts.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border bg-surface/40 p-10 text-center text-sm text-muted-foreground">
+            برای این برند حسابی ثبت نشده است.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-6">
+            {brandAccounts.map((account) => {
+              const metrics = allMetrics.filter(
+                (m) => m.accountId === account.id,
+              );
+              return (
+                <div
+                  key={account.id}
+                  className="rounded-xl border border-border bg-surface/60 p-4"
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <SocialPlatformIcon
+                        platform={account.platform}
+                        className="h-6 w-6 rounded-md"
+                        iconClassName="h-3.5 w-3.5"
+                      />
+                      <span className="text-sm font-semibold text-foreground">
+                        {SOCIAL_PLATFORM_LABELS[account.platform]}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {account.username}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1 text-xs"
+                      onClick={() => {
+                        setEditMetric(null);
+                        setDialogAccountId(account.id);
+                        setDialogOpen(true);
+                      }}
+                    >
+                      <Plus className="h-3 w-3" />
+                      ثبت آمار
+                    </Button>
+                  </div>
+                  <MetricHistoryTable
+                    metrics={metrics}
+                    onEdit={(m) => {
+                      setDialogAccountId(account.id);
+                      setEditMetric(m);
+                      setDialogOpen(true);
+                    }}
+                    onRecordNew={() => {
+                      setDialogAccountId(account.id);
+                      setEditMetric(null);
+                      setDialogOpen(true);
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {/* Record / edit dialog */}
       <MetricFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        accounts={accountRecord ? [accountRecord] : []}
+        accounts={
+          dialogAccountId
+            ? accounts.filter((a) => a.id === dialogAccountId)
+            : []
+        }
         metric={editMetric}
         onSaved={() => {
           setDialogOpen(false);
           setEditMetric(null);
+          setDialogAccountId(null);
           setRefreshKey((k) => k + 1);
         }}
       />
     </motion.div>
-  );
-}
-
-function KPICard({
-  icon: Icon,
-  label,
-  value,
-  valueClassName,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  valueClassName?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-surface/60 p-4">
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">{label}</span>
-      </div>
-      <p
-        className={`mt-2 text-xl font-bold ${valueClassName ?? 'text-foreground'}`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-/**
- * Platform-specific indicators for one account, read from the latest
- * metric row. Only cards whose platform has a dedicated metric (and whose
- * value is present) are rendered.
- */
-interface PlatformMetricSpec {
-  key: keyof SocialMetric;
-  label: string;
-  icon: LucideIcon;
-}
-
-const PLATFORM_SPECIFIC_METRICS: Partial<
-  Record<SocialPlatform, PlatformMetricSpec[]>
-> = {
-  instagram: [{ key: 'storyViews', label: 'بازدید استوری', icon: Eye }],
-  telegram: [{ key: 'channelMembers', label: 'اعضای کانال', icon: Users }],
-  bale: [{ key: 'channelMembers', label: 'اعضای کانال', icon: Users }],
-  eita: [{ key: 'channelMembers', label: 'اعضای کانال', icon: Users }],
-  rubika: [{ key: 'channelMembers', label: 'اعضای کانال', icon: Users }],
-  soroushplus: [{ key: 'channelMembers', label: 'اعضای کانال', icon: Users }],
-  twitter: [{ key: 'retweets', label: 'بازتوییت', icon: Repeat2 }],
-  youtube: [{ key: 'subscribers', label: 'مشترکین', icon: Youtube }],
-};
-
-function PlatformMetricCards({
-  platform,
-  metric,
-}: {
-  platform: SocialPlatform;
-  metric: SocialMetric | null;
-}) {
-  const specs = PLATFORM_SPECIFIC_METRICS[platform] ?? [];
-  const cards = specs.filter((spec) => {
-    const value = metric?.[spec.key];
-    return typeof value === 'number' && value > 0;
-  });
-  if (cards.length === 0) return null;
-
-  return (
-    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {cards.map((spec) => (
-        <KPICard
-          key={spec.key}
-          icon={spec.icon}
-          label={spec.label}
-          value={formatNumber(metric?.[spec.key] as number)}
-        />
-      ))}
-    </section>
   );
 }

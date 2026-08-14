@@ -1,28 +1,39 @@
-import { toJalaali } from 'jalaali-js';
+import { toJalaali, jalaaliToDateObject, jalaaliMonthLength } from 'jalaali-js';
 import { PERSIAN_MONTHS } from '@/constants/ui.constants';
+import { SOCIAL_METRIC_FIELDS } from '@/constants/social-fields';
+import type { SocialMetricFieldKey } from '@/constants/social-fields';
 import {
   absoluteGrowth,
   percentageGrowth,
   sortMetricsByPeriod,
   totalEngagement,
 } from '@/services/social-metrics';
-import { toPersianDigits } from '@/utils/persian';
+import { formatNumber, toPersianDigits } from '@/utils/persian';
 import type { SocialPlatform } from '@/types/domain';
 import type {
   SocialAccount,
+  SocialBrandOverview,
+  SocialBrandPlatformRow,
+  SocialBrandPlatformTimelineRow,
+  SocialBrandRanking,
   SocialBrandStat,
   SocialBrandTrend,
+  SocialDataFreshness,
   SocialEntityStat,
+  SocialGrowthDriver,
   SocialKpiComparison,
   SocialKpiKey,
   SocialKpis,
   SocialMetric,
+  SocialMetricValueComparison,
   SocialMonthlyGrowthPoint,
   SocialMonthRange,
+  SocialPeerComparisonItem,
   SocialPlatformStat,
   SocialRangePreset,
   SocialTrendPoint,
 } from '@/types/social';
+import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 
 /**
  * Pure analytics layer for the social-media dashboard.
@@ -333,6 +344,601 @@ export function monthlyGrowthSeries(
       growthPct: percentageGrowth(point.followers, prev.followers),
     };
   });
+}
+
+/* =========================================================================
+ * Brand performance analytics
+ * ========================================================================= */
+
+/** Which series a brand trend chart can plot. */
+export type SocialBrandTrendMetric = 'followers' | 'views' | 'engagement';
+
+/**
+ * Monthly series of one indicator for one brand (summed across its
+ * accounts). Only months with real data are included — gaps are not
+ * fabricated. Views / engagement are null when no data exists for that
+ * month.
+ */
+export function buildBrandTrendSeries(
+  accounts: SocialAccount[],
+  metrics: SocialMetric[],
+  brand: string,
+  metric: SocialBrandTrendMetric,
+): Array<{ month: string; monthLabel: string; value: number | null }> {
+  const ids = new Set(
+    accounts.filter((a) => a.brand === brand).map((a) => a.id),
+  );
+  const inBrand = metrics.filter((m) => ids.has(m.accountId));
+  const byMonth = new Map<string, SocialMetric[]>();
+  for (const m of sortMetricsByPeriod(inBrand)) {
+    const list = byMonth.get(m.periodLabel) ?? [];
+    list.push(m);
+    byMonth.set(m.periodLabel, list);
+  }
+  return [...byMonth.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([month, list]) => {
+      let value: number | null = null;
+      if (metric === 'followers') {
+        value = list.reduce((sum, m) => sum + m.followers, 0);
+      } else if (metric === 'views') {
+        value = sumOrNull(list, (m) => m.views);
+      } else {
+        value = sumOrNull(list, (m) => totalEngagement(m));
+      }
+      return { month, monthLabel: jalaliMonthName(month), value };
+    });
+}
+
+/* =========================================================================
+ * Brand performance analytics
+ * ========================================================================= */
+
+/**
+ * How old (in days) a platform's latest metric may be before it is shown
+ * as 'قدیمی' instead of 'به‌روز'. Kept here as the single source of truth
+ * (never hardcoded in components).
+ */
+export const SOCIAL_DATA_STALE_DAYS = 60;
+
+/**
+ * Latest metric of each account (by period), for snapshot-style stats that
+ * must not double count historical rows.
+ */
+function latestMetricsByAccountMap(
+  metrics: SocialMetric[],
+): Map<string, SocialMetric> {
+  const map = new Map<string, SocialMetric>();
+  for (const m of sortMetricsByPeriod(metrics)) {
+    map.set(m.accountId, m);
+  }
+  return map;
+}
+
+/** Sum only non-null values; null when no value exists at all. */
+function sumOrNull(
+  metrics: SocialMetric[],
+  pick: (m: SocialMetric) => number | null,
+): number | null {
+  const values = metrics
+    .map(pick)
+    .filter((v): v is number => typeof v === 'number');
+  return values.length > 0 ? values.reduce((a, b) => a + b, 0) : null;
+}
+
+/** Average only non-null values; null when none exist. */
+function avgOrNull(
+  metrics: SocialMetric[],
+  pick: (m: SocialMetric) => number | null,
+): number | null {
+  const values = metrics
+    .map(pick)
+    .filter((v): v is number => typeof v === 'number');
+  return values.length > 0
+    ? values.reduce((a, b) => a + b, 0) / values.length
+    : null;
+}
+
+/** Whether any metric in the list has a real engagement value. */
+function hasRealEngagement(metrics: SocialMetric[]): boolean {
+  return metrics.some(
+    (m) => m.likes !== null || m.comments !== null || m.shares !== null,
+  );
+}
+
+/** Distinct period labels of a metric list, sorted ascending. */
+function distinctPeriodLabels(metrics: SocialMetric[]): string[] {
+  return [...new Set(metrics.map((m) => m.periodLabel))].sort((a, b) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  );
+}
+
+/**
+ * Latest and previous period labels of a metric list (per its own series),
+ * so growth is measured between whole periods, not between the two newest
+ * rows (which may belong to different accounts of a multi-account brand).
+ */
+function latestTwoPeriods(metrics: SocialMetric[]): {
+  latest: string | null;
+  previous: string | null;
+} {
+  const labels = distinctPeriodLabels(metrics);
+  if (labels.length === 0) return { latest: null, previous: null };
+  if (labels.length === 1) return { latest: labels[0], previous: null };
+  return {
+    latest: labels[labels.length - 1],
+    previous: labels[labels.length - 2],
+  };
+}
+
+/** Sum of `followers` over the metrics of one period label. */
+function followersOfPeriod(
+  metrics: SocialMetric[],
+  periodLabel: string,
+): number {
+  return metrics
+    .filter((m) => m.periodLabel === periodLabel)
+    .reduce((sum, m) => sum + m.followers, 0);
+}
+
+/**
+ * Headline stats of one brand over its full history (latest snapshot for
+ * followers, summed flow metrics for views / engagement / posts). A flow
+ * metric is null when the brand has NO real data for it anywhere.
+ */
+export function buildBrandOverview(
+  accounts: SocialAccount[],
+  metrics: SocialMetric[],
+  brand: string,
+): SocialBrandOverview {
+  const brandAccounts = accounts.filter((a) => a.brand === brand);
+  const brandMetrics = metrics.filter((m) =>
+    brandAccounts.some((a) => a.id === m.accountId),
+  );
+  const latestByAccount = latestMetricsByAccountMap(brandMetrics);
+  const sortedMetrics = sortMetricsByPeriod(brandMetrics);
+  const latest = sortedMetrics[sortedMetrics.length - 1] ?? null;
+  const { latest: latestPeriod, previous: previousPeriod } =
+    latestTwoPeriods(brandMetrics);
+
+  const activeAccounts = brandAccounts.filter((a) =>
+    latestByAccount.has(a.id),
+  ).length;
+  const followers = [...latestByAccount.values()].reduce(
+    (sum, m) => sum + m.followers,
+    0,
+  );
+
+  let growth: number | null = null;
+  let growthPct: number | null = null;
+  if (latestPeriod && previousPeriod) {
+    const currentTotal = followersOfPeriod(brandMetrics, latestPeriod);
+    const previousTotal = followersOfPeriod(brandMetrics, previousPeriod);
+    growth = absoluteGrowth(currentTotal, previousTotal);
+    growthPct = percentageGrowth(currentTotal, previousTotal);
+  }
+
+  const latestAccount = latest
+    ? (brandAccounts.find((a) => a.id === latest.accountId) ?? null)
+    : null;
+
+  return {
+    brand,
+    activeAccounts,
+    followers,
+    growth,
+    growthPct,
+    views: sumOrNull(brandMetrics, (m) => m.views),
+    engagement: hasRealEngagement(brandMetrics)
+      ? sumOrNull(brandMetrics, (m) => totalEngagement(m))
+      : null,
+    engagementRate: avgOrNull(brandMetrics, (m) => m.engagementRate),
+    posts: sumOrNull(brandMetrics, (m) => m.posts),
+    latestPeriodLabel: latestPeriod,
+    latestAccountName: latestAccount?.username ?? null,
+  };
+}
+
+/**
+ * Per-platform performance of one brand over its full history. Growth is
+ * measured between the latest two periods of the platform's own series.
+ */
+export function buildBrandPlatformPerformance(
+  accounts: SocialAccount[],
+  metrics: SocialMetric[],
+  brand: string,
+): SocialBrandPlatformRow[] {
+  const brandAccounts = accounts.filter((a) => a.brand === brand);
+  const platforms = [...new Set(brandAccounts.map((a) => a.platform))];
+
+  return platforms
+    .map((platform) => {
+      const platformAccounts = brandAccounts.filter(
+        (a) => a.platform === platform,
+      );
+      const ids = new Set(platformAccounts.map((a) => a.id));
+      const platformMetrics = metrics.filter((m) => ids.has(m.accountId));
+      const latestByAccount = latestMetricsByAccountMap(platformMetrics);
+      const sorted = sortMetricsByPeriod(platformMetrics);
+      const latest = sorted[sorted.length - 1] ?? null;
+      const { latest: latestPeriod, previous: previousPeriod } =
+        latestTwoPeriods(platformMetrics);
+
+      let growth: number | null = null;
+      let growthPct: number | null = null;
+      if (latestPeriod && previousPeriod) {
+        growth = absoluteGrowth(
+          followersOfPeriod(platformMetrics, latestPeriod),
+          followersOfPeriod(platformMetrics, previousPeriod),
+        );
+        growthPct = percentageGrowth(
+          followersOfPeriod(platformMetrics, latestPeriod),
+          followersOfPeriod(platformMetrics, previousPeriod),
+        );
+      }
+
+      return {
+        platform,
+        followers: [...latestByAccount.values()].reduce(
+          (sum, m) => sum + m.followers,
+          0,
+        ),
+        growth,
+        growthPct,
+        views: sumOrNull(platformMetrics, (m) => m.views),
+        engagement: hasRealEngagement(platformMetrics)
+          ? sumOrNull(platformMetrics, (m) => totalEngagement(m))
+          : null,
+        engagementRate: avgOrNull(platformMetrics, (m) => m.engagementRate),
+        posts: sumOrNull(platformMetrics, (m) => m.posts),
+        latestPeriodLabel: latest?.periodLabel ?? null,
+        accounts: platformAccounts.length,
+      };
+    })
+    .sort((a, b) => b.followers - a.followers);
+}
+
+/**
+ * Compare one brand against the average of the other brands. Each average
+ * is computed only from the brands that have real data for that indicator
+ * (e.g. average views uses only the brands with views).
+ */
+export function buildBrandPeerComparison(
+  accounts: SocialAccount[],
+  metrics: SocialMetric[],
+  brand: string,
+): SocialPeerComparisonItem[] {
+  const brands = [...new Set(accounts.map((a) => a.brand))].filter(
+    (b) => b !== brand,
+  );
+  const labels: Array<{ key: SocialKpiKey; label: string }> = [
+    { key: 'followers', label: 'دنبال‌کنندگان' },
+    { key: 'views', label: 'بازدید' },
+    { key: 'engagement', label: 'تعامل' },
+    { key: 'posts', label: 'محتوا' },
+  ];
+
+  return labels.map(({ key, label }) => {
+    const brandOverview = buildBrandOverview(accounts, metrics, brand);
+    const brandValue =
+      key === 'followers'
+        ? brandOverview.followers
+        : (brandOverview[key] ?? null);
+
+    const peerValues: number[] = [];
+    for (const other of brands) {
+      const overview = buildBrandOverview(accounts, metrics, other);
+      const value =
+        key === 'followers' ? overview.followers : (overview[key] ?? null);
+      if (typeof value === 'number' && value > 0) peerValues.push(value);
+    }
+
+    const peersAverage =
+      peerValues.length > 0
+        ? peerValues.reduce((a, b) => a + b, 0) / peerValues.length
+        : null;
+    const difference =
+      typeof brandValue === 'number' && peersAverage !== null
+        ? brandValue - peersAverage
+        : null;
+    return {
+      key,
+      label,
+      brand: brandValue,
+      peersAverage,
+      peersCount: peerValues.length,
+      difference,
+    };
+  });
+}
+
+/**
+ * 1-based rank of one brand for each indicator among all brands that have
+ * real data for it (1 = highest). Null when the brand has no data.
+ */
+export function buildBrandRankings(
+  accounts: SocialAccount[],
+  metrics: SocialMetric[],
+  brand: string,
+): SocialBrandRanking[] {
+  const brands = [...new Set(accounts.map((a) => a.brand))];
+  const labels: Array<{ key: SocialKpiKey; label: string }> = [
+    { key: 'followers', label: 'دنبال‌کنندگان' },
+    { key: 'views', label: 'بازدید' },
+    { key: 'engagement', label: 'تعامل' },
+    { key: 'posts', label: 'محتوا' },
+  ];
+
+  return labels.map(({ key, label }) => {
+    const values = brands
+      .map((b) => {
+        const overview = buildBrandOverview(accounts, metrics, b);
+        const value =
+          key === 'followers' ? overview.followers : (overview[key] ?? null);
+        return { brand: b, value };
+      })
+      .filter(
+        (v): v is { brand: string; value: number } =>
+          typeof v.value === 'number' && v.value > 0,
+      )
+      .sort((a, b) => b.value - a.value);
+
+    const own = values.find((v) => v.brand === brand) ?? null;
+    return {
+      key,
+      label,
+      value: own?.value ?? null,
+      rank: own ? values.indexOf(own) + 1 : null,
+      total: values.length,
+    };
+  });
+}
+
+/**
+ * Freshness of each platform's latest metric vs. today, using the Jalali
+ * month label (end of month as the reference date). 'stale' when the
+ * latest metric is older than SOCIAL_DATA_STALE_DAYS.
+ */
+export function buildBrandPlatformTimeline(
+  accounts: SocialAccount[],
+  metrics: SocialMetric[],
+  brand: string,
+): SocialBrandPlatformTimelineRow[] {
+  const brandAccounts = accounts.filter((a) => a.brand === brand);
+  const platforms = [...new Set(brandAccounts.map((a) => a.platform))];
+  const now = new Date();
+
+  return platforms.map((platform) => {
+    const ids = new Set(
+      brandAccounts.filter((a) => a.platform === platform).map((a) => a.id),
+    );
+    const sorted = sortMetricsByPeriod(
+      metrics.filter((m) => ids.has(m.accountId)),
+    );
+    const latest = sorted[sorted.length - 1] ?? null;
+    if (!latest) {
+      return { platform, latestPeriodLabel: null, freshness: 'no-data' };
+    }
+    const ageDays = ageOfPeriodLabelDays(latest.periodLabel, now);
+    const freshness: SocialDataFreshness =
+      ageDays === null || ageDays <= SOCIAL_DATA_STALE_DAYS
+        ? 'up-to-date'
+        : 'stale';
+    return { platform, latestPeriodLabel: latest.periodLabel, freshness };
+  });
+}
+
+/** Approximate age in days of a 'YYYY-MM' Jalali label vs. now (end of month). */
+function ageOfPeriodLabelDays(label: string, now: Date): number | null {
+  const m = label.match(/^(\d{4})-(\d{2})$/);
+  if (!m) return null;
+  const jy = Number(m[1]);
+  const jm = Number(m[2]);
+  const end = jalaaliToDateObject(jy, jm, jalaaliMonthLength(jy, jm));
+  const ms = now.getTime() - end.getTime();
+  return Math.max(0, Math.floor(ms / 86_400_000));
+}
+
+/**
+ * Rule-based growth insights for a brand. No AI, no fabricated text: only
+ * conclusions that follow directly from the data (or an explicit
+ * 'not enough data' note).
+ */
+export function buildBrandGrowthDrivers(
+  rows: SocialBrandPlatformRow[],
+): SocialGrowthDriver[] {
+  const drivers: SocialGrowthDriver[] = [];
+  // A zero growth is "no change", not a positive or negative driver — it
+  // must not be presented as the best/worst platform.
+  const withGrowth = rows.filter(
+    (r): r is SocialBrandPlatformRow & { growth: number; growthPct: number } =>
+      r.growth !== null && r.growth !== 0 && r.growthPct !== null,
+  );
+
+  if (withGrowth.length === 0) {
+    drivers.push({
+      type: 'info',
+      text: 'داده کافی برای تحلیل عوامل رشد وجود ندارد.',
+    });
+    return drivers;
+  }
+
+  const sorted = [...withGrowth].sort((a, b) => b.growth - a.growth);
+  const best = sorted[0];
+  const worst = sorted[sorted.length - 1];
+  const totalGrowth = rows.reduce((sum, r) => sum + (r.growth ?? 0), 0);
+
+  if (totalGrowth > 0) {
+    drivers.push({
+      type: 'positive',
+      text: `بخش عمدهٔ رشد دنبال‌کنندگان از ${SOCIAL_PLATFORM_LABELS[best.platform]} حاصل شده است (${formatGrowthPctSafe(best.growthPct)}).`,
+    });
+  } else if (totalGrowth < 0) {
+    drivers.push({
+      type: 'negative',
+      text: `بیشترین افت دنبال‌کنندگان در ${SOCIAL_PLATFORM_LABELS[worst.platform]} ثبت شده است (${formatGrowthPctSafe(worst.growthPct)}).`,
+    });
+  } else {
+    drivers.push({
+      type: 'info',
+      text: 'مجموع رشد دنبال‌کنندگان در آخرین دوره تقریباً صفر بوده است.',
+    });
+  }
+
+  if (best !== worst && totalGrowth > 0) {
+    drivers.push({
+      type: 'info',
+      text: `${SOCIAL_PLATFORM_LABELS[best.platform]} با ${formatNumber(Math.abs(best.growth ?? 0))} دنبال‌کنندهٔ جدید، بیشترین سهم را در رشد داشته است.`,
+    });
+  }
+
+  const withEngagement = rows.filter(
+    (r): r is SocialBrandPlatformRow & { engagement: number } =>
+      typeof r.engagement === 'number' && r.engagement > 0,
+  );
+  if (withEngagement.length > 0) {
+    const top = withEngagement.sort((a, b) => b.engagement - a.engagement)[0];
+    drivers.push({
+      type: 'info',
+      text: `بیشترین تعامل در ${SOCIAL_PLATFORM_LABELS[top.platform]} ثبت شده است.`,
+    });
+  }
+
+  return drivers;
+}
+
+function formatGrowthPctSafe(value: number | null): string {
+  if (value === null) return '۰٪';
+  return `${toPersianDigits(String(Math.round(Math.abs(value) * 10) / 10))}٪`;
+}
+
+/* =========================================================================
+ * Brand period comparison
+ * ========================================================================= */
+
+/**
+ * Latest and previous period labels of one brand (whole periods, so a
+ * multi-account brand compares month-to-month, never two arbitrary rows).
+ */
+export function latestBrandPeriods(
+  accounts: SocialAccount[],
+  metrics: SocialMetric[],
+  brand: string,
+): { latest: string | null; previous: string | null } {
+  const ids = new Set(
+    accounts.filter((a) => a.brand === brand).map((a) => a.id),
+  );
+  const brandMetrics = metrics.filter((m) => ids.has(m.accountId));
+  return latestTwoPeriods(brandMetrics);
+}
+
+/**
+ * Compare every metric field between the brand's latest and previous
+ * period, summing across the brand's accounts per period. Unlike
+ * `compareMetricValues` (per-account, two newest rows), this compares
+ * whole periods so a multi-account brand never mixes accounts. A field is
+ * included only when at least one side has a real value.
+ */
+export function compareBrandPeriods(
+  accounts: SocialAccount[],
+  metrics: SocialMetric[],
+  brand: string,
+): SocialMetricValueComparison[] {
+  const ids = new Set(
+    accounts.filter((a) => a.brand === brand).map((a) => a.id),
+  );
+  const brandMetrics = metrics.filter((m) => ids.has(m.accountId));
+  const { latest, previous } = latestTwoPeriods(brandMetrics);
+  if (!latest || !previous) return [];
+
+  const current = brandMetrics.filter((m) => m.periodLabel === latest);
+  const prev = brandMetrics.filter((m) => m.periodLabel === previous);
+
+  const out: SocialMetricValueComparison[] = [];
+  for (const key of Object.keys(
+    SOCIAL_METRIC_FIELDS,
+  ) as SocialMetricFieldKey[]) {
+    const column = METRIC_COLUMN_BY_FIELD_KEY_BRAND[key];
+    const cur = aggregateBrandField(current, key, column);
+    const prevVal = aggregateBrandField(prev, key, column);
+    if (cur === null && prevVal === null) continue;
+    out.push({
+      key,
+      label: SOCIAL_METRIC_FIELDS[key].label,
+      current: cur,
+      previous: prevVal,
+      absoluteChange:
+        cur !== null && prevVal !== null ? absoluteGrowth(cur, prevVal) : null,
+      changePct:
+        cur !== null && prevVal !== null
+          ? percentageGrowth(cur, prevVal)
+          : null,
+    });
+  }
+
+  // Engagement (likes + comments + shares) as an aggregate field.
+  const curEngagement = hasRealEngagement(current)
+    ? sumOrNull(current, (m) => totalEngagement(m))
+    : null;
+  const prevEngagement = hasRealEngagement(prev)
+    ? sumOrNull(prev, (m) => totalEngagement(m))
+    : null;
+  if (curEngagement !== null || prevEngagement !== null) {
+    out.push({
+      key: 'engagement' as SocialMetricFieldKey,
+      label: 'تعامل',
+      current: curEngagement,
+      previous: prevEngagement,
+      absoluteChange:
+        curEngagement !== null && prevEngagement !== null
+          ? absoluteGrowth(curEngagement, prevEngagement)
+          : null,
+      changePct:
+        curEngagement !== null && prevEngagement !== null
+          ? percentageGrowth(curEngagement, prevEngagement)
+          : null,
+    });
+  }
+
+  return out;
+}
+
+/** Column on SocialMetric for each brand-comparison field key. */
+const METRIC_COLUMN_BY_FIELD_KEY_BRAND: Record<
+  SocialMetricFieldKey,
+  keyof SocialMetric
+> = {
+  followers: 'followers',
+  following: 'following',
+  posts: 'posts',
+  views: 'views',
+  likes: 'likes',
+  comments: 'comments',
+  shares: 'shares',
+  saves: 'saves',
+  reach: 'reach',
+  impressions: 'impressions',
+  engagementRate: 'engagementRate',
+  storyViews: 'storyViews',
+  channelMembers: 'channelMembers',
+  retweets: 'retweets',
+  subscribers: 'subscribers',
+};
+
+/**
+ * Aggregate one field across a period's metrics: followers are summed as
+ * snapshots (each account appears once per period), flow metrics summed,
+ * engagement rate averaged. Returns null when the period has no value.
+ */
+function aggregateBrandField(
+  metrics: SocialMetric[],
+  key: SocialMetricFieldKey,
+  column: keyof SocialMetric,
+): number | null {
+  if (key === 'engagementRate') {
+    return avgOrNull(metrics, (m) => m[column] as number | null);
+  }
+  return sumOrNull(metrics, (m) => m[column] as number | null);
 }
 
 /* =========================================================================
