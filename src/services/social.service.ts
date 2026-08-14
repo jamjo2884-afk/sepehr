@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { socialBrandData } from '@/features/mock-data/social-data.generated';
 import type {
   SocialMonthlyPoint,
@@ -291,6 +292,25 @@ export async function getSocialOverview(): Promise<SocialOverview> {
     getSocialMetrics(undefined, 'monthly'),
   ]);
   return buildSocialOverview(accounts, metrics);
+}
+
+/** Everything the analytics dashboard needs, fetched in one round-trip. */
+export interface SocialDashboardData {
+  accounts: SocialAccount[];
+  metrics: SocialMetric[];
+}
+
+/**
+ * Fetch the dashboard dataset: all accounts + all monthly metrics.
+ * The page reads this once and derives every KPI / chart / table from it
+ * via `src/services/social-analytics.ts` — no per-section queries, no N+1.
+ */
+export async function getSocialDashboardData(): Promise<SocialDashboardData> {
+  const [accounts, metrics] = await Promise.all([
+    getSocialAccounts(),
+    getSocialMetrics(undefined, 'monthly'),
+  ]);
+  return { accounts, metrics };
 }
 
 /** Human label helper. */
@@ -590,7 +610,8 @@ export async function getSocialAccounts(): Promise<SocialAccount[]> {
       )
       .order('brand', { ascending: true })
       .order('platform', { ascending: true })
-      .order('username', { ascending: true });
+      .order('username', { ascending: true })
+      .limit(10000);
     if (error) throw error;
     if (!data || data.length === 0) return accountsFromSnapshot();
     return (data as unknown as AccountRow[]).map(toSocialAccount);
@@ -607,6 +628,10 @@ export async function getSocialAccounts(): Promise<SocialAccount[]> {
 /**
  * Metrics for one or more accounts, filtered by period granularity.
  * Supabase first, snapshot fallback.
+ *
+ * The Supabase project caps REST responses at 1000 rows per request, so the
+ * fetch is paginated with range headers to guarantee the full history is
+ * read (1156 monthly rows today, and any future daily/weekly rows).
  */
 export async function getSocialMetrics(
   accountIds?: string[],
@@ -614,24 +639,8 @@ export async function getSocialMetrics(
 ): Promise<SocialMetric[]> {
   try {
     const { supabase } = await import('@/lib/supabase');
-    let query = supabase
-      .from('social_metrics')
-      .select(
-        'id, account_id, period, period_label, period_start, period_end, ' +
-          'followers, following, posts, views, likes, comments, shares, saves, ' +
-          'reach, impressions, engagement_rate, story_views, channel_members, ' +
-          'retweets, subscribers, created_at, updated_at',
-      )
-      .order('period_label', { ascending: true });
-    if (accountIds && accountIds.length > 0) {
-      query = query.in('account_id', accountIds);
-    }
-    if (period) {
-      query = query.eq('period', period);
-    }
-    const { data, error } = await query;
-    if (error) throw error;
-    if (!data || data.length === 0) {
+    const rows = await fetchAllMetricRows(supabase, accountIds, period);
+    if (rows.length === 0) {
       // Fall back to the snapshot when the table is empty so callers never
       // get an empty result from a misconfigured backend.
       const accounts =
@@ -640,7 +649,7 @@ export async function getSocialMetrics(
           : await getSocialAccounts();
       return accounts.flatMap((account) => metricsFromSnapshot(account));
     }
-    return (data as unknown as MetricRow[]).map(toSocialMetric);
+    return rows.map(toSocialMetric);
   } catch (err) {
     console.warn(
       '[social] Could not read social_metrics from Supabase, ' +
@@ -653,6 +662,40 @@ export async function getSocialMetrics(
         : await getSocialAccounts();
     return accounts.flatMap((account) => metricsFromSnapshot(account));
   }
+}
+
+/** Read every matching metric row, paginating past the 1000-row cap. */
+async function fetchAllMetricRows(
+  supabase: SupabaseClient,
+  accountIds: string[] | undefined,
+  period: SocialMetricPeriod | undefined,
+): Promise<MetricRow[]> {
+  const PAGE = 1000;
+  const rows: MetricRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    let query = supabase
+      .from('social_metrics')
+      .select(
+        'id, account_id, period, period_label, period_start, period_end, ' +
+          'followers, following, posts, views, likes, comments, shares, saves, ' +
+          'reach, impressions, engagement_rate, story_views, channel_members, ' +
+          'retweets, subscribers, created_at, updated_at',
+      )
+      .order('period_label', { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (accountIds && accountIds.length > 0) {
+      query = query.in('account_id', accountIds);
+    }
+    if (period) {
+      query = query.eq('period', period);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    rows.push(...(data as unknown as MetricRow[]));
+    if (data.length < PAGE) break;
+  }
+  return rows;
 }
 
 /** Metrics for a single account, sorted by periodLabel. */
