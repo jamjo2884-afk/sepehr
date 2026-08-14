@@ -259,13 +259,14 @@ export async function syncSocialAccount(
   }
 
   if (!verification.ok) {
+    const errorCode = verification.errorCode ?? 'verify_failed';
     await writeSyncLog(supabase, {
       accountId,
       platform: account.platform,
       status: 'error',
       recordsFetched: 0,
       recordsWritten: 0,
-      errorCode: verification.errorCode ?? 'verify_failed',
+      errorCode,
       errorMessage: sanitizeErrorMessage(
         verification.errorMessage ?? 'اتصال تأیید نشد.',
         [credential.secret],
@@ -280,9 +281,19 @@ export async function syncSocialAccount(
       accountId,
       recordsFetched: 0,
       recordsWritten: 0,
-      errorCode: verification.errorCode ?? 'verify_failed',
-      errorMessage: 'همگام‌سازی انجام نشد.',
+      errorCode,
+      // Safe-to-show Persian message; raw API detail stays in the log.
+      errorMessage: friendlySyncError(errorCode),
     };
+  }
+
+  // Account discovery: persist the platform's own account id when the
+  // connector verified it (never guessed by us).
+  if (verification.account?.externalId) {
+    await supabase
+      .from('social_accounts')
+      .update({ external_id: verification.account.externalId })
+      .eq('id', accountId);
   }
 
   await updateAccountSyncState(supabase, accountId, {
@@ -384,6 +395,24 @@ export async function syncSocialAccount(
     errorCode: null,
     errorMessage: null,
   };
+}
+
+/**
+ * Map a structured connector error code to a safe Persian message for the
+ * UI. Unknown codes fall back to a generic message — technical detail is
+ * never exposed to the user.
+ */
+function friendlySyncError(errorCode: string): string {
+  switch (errorCode) {
+    case 'bot_not_in_chat':
+      return 'ربات به این کانال دسترسی ندارد. لطفاً ربات را به کانال اضافه کنید.';
+    case 'invalid_credential':
+      return 'اعتبارنامهٔ این پلتفرم نامعتبر است.';
+    case 'bot_forbidden':
+      return 'ربات اجازهٔ دسترسی به این حساب را ندارد.';
+    default:
+      return 'همگام‌سازی انجام نشد.';
+  }
 }
 
 /** Latest sync log rows for a set of accounts (for the accounts page). */

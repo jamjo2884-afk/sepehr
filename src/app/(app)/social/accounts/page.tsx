@@ -405,6 +405,12 @@ export default function SocialAccountsPage() {
                               {SOCIAL_SYNC_RUN_LABELS[account.lastSyncStatus]}
                             </span>
                           ) : null}
+                          {account.lastSuccessfulSyncAt ? (
+                            <span className="text-[11px] text-success/80">
+                              آخرین موفق:{' '}
+                              {formatJalaliShort(account.lastSuccessfulSyncAt)}
+                            </span>
+                          ) : null}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>

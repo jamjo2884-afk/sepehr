@@ -3,8 +3,12 @@ import {
   resolveConnector,
   registeredPlatforms,
 } from '@/services/connectors/registry';
-import { TelegramConnector } from '@/services/connectors/telegram';
-import { sanitizeErrorMessage } from '@/services/connectors/utils';
+import {
+  TelegramConnector,
+  telegramError,
+} from '@/services/connectors/telegram';
+import { InstagramConnector } from '@/services/connectors/instagram';
+import { HttpError, sanitizeErrorMessage } from '@/services/connectors/utils';
 import { validateNormalizedMetric } from '@/services/social-sync.service';
 import type { NormalizedSocialMetric } from '@/types/social';
 
@@ -28,8 +32,12 @@ describe('connector registry', () => {
     expect(connector?.capabilities.auth).toContain('bot-token');
   });
 
+  it('resolves instagram to the Instagram connector', () => {
+    const connector = resolveConnector('instagram');
+    expect(connector).toBeInstanceOf(InstagramConnector);
+  });
+
   it('returns null for platforms without a connector', () => {
-    expect(resolveConnector('instagram')).toBeNull();
     expect(resolveConnector('youtube')).toBeNull();
   });
 
@@ -44,8 +52,31 @@ describe('connector registry', () => {
     ]);
   });
 
-  it('registry lists telegram only (first real connector)', () => {
+  it('registry lists the registered connectors', () => {
     expect(registeredPlatforms()).toContain('telegram');
+    expect(registeredPlatforms()).toContain('instagram');
+  });
+});
+
+describe('telegramError mapping', () => {
+  it('bot not in channel → bot_not_in_chat with Persian message', () => {
+    const result = telegramError(
+      new HttpError(400, 'Bad Request: chat not found'),
+    );
+    expect(result.ok).toBe(false);
+    expect(result.errorCode).toBe('bot_not_in_chat');
+    expect(result.errorMessage).toContain('ربات');
+  });
+
+  it('invalid token → invalid_credential', () => {
+    const result = telegramError(new HttpError(401, 'Unauthorized'));
+    expect(result.errorCode).toBe('invalid_credential');
+  });
+
+  it('unknown failures keep the raw detail for the log', () => {
+    const result = telegramError(new Error('network down'));
+    expect(result.errorCode).toBe('unknown');
+    expect(result.errorMessage).toBe('network down');
   });
 });
 

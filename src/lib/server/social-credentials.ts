@@ -15,6 +15,9 @@ import type {
  *
  * Env variables (add to the server / Vercel project):
  *   SOCIAL_TELEGRAM_BOT_TOKEN   — Telegram Bot API token (bot123:ABC...)
+ *   INSTAGRAM_ACCESS_TOKEN      — Instagram Graph API token (Facebook
+ *                                 User/System User token with
+ *                                 instagram_basic + instagram_manage_insights)
  *
  * This module must only be imported from server code (API routes). It is
  * never imported by client components.
@@ -24,6 +27,7 @@ const ENV_BY_PLATFORM: Partial<
   Record<SocialPlatform, { varName: string; kind: SocialCredentialKind }>
 > = {
   telegram: { varName: 'SOCIAL_TELEGRAM_BOT_TOKEN', kind: 'bot-token' },
+  instagram: { varName: 'INSTAGRAM_ACCESS_TOKEN', kind: 'oauth' },
 };
 
 /** Resolve the credential for a platform, or null when not configured. */

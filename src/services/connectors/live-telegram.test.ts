@@ -38,13 +38,12 @@ describe('TelegramConnector live (invalid token → real error)', () => {
       },
       account,
       now: new Date(),
-    });
-
-    // Must be a REAL failure (401 Unauthorized from Telegram), never ok.
-    expect(result.ok).toBe(false);
-    expect(result.errorCode).toBe('http_401');
-    // The raw message may contain Telegram's description but never the
-    // token itself (the sanitizer removes it before it reaches logs/UI).
-    expect(result.errorMessage).not.toContain('INVALID_TOKEN_FOR_LIVE_TEST');
+    });      // Must be a REAL failure (401 Unauthorized from Telegram), never ok.
+      expect(result.ok).toBe(false);
+      // 401 is mapped to a structured, safe code by telegramError().
+      expect(result.errorCode).toBe('invalid_credential');
+      // The raw message may contain Telegram's description but never the
+      // token itself (the sanitizer removes it before it reaches logs/UI).
+      expect(result.errorMessage).not.toContain('INVALID_TOKEN_FOR_LIVE_TEST');
   }, 30_000);
 });

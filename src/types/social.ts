@@ -44,6 +44,12 @@ export interface SocialAccount {
   displayName: string | null;
   /** Public profile URL on the platform. */
   url: string | null;
+  /**
+   * The platform's OWN account identifier (Telegram chat id, Instagram
+   * Graph API user id). Written only from the platform API response by a
+   * connector — never guessed by the app.
+   */
+  externalId: string | null;
   status: SocialAccountStatus;
   createdAt: Timestamp;
   updatedAt: Timestamp;

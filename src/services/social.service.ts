@@ -491,6 +491,7 @@ export function accountsFromSnapshot(): SocialAccount[] {
     username: row.handle ?? '',
     displayName: row.handle,
     url: socialAccountUrl(row.platform, row.handle),
+    externalId: null,
     status: 'active' as SocialAccountStatus,
     createdAt: now,
     updatedAt: now,
@@ -545,6 +546,7 @@ interface AccountRow {
   username: string;
   display_name: string | null;
   url: string | null;
+  external_id: string | null;
   status: SocialAccountStatus;
   connection_status: SocialConnectionStatus;
   last_sync_at: string | null;
@@ -588,6 +590,7 @@ function toSocialAccount(row: AccountRow): SocialAccount {
     username: row.username,
     displayName: row.display_name,
     url: row.url,
+    externalId: row.external_id ?? null,
     status: row.status,
     connectionStatus: row.connection_status,
     lastSyncAt: row.last_sync_at,
@@ -633,8 +636,8 @@ export async function getSocialAccounts(): Promise<SocialAccount[]> {
     const { data, error } = await supabase
       .from('social_accounts')
       .select(
-        'id, brand, platform, username, display_name, url, status, ' +
-          'connection_status, last_sync_at, last_sync_status, ' +
+        'id, brand, platform, username, display_name, url, external_id, ' +
+          'status, connection_status, last_sync_at, last_sync_status, ' +
           'last_successful_sync_at, created_at, updated_at',
       )
       .order('brand', { ascending: true })

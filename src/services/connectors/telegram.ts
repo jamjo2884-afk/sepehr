@@ -120,12 +120,7 @@ export class TelegramConnector implements SocialPlatformConnector {
         errorMessage: undefined,
       };
     } catch (err) {
-      return {
-        ok: false,
-        errorCode: err instanceof HttpError ? `http_${err.status}` : 'unknown',
-        errorMessage:
-          err instanceof Error ? err.message : 'Telegram connection failed',
-      };
+      return telegramError(err);
     }
   }
 
@@ -200,4 +195,46 @@ export class TelegramConnector implements SocialPlatformConnector {
     void token;
     return fetchAllPages(pageFn);
   }
+}
+
+/**
+ * Map a Telegram API failure to a structured error code + a Persian,
+ * safe-to-show message. Raw API descriptions never reach the UI — they go
+ * to the sync log (sanitized) only.
+ */
+export function telegramError(err: unknown): SocialConnectionVerification {
+  const status = err instanceof HttpError ? err.status : null;
+  const detail =
+    err instanceof Error ? err.message : 'Telegram connection failed';
+  // Bot API: 400 'chat not found' / 'bot is not a member of the channel chat'.
+  if (
+    status === 400 &&
+    /chat not found|not a member|bot.*member/i.test(detail)
+  ) {
+    return {
+      ok: false,
+      errorCode: 'bot_not_in_chat',
+      errorMessage:
+        'ربات به این کانال دسترسی ندارد. لطفاً ربات را به کانال اضافه کنید.',
+    };
+  }
+  if (status === 401) {
+    return {
+      ok: false,
+      errorCode: 'invalid_credential',
+      errorMessage: 'توکن ربات نامعتبر است.',
+    };
+  }
+  if (status === 403) {
+    return {
+      ok: false,
+      errorCode: 'bot_forbidden',
+      errorMessage: 'ربات اجازهٔ دسترسی به این کانال را ندارد.',
+    };
+  }
+  return {
+    ok: false,
+    errorCode: status ? `http_${status}` : 'unknown',
+    errorMessage: detail,
+  };
 }
