@@ -47,6 +47,11 @@ export interface SocialAccount {
   status: SocialAccountStatus;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  /** Sync / connection state (added by the sync infrastructure). */
+  connectionStatus: SocialConnectionStatus;
+  lastSyncAt: Timestamp | null;
+  lastSyncStatus: SocialSyncRunStatus | null;
+  lastSuccessfulSyncAt: Timestamp | null;
 }
 
 /**
@@ -360,16 +365,69 @@ export interface SocialBrandRanking {
 }
 
 /* =========================================================================
+ * Sync / connector infrastructure
+ * ========================================================================= */
+
+/** How an account is connected to its platform API. */
+export type SocialConnectionStatus =
+  'connected' | 'disconnected' | 'error' | 'pending';
+
+export const SOCIAL_CONNECTION_STATUS_LABELS: Record<
+  SocialConnectionStatus,
+  string
+> = {
+  connected: 'متصل',
+  disconnected: 'قطع',
+  error: 'خطا',
+  pending: 'در انتظار',
+};
+
+/** Outcome of the latest sync run for an account. */
+export type SocialSyncRunStatus = 'success' | 'error' | 'running';
+
+export const SOCIAL_SYNC_RUN_LABELS: Record<SocialSyncRunStatus, string> = {
+  success: 'موفق',
+  error: 'ناموفق',
+  running: 'در حال اجرا',
+};
+
+/** One sync run row in `social_sync_logs`. */
+export interface SocialSyncLog {
+  id: string;
+  socialAccountId: string;
+  platform: SocialPlatform;
+  startedAt: Timestamp;
+  finishedAt: Timestamp | null;
+  status: SocialSyncRunStatus;
+  recordsFetched: number;
+  recordsWritten: number;
+  errorCode: string | null;
+  errorMessage: string | null;
+}
+
+/**
+ * A metric row normalized by a connector, ready for upsert into
+ * `social_metrics`. Field values are the connector's platform-specific
+ * numbers mapped onto the shared metric set; absent fields are omitted so
+ * the merge behavior of `recordSocialMetrics` keeps previously stored
+ * values.
+ */
+export interface NormalizedSocialMetric {
+  period: SocialMetricPeriod;
+  periodLabel: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  /** Only the fields the platform really provides. */
+  values: SocialMetricValues;
+}
+
+/* =========================================================================
  * Social Performance Score (social-score service)
  * ========================================================================= */
 
 /** The five components a brand score can be built from. */
 export type SocialScoreComponentKey =
-  | 'growth'
-  | 'engagement'
-  | 'audience'
-  | 'views'
-  | 'publishing';
+  'growth' | 'engagement' | 'audience' | 'views' | 'publishing';
 
 /** How much real data backs the score. */
 export type SocialScoreConfidence = 'high' | 'medium' | 'low';

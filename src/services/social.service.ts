@@ -17,6 +17,7 @@ import type {
   SocialAccount,
   SocialAccountInput,
   SocialAccountStatus,
+  SocialConnectionStatus,
   SocialBrandOverview,
   SocialBrandPlatformRow,
   SocialBrandPlatformTimelineRow,
@@ -28,6 +29,7 @@ import type {
   SocialMetricValues,
   SocialPeerComparisonItem,
   SocialPeriodComparison,
+  SocialSyncRunStatus,
 } from '@/types/social';
 import {
   aggregateWindow,
@@ -492,6 +494,10 @@ export function accountsFromSnapshot(): SocialAccount[] {
     status: 'active' as SocialAccountStatus,
     createdAt: now,
     updatedAt: now,
+    connectionStatus: 'disconnected' as const,
+    lastSyncAt: null,
+    lastSyncStatus: null,
+    lastSuccessfulSyncAt: null,
   }));
 }
 
@@ -540,6 +546,10 @@ interface AccountRow {
   display_name: string | null;
   url: string | null;
   status: SocialAccountStatus;
+  connection_status: SocialConnectionStatus;
+  last_sync_at: string | null;
+  last_sync_status: SocialSyncRunStatus | null;
+  last_successful_sync_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -579,6 +589,10 @@ function toSocialAccount(row: AccountRow): SocialAccount {
     displayName: row.display_name,
     url: row.url,
     status: row.status,
+    connectionStatus: row.connection_status,
+    lastSyncAt: row.last_sync_at,
+    lastSyncStatus: row.last_sync_status,
+    lastSuccessfulSyncAt: row.last_successful_sync_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -619,7 +633,9 @@ export async function getSocialAccounts(): Promise<SocialAccount[]> {
     const { data, error } = await supabase
       .from('social_accounts')
       .select(
-        'id, brand, platform, username, display_name, url, status, created_at, updated_at',
+        'id, brand, platform, username, display_name, url, status, ' +
+          'connection_status, last_sync_at, last_sync_status, ' +
+          'last_successful_sync_at, created_at, updated_at',
       )
       .order('brand', { ascending: true })
       .order('platform', { ascending: true })

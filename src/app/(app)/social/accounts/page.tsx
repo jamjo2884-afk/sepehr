@@ -9,6 +9,7 @@ import {
   Pencil,
   Plus,
   Power,
+  RefreshCw,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -17,12 +18,20 @@ import {
   latestMetricsByAccount,
 } from '@/services/social.service';
 import type { SocialAccount, SocialMetric } from '@/types/social';
-import { SOCIAL_ACCOUNT_STATUS_LABELS } from '@/types/social';
-import type { SocialAccountStatus } from '@/types/social';
+import {
+  SOCIAL_ACCOUNT_STATUS_LABELS,
+  SOCIAL_CONNECTION_STATUS_LABELS,
+} from '@/types/social';
+import type {
+  SocialAccountStatus,
+  SocialConnectionStatus,
+  SocialSyncRunStatus,
+} from '@/types/social';
+import { SOCIAL_SYNC_RUN_LABELS } from '@/types/social';
 import type { SocialPlatform } from '@/types/domain';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { jalaliMonthName } from '@/services/social-analytics';
-import { formatNumber } from '@/utils/persian';
+import { formatJalaliDate, formatNumber } from '@/utils/persian';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { MetricFormDialog } from '@/components/social/metric-form-dialog';
 import { BulkMetricFormDialog } from '@/components/social/bulk-metric-form-dialog';
@@ -38,6 +47,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export default function SocialAccountsPage() {
   const [raw, setRaw] = useState<{
@@ -136,6 +146,32 @@ export default function SocialAccountsPage() {
           }
         : prev,
     );
+  };
+
+  const runSync = async (account: SocialAccount) => {
+    if (busyAccountId) return;
+    setBusyAccountId(account.id);
+    try {
+      const res = await fetch('/api/social/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId: account.id }),
+      });
+      const result = (await res.json()) as {
+        ok: boolean;
+        errorMessage?: string | null;
+      };
+      if (result.ok) {
+        toast.success('آمار با موفقیت به‌روزرسانی شد.');
+        setReloadKey((k) => k + 1);
+      } else {
+        toast.error(result.errorMessage || 'همگام‌سازی انجام نشد.');
+      }
+    } catch {
+      toast.error('همگام‌سازی انجام نشد.');
+    } finally {
+      setBusyAccountId(null);
+    }
   };
 
   if (loading) {
@@ -299,6 +335,12 @@ export default function SocialAccountsPage() {
                 <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
                   آخرین دوره
                 </th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
+                  اتصال
+                </th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
+                  آخرین همگام‌سازی
+                </th>
                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                   عملیات
                 </th>
@@ -347,7 +389,46 @@ export default function SocialAccountsPage() {
                         : '—'}
                     </td>
                     <td className="px-4 py-2.5">
+                      <ConnectionBadge
+                        status={account.connectionStatus}
+                        lastStatus={account.lastSyncStatus}
+                      />
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">
+                      {account.lastSyncAt ? (
+                        <span className="flex flex-col gap-0.5">
+                          <span className="text-xs tabular-nums">
+                            {formatJalaliShort(account.lastSyncAt)}
+                          </span>
+                          {account.lastSyncStatus ? (
+                            <span className="text-[11px]">
+                              {SOCIAL_SYNC_RUN_LABELS[account.lastSyncStatus]}
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
                       <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1 text-xs"
+                          disabled={busyAccountId === account.id}
+                          onClick={() => runSync(account)}
+                        >
+                          <RefreshCw
+                            className={cn(
+                              'h-3 w-3',
+                              busyAccountId === account.id && 'animate-spin',
+                            )}
+                          />
+                          {busyAccountId === account.id
+                            ? 'در حال همگام‌سازی…'
+                            : 'همگام‌سازی'}
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -479,4 +560,47 @@ function StatusBadge({ status }: { status: SocialAccountStatus }) {
       {SOCIAL_ACCOUNT_STATUS_LABELS[status]}
     </Badge>
   );
+}
+
+function ConnectionBadge({
+  status,
+  lastStatus,
+}: {
+  status: SocialConnectionStatus;
+  lastStatus: SocialSyncRunStatus | null;
+}) {
+  const className = cn(
+    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+    status === 'connected' && 'bg-success/10 text-success',
+    status === 'disconnected' && 'bg-muted text-muted-foreground',
+    status === 'error' && 'bg-destructive/10 text-destructive',
+    status === 'pending' &&
+      'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    lastStatus === 'running' &&
+      'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  );
+  return (
+    <span className={className}>
+      <span
+        className={cn(
+          'h-1.5 w-1.5 rounded-full',
+          status === 'connected' && 'bg-success',
+          status === 'disconnected' && 'bg-muted-foreground',
+          status === 'error' && 'bg-destructive',
+          (status === 'pending' || lastStatus === 'running') && 'bg-amber-500',
+        )}
+      />
+      {lastStatus === 'running'
+        ? SOCIAL_SYNC_RUN_LABELS.running
+        : SOCIAL_CONNECTION_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+function formatJalaliShort(iso: string): string {
+  try {
+    return formatJalaliDate(new Date(iso));
+  } catch {
+    return new Date(iso).toLocaleDateString('fa-IR');
+  }
 }
