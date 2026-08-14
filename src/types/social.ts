@@ -253,7 +253,8 @@ export interface SocialPlatformStat extends SocialEntityStat {
  * NOT NULL in the schema, so it defaults to 0 when empty.
  */
 export type SocialMetricValues = Partial<{
-  followers: number;
+  /** NULL means "not provided" — preserved on re-record, defaults to 0 for new rows. */
+  followers: number | null;
   following: number | null;
   posts: number | null;
   views: number | null;

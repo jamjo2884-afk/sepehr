@@ -213,15 +213,13 @@ export function MetricFormDialog({
     for (const key of platformFields) {
       const raw = (values[key] ?? '').trim();
       if (raw === '') {
-        // followers is NOT NULL in the schema → empty becomes 0; the rest
-        // of the columns stay NULL.
-        if (key === 'followers') payload.followers = 0;
-        else payload[key] = null;
+        // NULL = "not provided": the service keeps the stored value on
+        // re-record and defaults to 0 only for brand-new rows. Explicit 0
+        // is stored as 0 by the number path below.
+        payload[key] = null;
         continue;
       }
-      const n = Number(raw);
-      if (key === 'followers') payload.followers = n;
-      else payload[key] = n;
+      payload[key] = Number(raw);
     }
     return payload;
   };

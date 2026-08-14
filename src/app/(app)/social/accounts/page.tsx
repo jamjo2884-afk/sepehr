@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, Eye, Plus, Users } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Eye, Plus, Users } from 'lucide-react';
 import Link from 'next/link';
 import {
   getSocialDashboardData,
@@ -17,6 +17,7 @@ import { jalaliMonthName } from '@/services/social-analytics';
 import { formatNumber } from '@/utils/persian';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { MetricFormDialog } from '@/components/social/metric-form-dialog';
+import { BulkMetricFormDialog } from '@/components/social/bulk-metric-form-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -45,6 +46,7 @@ export default function SocialAccountsPage() {
   const [recordAccountId, setRecordAccountId] = useState<string | undefined>(
     undefined,
   );
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -138,9 +140,20 @@ export default function SocialAccountsPage() {
         <p className="text-sm text-muted-foreground">
           مدیریت حساب‌های شبکه‌های اجتماعی
         </p>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          مدیریت آمار
-        </h1>
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            مدیریت آمار
+          </h1>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 gap-1.5 text-xs"
+            onClick={() => setBulkOpen(true)}
+          >
+            <ClipboardList className="h-3.5 w-3.5" />
+            ثبت انبوه
+          </Button>
+        </div>
         <p className="text-sm text-muted-foreground">
           {formatNumber(accounts.length)} حساب — آخرین آمار هر حساب و ثبت/ویرایش
           متریک
@@ -325,6 +338,15 @@ export default function SocialAccountsPage() {
         defaultAccountId={recordAccountId}
         onSaved={() => {
           setRecordOpen(false);
+          setReloadKey((k) => k + 1);
+        }}
+      />
+      <BulkMetricFormDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        accounts={accounts}
+        onSaved={() => {
+          setBulkOpen(false);
           setReloadKey((k) => k + 1);
         }}
       />

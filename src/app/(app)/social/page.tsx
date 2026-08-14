@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   BarChart3,
   CalendarRange,
+  ClipboardList,
   Database,
   GitCompareArrows,
   Inbox,
@@ -56,6 +57,7 @@ import { PlatformComparisonTable } from '@/components/social/analytics/platform-
 import { PeriodComparison } from '@/components/social/analytics/period-comparison';
 import { SectionTitle } from '@/components/social/analytics/shared';
 import { SocialAccountCard } from '@/components/social/account-card';
+import { BulkMetricFormDialog } from '@/components/social/bulk-metric-form-dialog';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { useSocialBrandEdits } from '@/stores/social-brands.store';
 import { formatNumber } from '@/utils/persian';
@@ -88,6 +90,7 @@ export default function SocialPage() {
   );
   const [rangePreset, setRangePreset] = useState<SocialRangePreset>('24m');
   const [customRange, setCustomRange] = useState<SocialMonthRange | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [brandWarning, setBrandWarning] = useState<string | null>(null);
 
   // Brand management dialog state.
@@ -529,17 +532,28 @@ export default function SocialPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             شبکه‌های اجتماعی
           </h1>
-          <Button
-            variant="outline"
-            size="sm"
-            className="shrink-0 gap-1.5 text-xs"
-            asChild
-          >
-            <Link href="/social/accounts">
-              <Database className="h-3.5 w-3.5" />
-              مدیریت آمار
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5 text-xs"
+              onClick={() => setBulkOpen(true)}
+            >
+              <ClipboardList className="h-3.5 w-3.5" />
+              ثبت انبوه
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5 text-xs"
+              asChild
+            >
+              <Link href="/social/accounts">
+                <Database className="h-3.5 w-3.5" />
+                مدیریت آمار
+              </Link>
+            </Button>
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">
           {formatNumber(brandCount)} برند در {formatNumber(platformCount)}{' '}
@@ -712,6 +726,16 @@ export default function SocialPage() {
           </div>
         )}
       </section>
+
+      <BulkMetricFormDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        accounts={raw.accounts}
+        onSaved={() => {
+          setBulkOpen(false);
+          setReloadKey((k) => k + 1);
+        }}
+      />
     </motion.div>
   );
 }

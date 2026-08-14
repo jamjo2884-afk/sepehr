@@ -7,6 +7,10 @@ import type {
   SocialBrandNode,
 } from '@/features/mock-data/social-data.generated';
 import { percentageGrowth } from '@/services/social-metrics';
+import {
+  PLATFORM_METRIC_FIELDS,
+  type SocialMetricFieldKey,
+} from '@/constants/social-fields';
 import type { SocialPlatform } from '@/types/domain';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import type {
@@ -869,9 +873,11 @@ export async function recordSocialMetrics(
       period_label: periodLabel,
       period_start: range?.start ?? null,
       period_end: range?.end ?? null,
-      // `followers` is NOT NULL in the schema → empty input is stored as 0.
-      // Every other column stays NULL when not provided.
-      followers: values.followers ?? 0,
+      // `followers` is NOT NULL in the schema. NULL here means "not
+      // provided" — the merge below keeps the stored value on re-record;
+      // only a brand-new row defaults to 0. Every other column stays NULL
+      // when not provided.
+      followers: values.followers ?? null,
       following: values.following ?? null,
       posts: values.posts ?? null,
       views: values.views ?? null,
@@ -908,6 +914,8 @@ export async function recordSocialMetrics(
         }
       }
     }
+    // NOT NULL fallback for a brand-new row whose followers were left empty.
+    if (row.followers === null) row.followers = 0;
     const { data, error } = await supabase
       .from('social_metrics')
       .upsert(row, { onConflict: 'account_id,period,period_label' })
@@ -917,6 +925,88 @@ export async function recordSocialMetrics(
     return toSocialMetric(data as unknown as MetricRow);
   } catch (err) {
     console.warn('[social] Could not record social metric.', err);
+    return null;
+  }
+}
+
+/**
+ * Upsert one metric row per account in a single request. All accounts share
+ * the same period and label; each row keeps only the columns its platform
+ * supports (from `PLATFORM_METRIC_FIELDS`) — e.g. `story_views` is written
+ * only for Instagram accounts, never for Telegram. Previously stored values
+ * are preserved for columns the bulk form leaves empty (NULL payload), and
+ * duplicates are prevented by the same UNIQUE constraint as single records.
+ * Returns the number of rows written, or null on failure (already logged).
+ */
+export async function recordSocialMetricsBulk(
+  accounts: Array<Pick<SocialAccount, 'id' | 'platform'>>,
+  period: SocialMetricPeriod,
+  values: SocialMetricValues,
+  options: { date?: Date; periodLabel?: string } = {},
+): Promise<number | null> {
+  try {
+    if (accounts.length === 0) return 0;
+    const { supabase } = await import('@/lib/supabase');
+    const date = options.date ?? new Date();
+    const periodLabel = options.periodLabel ?? periodLabelForDate(date, period);
+    const range =
+      period === 'weekly' && options.date
+        ? weeklyRangeForDate(options.date)
+        : periodRangeForLabel(period, periodLabel);
+    const accountIds = accounts.map((a) => a.id);
+
+    // Existing rows for the same accounts + period + label, for merging.
+    const { data: existingRows } = await supabase
+      .from('social_metrics')
+      .select('*')
+      .in('account_id', accountIds)
+      .eq('period', period)
+      .eq('period_label', periodLabel);
+    const existingByAccount = new Map<string, Record<string, unknown>>(
+      (existingRows ?? []).map((r) => [
+        r.account_id as string,
+        r as Record<string, unknown>,
+      ]),
+    );
+
+    const rows: Array<Record<string, number | string | null>> = [];
+    for (const account of accounts) {
+      const supported = new Set(PLATFORM_METRIC_FIELDS[account.platform]);
+      const existing = existingByAccount.get(account.id);
+      const row: Record<string, number | string | null> = {
+        account_id: account.id,
+        period,
+        period_label: periodLabel,
+        period_start: range?.start ?? null,
+        period_end: range?.end ?? null,
+      };
+      for (const [key, column] of Object.entries(METRIC_COLUMN_BY_KEY)) {
+        const typedKey = key as keyof SocialMetricValues;
+        const fieldKey = key as SocialMetricFieldKey;
+        const value = values[typedKey];
+        if (supported.has(fieldKey)) {
+          row[column] =
+            value ?? (existing?.[column] as number | string | null) ?? null;
+        } else {
+          // Column not supported by this platform: keep stored value, or
+          // default followers to 0 (NOT NULL in the schema).
+          row[column] =
+            (existing?.[column] as number | string | null) ??
+            (key === 'followers' ? 0 : null);
+        }
+      }
+      if (row.followers === null) row.followers = 0;
+      rows.push(row);
+    }
+
+    const { data, error } = await supabase
+      .from('social_metrics')
+      .upsert(rows, { onConflict: 'account_id,period,period_label' })
+      .select();
+    if (error) throw error;
+    return data?.length ?? 0;
+  } catch (err) {
+    console.warn('[social] Could not bulk record social metrics.', err);
     return null;
   }
 }
