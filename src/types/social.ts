@@ -50,6 +50,19 @@ export interface SocialAccount {
 }
 
 /**
+ * Input values for creating / updating a `social_accounts` row through the
+ * service. `status` defaults to 'active' when creating.
+ */
+export interface SocialAccountInput {
+  brand: string;
+  platform: SocialPlatform;
+  username: string;
+  displayName?: string | null;
+  url?: string | null;
+  status?: SocialAccountStatus;
+}
+
+/**
  * Metrics for one account at one point in time (one period). Only the
  * columns relevant to the platform are populated; the rest are null.
  */

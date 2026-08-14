@@ -15,6 +15,7 @@ import type { SocialPlatform } from '@/types/domain';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import type {
   SocialAccount,
+  SocialAccountInput,
   SocialAccountStatus,
   SocialMetric,
   SocialMetricPeriod,
@@ -628,6 +629,94 @@ export async function getSocialAccounts(): Promise<SocialAccount[]> {
       err,
     );
     return accountsFromSnapshot();
+  }
+}
+
+/**
+ * Create a social account row. Rejects duplicates (UNIQUE brand, platform,
+ * username) with a typed result so the UI can show a Persian message.
+ * Returns the stored account, or null on failure.
+ */
+export async function createSocialAccount(
+  input: SocialAccountInput,
+): Promise<SocialAccount | null> {
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    const row = {
+      brand: input.brand.trim(),
+      platform: input.platform,
+      username: input.username.trim(),
+      display_name: input.displayName?.trim() || null,
+      url: input.url?.trim() || null,
+      status: input.status ?? 'active',
+    };
+    const { data, error } = await supabase
+      .from('social_accounts')
+      .insert(row)
+      .select()
+      .single();
+    if (error) throw error;
+    return toSocialAccount(data as unknown as AccountRow);
+  } catch (err) {
+    console.warn('[social] Could not create social account.', err);
+    return null;
+  }
+}
+
+/**
+ * Update a social account row (brand / platform / username / display name /
+ * URL / status). Returns the updated account, or null on failure (a
+ * duplicate brand+platform+username edit fails the same way as create).
+ */
+export async function updateSocialAccount(
+  accountId: string,
+  input: SocialAccountInput,
+): Promise<SocialAccount | null> {
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    const row = {
+      brand: input.brand.trim(),
+      platform: input.platform,
+      username: input.username.trim(),
+      display_name: input.displayName?.trim() || null,
+      url: input.url?.trim() || null,
+      status: input.status ?? 'active',
+    };
+    const { data, error } = await supabase
+      .from('social_accounts')
+      .update(row)
+      .eq('id', accountId)
+      .select()
+      .single();
+    if (error) throw error;
+    return toSocialAccount(data as unknown as AccountRow);
+  } catch (err) {
+    console.warn('[social] Could not update social account.', err);
+    return null;
+  }
+}
+
+/**
+ * Change an account's lifecycle status (active / inactive / archived /
+ * suspended) without touching the rest of the row.
+ */
+export async function setSocialAccountStatus(
+  accountId: string,
+  status: SocialAccountStatus,
+): Promise<SocialAccount | null> {
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    const { data, error } = await supabase
+      .from('social_accounts')
+      .update({ status })
+      .eq('id', accountId)
+      .select()
+      .single();
+    if (error) throw error;
+    return toSocialAccount(data as unknown as AccountRow);
+  } catch (err) {
+    console.warn('[social] Could not update social account status.', err);
+    return null;
   }
 }
 

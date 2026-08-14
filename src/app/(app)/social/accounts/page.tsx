@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, ClipboardList, Eye, Plus, Users } from 'lucide-react';
+import {
+  AlertTriangle,
+  ClipboardList,
+  Eye,
+  Pencil,
+  Plus,
+  Power,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import {
   getSocialDashboardData,
@@ -18,6 +26,7 @@ import { formatNumber } from '@/utils/persian';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { MetricFormDialog } from '@/components/social/metric-form-dialog';
 import { BulkMetricFormDialog } from '@/components/social/bulk-metric-form-dialog';
+import { AccountFormDialog } from '@/components/social/account-form-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,6 +56,11 @@ export default function SocialAccountsPage() {
     undefined,
   );
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [accountDialogOpen, setAccountDialogOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<SocialAccount | null>(
+    null,
+  );
+  const [busyAccountId, setBusyAccountId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -102,6 +116,28 @@ export default function SocialAccountsPage() {
     );
   }, [accounts, brandFilter, platformFilter, statusFilter]);
 
+  const toggleAccountStatus = async (account: SocialAccount) => {
+    if (busyAccountId) return;
+    setBusyAccountId(account.id);
+    const { setSocialAccountStatus } =
+      await import('@/services/social.service');
+    const nextStatus: SocialAccountStatus =
+      account.status === 'active' ? 'inactive' : 'active';
+    const updated = await setSocialAccountStatus(account.id, nextStatus);
+    setBusyAccountId(null);
+    if (!updated) return;
+    setRaw((prev) =>
+      prev
+        ? {
+            ...prev,
+            accounts: prev.accounts.map((a) =>
+              a.id === account.id ? updated : a,
+            ),
+          }
+        : prev,
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col gap-6">
@@ -144,15 +180,29 @@ export default function SocialAccountsPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             مدیریت آمار
           </h1>
-          <Button
-            variant="outline"
-            size="sm"
-            className="shrink-0 gap-1.5 text-xs"
-            onClick={() => setBulkOpen(true)}
-          >
-            <ClipboardList className="h-3.5 w-3.5" />
-            ثبت انبوه
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5 text-xs"
+              onClick={() => {
+                setEditingAccount(null);
+                setAccountDialogOpen(true);
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              افزودن حساب
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5 text-xs"
+              onClick={() => setBulkOpen(true)}
+            >
+              <ClipboardList className="h-3.5 w-3.5" />
+              ثبت انبوه
+            </Button>
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">
           {formatNumber(accounts.length)} حساب — آخرین آمار هر حساب و ثبت/ویرایش
@@ -297,7 +347,7 @@ export default function SocialAccountsPage() {
                         : '—'}
                     </td>
                     <td className="px-4 py-2.5">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5">
                         <Button
                           variant="outline"
                           size="sm"
@@ -309,6 +359,42 @@ export default function SocialAccountsPage() {
                         >
                           <Plus className="h-3 w-3" />
                           ثبت آمار
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            setEditingAccount(account);
+                            setAccountDialogOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" />
+                          ویرایش
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 text-xs"
+                          disabled={busyAccountId === account.id}
+                          onClick={() => toggleAccountStatus(account)}
+                          aria-label={
+                            account.status === 'active'
+                              ? 'غیرفعال‌کردن حساب'
+                              : 'فعال‌کردن حساب'
+                          }
+                        >
+                          <Power
+                            className={cn(
+                              'h-3 w-3',
+                              account.status === 'active'
+                                ? 'text-muted-foreground'
+                                : 'text-success',
+                            )}
+                          />
+                          {account.status === 'active'
+                            ? 'غیرفعال'
+                            : 'فعال‌سازی'}
                         </Button>
                         <Button
                           variant="ghost"
@@ -348,6 +434,30 @@ export default function SocialAccountsPage() {
         onSaved={() => {
           setBulkOpen(false);
           setReloadKey((k) => k + 1);
+        }}
+      />
+      <AccountFormDialog
+        open={accountDialogOpen}
+        onOpenChange={setAccountDialogOpen}
+        account={editingAccount}
+        onSaved={(saved, mode) => {
+          setAccountDialogOpen(false);
+          setEditingAccount(null);
+          setRaw((prev) => {
+            if (!prev) return prev;
+            if (mode === 'create') {
+              return {
+                ...prev,
+                accounts: [...prev.accounts, saved],
+              };
+            }
+            return {
+              ...prev,
+              accounts: prev.accounts.map((a) =>
+                a.id === saved.id ? saved : a,
+              ),
+            };
+          });
         }}
       />
     </motion.div>
