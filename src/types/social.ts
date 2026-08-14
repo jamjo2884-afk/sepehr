@@ -1,5 +1,6 @@
 import type { ID, Timestamp } from '@/types/index';
 import type { SocialPlatform } from '@/types/domain';
+import type { SocialMetricFieldKey } from '@/constants/social-fields';
 
 /**
  * Standardized social-media domain types.
@@ -182,6 +183,22 @@ export interface SocialKpis {
 
 export type SocialKpiKey =
   'followers' | 'views' | 'engagement' | 'engagementRate' | 'posts';
+
+/**
+ * One metric field compared between the latest period and the period
+ * before it (used by the account-detail comparison section). `current` /
+ * `previous` are null when that period has no value for the field.
+ */
+export interface SocialMetricValueComparison {
+  key: SocialMetricFieldKey;
+  label: string;
+  current: number | null;
+  previous: number | null;
+  /** current - previous (null when either side is missing). */
+  absoluteChange: number | null;
+  /** percentage change (null when the previous value is missing or 0). */
+  changePct: number | null;
+}
 
 /** One KPI compared between the current and the previous window. */
 export interface SocialKpiComparison {

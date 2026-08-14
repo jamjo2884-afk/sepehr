@@ -4,10 +4,13 @@ import {
   jalaaliMonthLength,
   jalaaliToDateObject,
 } from 'jalaali-js';
+import { SOCIAL_METRIC_FIELDS } from '@/constants/social-fields';
+import type { SocialMetricFieldKey } from '@/constants/social-fields';
 import type {
   SocialMetric,
   SocialMetricPeriod,
   SocialMetricSummary,
+  SocialMetricValueComparison,
   SocialPeriodComparison,
 } from '@/types/social';
 
@@ -266,6 +269,63 @@ export function latestMetric(metrics: SocialMetric[]): SocialMetric | null {
 export function firstMetric(metrics: SocialMetric[]): SocialMetric | null {
   const sorted = sortMetricsByPeriod(metrics);
   return sorted[0] ?? null;
+}
+
+/** The metric column on `SocialMetric` for each form field key. */
+const METRIC_COLUMN_BY_FIELD_KEY: Record<
+  SocialMetricFieldKey,
+  keyof SocialMetric
+> = {
+  followers: 'followers',
+  following: 'following',
+  posts: 'posts',
+  views: 'views',
+  likes: 'likes',
+  comments: 'comments',
+  shares: 'shares',
+  saves: 'saves',
+  reach: 'reach',
+  impressions: 'impressions',
+  engagementRate: 'engagementRate',
+  storyViews: 'storyViews',
+  channelMembers: 'channelMembers',
+  retweets: 'retweets',
+  subscribers: 'subscribers',
+};
+
+/**
+ * Compare the given metric fields between the latest and the previous
+ * period. Only fields where at least one side has a value are included;
+ * engagement rate and other percentage columns are compared like counts.
+ * Used by the account-detail "this month vs last month" section.
+ */
+export function compareMetricValues(
+  metrics: SocialMetric[],
+  fields: SocialMetricFieldKey[],
+): SocialMetricValueComparison[] {
+  const sorted = sortMetricsByPeriod(metrics);
+  if (sorted.length < 2) return [];
+  const current = sorted[sorted.length - 1];
+  const previous = sorted[sorted.length - 2];
+
+  const out: SocialMetricValueComparison[] = [];
+  for (const key of fields) {
+    const column = METRIC_COLUMN_BY_FIELD_KEY[key];
+    const cur = current[column] as number | null;
+    const prev = previous[column] as number | null;
+    if (cur === null && prev === null) continue;
+    out.push({
+      key,
+      label: SOCIAL_METRIC_FIELDS[key].label,
+      current: cur,
+      previous: prev,
+      absoluteChange:
+        cur !== null && prev !== null ? absoluteGrowth(cur, prev) : null,
+      changePct:
+        cur !== null && prev !== null ? percentageGrowth(cur, prev) : null,
+    });
+  }
+  return out;
 }
 
 /**

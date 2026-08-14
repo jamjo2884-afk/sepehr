@@ -32,10 +32,17 @@ import {
   socialAccountUrl,
 } from '@/services/social.service';
 import type { SocialAccountRow } from '@/services/social.service';
-import { latestMetric as latestMetricOf } from '@/services/social-metrics';
+import {
+  compareMetricValues,
+  latestMetric as latestMetricOf,
+  sortMetricsByPeriod,
+} from '@/services/social-metrics';
+import { PLATFORM_METRIC_FIELDS } from '@/constants/social-fields';
+import { jalaliMonthName } from '@/services/social-analytics';
 import type { SocialAccount, SocialMetric } from '@/types/social';
 import { MetricFormDialog } from '@/components/social/metric-form-dialog';
 import { MetricHistoryTable } from '@/components/social/metric-history-table';
+import { MetricPeriodComparison } from '@/components/social/metric-period-comparison';
 import type { SocialPlatform } from '@/types/domain';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
@@ -111,6 +118,25 @@ export default function AccountDetailPage() {
         : [],
     [metricsAll, accountRecord],
   );
+
+  // This month vs last month, per recorded field.
+  const periodComparison = useMemo(() => {
+    if (!accountRecord) return [];
+    return compareMetricValues(
+      accountMetrics,
+      PLATFORM_METRIC_FIELDS[accountRecord.platform],
+    );
+  }, [accountRecord, accountMetrics]);
+
+  const periodLabels = useMemo(() => {
+    const sorted = sortMetricsByPeriod(accountMetrics);
+    const cur = sorted[sorted.length - 1]?.periodLabel;
+    const prev = sorted[sorted.length - 2]?.periodLabel;
+    return {
+      current: cur ? jalaliMonthName(cur) : '',
+      previous: prev ? jalaliMonthName(prev) : '',
+    };
+  }, [accountMetrics]);
 
   // Prepare chart data (declared before any early returns — Rules of Hooks).
   const chartData = useMemo(() => {
@@ -231,6 +257,13 @@ export default function AccountDetailPage() {
 
       {/* Platform-specific metric cards */}
       <PlatformMetricCards platform={account.platform} metric={latestMetric} />
+
+      {/* This month vs last month, per metric field */}
+      <MetricPeriodComparison
+        items={periodComparison}
+        currentPeriodLabel={periodLabels.current}
+        previousPeriodLabel={periodLabels.previous}
+      />
 
       {/* Follower Trend Chart */}
       <section>
