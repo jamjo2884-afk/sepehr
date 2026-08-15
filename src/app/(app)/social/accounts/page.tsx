@@ -12,6 +12,7 @@ import {
   Plus,
   Power,
   RefreshCw,
+  Upload,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -46,6 +47,7 @@ import { formatJalaliDate, formatNumber } from '@/utils/persian';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { MetricFormDialog } from '@/components/social/metric-form-dialog';
 import { BulkMetricFormDialog } from '@/components/social/bulk-metric-form-dialog';
+import { BulkImportDialog } from '@/components/social/bulk-import-dialog';
 import { AccountFormDialog } from '@/components/social/account-form-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -84,6 +86,7 @@ export default function SocialAccountsPage() {
     undefined,
   );
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<SocialAccount | null>(
     null,
@@ -326,6 +329,15 @@ export default function SocialAccountsPage() {
             >
               <ClipboardList className="h-3.5 w-3.5" />
               ثبت انبوه
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5 text-xs"
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload className="h-3.5 w-3.5" />
+              ورود انبوه
             </Button>
           </div>
         </div>
@@ -624,6 +636,13 @@ export default function SocialAccountsPage() {
         accounts={accounts}
         onSaved={() => {
           setBulkOpen(false);
+          setReloadKey((k) => k + 1);
+        }}
+      />
+      <BulkImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={() => {
           setReloadKey((k) => k + 1);
         }}
       />

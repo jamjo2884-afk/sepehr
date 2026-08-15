@@ -8,7 +8,7 @@ import {
 /** Convert Latin/Arabic digits in a string to Persian digits. */
 export function toPersianDigits(value: string | number): string {
   const normalized = String(value).replace(/[٠-٩]/g, (d) =>
-    String.fromCharCode(d.charCodeAt(0) - 0x6c0 + 0x0030),
+    String.fromCharCode(d.charCodeAt(0) - 0x0660 + 0x0030),
   );
   return normalized.replace(/[0-9]/g, (d) => PERSIAN_DIGITS[Number(d)]);
 }
@@ -16,8 +16,8 @@ export function toPersianDigits(value: string | number): string {
 /** Convert Persian/Arabic digits in a string to Latin digits. */
 export function toLatinDigits(value: string): string {
   return value
-    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x6f0))
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x6c0));
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660));
 }
 
 /** Format a number with grouping separators and Persian digits. */

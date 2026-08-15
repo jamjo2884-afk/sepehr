@@ -62,6 +62,7 @@
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.1",
     "vazirmatn": "^33.0.3",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.0",
     "zustand": "^4.5.4"
   },
