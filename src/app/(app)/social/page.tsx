@@ -542,14 +542,16 @@ export default function SocialPage() {
           </h1>
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
               size="sm"
-              className="shrink-0 gap-1.5 text-xs"
+              className="shrink-0 gap-2 px-4 text-xs shadow-sm"
               asChild
             >
               <Link href="/social/accounts">
-                <Database className="h-3.5 w-3.5" />
+                <Database className="h-4 w-4" />
                 مدیریت آمار
+                <span className="rounded-full bg-primary-foreground/15 px-2 py-0.5 text-[10px] font-medium">
+                  ورود داده
+                </span>
               </Link>
             </Button>
           </div>
