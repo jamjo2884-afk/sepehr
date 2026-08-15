@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   BarChart3,
   CalendarRange,
-  ClipboardList,
   Database,
   GitCompareArrows,
   Inbox,
@@ -59,7 +58,6 @@ import { PeriodComparison } from '@/components/social/analytics/period-compariso
 import { SectionTitle } from '@/components/social/analytics/shared';
 import { ScoreRankingTable } from '@/components/social/score-ranking-table';
 import { SocialAccountCard } from '@/components/social/account-card';
-import { BulkMetricFormDialog } from '@/components/social/bulk-metric-form-dialog';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { useSocialBrandEdits } from '@/stores/social-brands.store';
 import { formatNumber } from '@/utils/persian';
@@ -92,7 +90,6 @@ export default function SocialPage() {
   );
   const [rangePreset, setRangePreset] = useState<SocialRangePreset>('24m');
   const [customRange, setCustomRange] = useState<SocialMonthRange | null>(null);
-  const [bulkOpen, setBulkOpen] = useState(false);
   const [brandWarning, setBrandWarning] = useState<string | null>(null);
 
   // Brand management dialog state.
@@ -548,15 +545,6 @@ export default function SocialPage() {
               variant="outline"
               size="sm"
               className="shrink-0 gap-1.5 text-xs"
-              onClick={() => setBulkOpen(true)}
-            >
-              <ClipboardList className="h-3.5 w-3.5" />
-              ثبت انبوه
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0 gap-1.5 text-xs"
               asChild
             >
               <Link href="/social/accounts">
@@ -740,16 +728,6 @@ export default function SocialPage() {
           </div>
         )}
       </section>
-
-      <BulkMetricFormDialog
-        open={bulkOpen}
-        onOpenChange={setBulkOpen}
-        accounts={raw.accounts}
-        onSaved={() => {
-          setBulkOpen(false);
-          setReloadKey((k) => k + 1);
-        }}
-      />
     </motion.div>
   );
 }
