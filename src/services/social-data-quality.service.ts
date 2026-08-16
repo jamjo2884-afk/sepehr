@@ -23,6 +23,7 @@ import type {
   SocialAccount,
   SocialDataQualityAccountStatus,
   SocialDataQualityIssue,
+  SocialDataQualityIssueType,
   SocialDataQualityReport,
   SocialDataQualitySeverity,
   SocialDataQualityStatus,
@@ -75,6 +76,22 @@ export const SOCIAL_DATA_QUALITY_SEVERITY_LABELS: Record<
   critical: 'مشکل جدی',
   warning: 'نیازمند بررسی',
   info: 'اطلاعات',
+};
+
+/** Centralized Persian labels for every issue type (UI must use these). */
+export const SOCIAL_DATA_QUALITY_ISSUE_TYPE_LABELS: Record<
+  SocialDataQualityIssueType,
+  string
+> = {
+  negative_metric: 'مقدار منفی',
+  invalid_engagement_rate: 'نرخ تعامل نامعتبر',
+  future_metric: 'متریک آینده',
+  stale_account: 'دادهٔ قدیمی',
+  temporal_gap: 'شکاف زمانی',
+  orphan_metric: 'متریک یتیم',
+  duplicate_metric: 'تکرار رکورد',
+  missing_optional_field: 'فیلد اختیاری ثبت‌نشده',
+  account_without_metrics: 'حساب بدون متریک',
 };
 
 /** Whether a stored period label matches the expected format of its period. */
@@ -145,6 +162,7 @@ export function analyzeSocialDataQuality(
         type: 'orphan_metric',
         accountId: metric.accountId,
         platform: null,
+        metricId: String(metric.id),
         metricDate: metric.periodLabel,
         field: null,
         message: 'متریک به حسابی ارجاع می‌دهد که وجود ندارد.',
@@ -172,6 +190,9 @@ export function analyzeSocialDataQuality(
         type: 'duplicate_metric',
         accountId: first.accountId,
         platform: accountById.get(first.accountId)?.platform ?? null,
+        // The issue concerns the whole (account, period, label) group;
+        // keying it on one member's id keeps groups distinguishable.
+        metricId: String(first.id),
         metricDate: first.periodLabel,
         field: null,
         message: `برای کلید یکسان (حساب، دوره، برچسب دوره) ${group.length} رکورد ثبت شده است.`,
@@ -196,6 +217,7 @@ export function analyzeSocialDataQuality(
         type: 'account_without_metrics',
         accountId: account.id,
         platform: account.platform,
+        metricId: null,
         metricDate: null,
         field: null,
         message: 'برای این حساب هنوز هیچ متریکی ثبت نشده است.',
@@ -231,6 +253,7 @@ export function analyzeSocialDataQuality(
                 : 'negative_metric',
             accountId: account.id,
             platform: account.platform,
+            metricId: String(metric.id),
             metricDate: metric.periodLabel,
             field,
             message: error,
@@ -253,6 +276,7 @@ export function analyzeSocialDataQuality(
           type: 'future_metric',
           accountId: account.id,
           platform: account.platform,
+          metricId: String(metric.id),
           metricDate: metric.periodLabel,
           field: null,
           message: `متریک برای دورهٔ ${metric.periodLabel} در آینده ثبت شده است.`,
@@ -284,6 +308,8 @@ export function analyzeSocialDataQuality(
               type: 'temporal_gap',
               accountId: account.id,
               platform: account.platform,
+              // The gap is anchored on the LATER metric of the pair.
+              metricId: String(metric.id),
               metricDate: metric.periodLabel,
               field: null,
               message: `بین دورهٔ ${previousMonthly.periodLabel} و ${metric.periodLabel}، ${gapMonths} ماه بدون داده وجود دارد.`,
@@ -312,6 +338,7 @@ export function analyzeSocialDataQuality(
           type: 'missing_optional_field',
           accountId: account.id,
           platform: account.platform,
+          metricId: null,
           metricDate: null,
           field,
           message: `متریک «${SOCIAL_METRIC_FIELDS[field].label}» (ویژهٔ ${SOCIAL_PLATFORM_LABELS[account.platform]}) برای این حساب ثبت نشده است.`,
@@ -340,6 +367,10 @@ export function analyzeSocialDataQuality(
         type: 'stale_account',
         accountId: account.id,
         platform: account.platform,
+        // Tied to the specific latest metric row: when a newer metric is
+        // added the issue (and its identity) changes, so an old review can
+        // never carry over to a new stale issue.
+        metricId: String(latest.id),
         metricDate: latest.periodLabel,
         field: null,
         message: `آخرین متریک این حساب ${ageDays} روز قبل ثبت شده است (آستانه: ${SOCIAL_DATA_STALE_DAYS} روز).`,

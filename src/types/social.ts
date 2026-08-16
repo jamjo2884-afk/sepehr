@@ -567,6 +567,13 @@ export interface SocialDataQualityIssue {
   /** Account the issue belongs to (dangling id for orphan metrics). */
   accountId: string | null;
   platform: SocialPlatform | null;
+  /**
+   * Primary key of the `social_metrics` row the issue is tied to, when one
+   * exists (negative/future/temporal-gap/duplicate/orphan/stale issues).
+   * NULL for account-level issues (e.g. account without metrics, missing
+   * optional field). Stable identity — used as part of the review key.
+   */
+  metricId: string | null;
   /** Period label of the related metric, when the issue concerns one. */
   metricDate: string | null;
   /** Metric field the issue concerns (e.g. 'storyViews'), when applicable. */
@@ -596,9 +603,60 @@ export interface SocialDataQualitySummary {
   totalIssues: number;
 }
 
-/** Full read-only data-quality report. */
+/** Full read-only data-quality report (pure detector output). */
 export interface SocialDataQualityReport {
   summary: SocialDataQualitySummary;
   issues: SocialDataQualityIssue[];
+  accounts: SocialDataQualityAccountStatus[];
+}
+
+/* =========================================================================
+ * Data Quality Review (social-data-quality-review service)
+ * ========================================================================= */
+
+/** Human review state attached to a detected issue (no data mutation). */
+export type SocialDataQualityReviewStatus = 'reviewed' | 'ignored';
+
+/** Effective review state of an issue in the merged report. */
+export type SocialDataQualityIssueReviewStatus =
+  'open' | SocialDataQualityReviewStatus;
+
+/** One persisted human review row (`social_data_quality_reviews`). */
+export interface SocialDataQualityReview {
+  id: string;
+  /** Issue type this review applies to (deterministic issue identity). */
+  issueType: SocialDataQualityIssueType;
+  accountId: string | null;
+  metricId: number | null;
+  field: SocialMetricFieldKey | null;
+  status: SocialDataQualityReviewStatus;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Input for creating / updating a review through the service. */
+export interface SocialDataQualityReviewInput {
+  issueType: SocialDataQualityIssueType;
+  accountId: string | null;
+  metricId?: number | null;
+  field?: SocialMetricFieldKey | null;
+  status: SocialDataQualityReviewStatus;
+}
+
+/** A detected issue with its human review state attached. */
+export interface SocialDataQualityIssueWithReview extends SocialDataQualityIssue {
+  /** 'open' when no review record exists. */
+  reviewStatus: SocialDataQualityIssueReviewStatus;
+}
+
+/** Data-quality report merged with review states (what the API returns). */
+export interface SocialDataQualityReportWithReviews {
+  summary: SocialDataQualitySummary & {
+    openIssues: number;
+    reviewedIssues: number;
+    ignoredIssues: number;
+  };
+  issues: SocialDataQualityIssueWithReview[];
   accounts: SocialDataQualityAccountStatus[];
 }

@@ -149,6 +149,8 @@ describe('analyzeSocialDataQuality', () => {
     expect(issue.type).toBe('account_without_metrics');
     expect(issue.severity).toBe('warning');
     expect(issue.accountId).toBe(account.id);
+    // No metric exists → the durable review identity has no metricId.
+    expect(issue.metricId).toBeNull();
     expect(report.accounts[0].status).toBe('warning');
     expect(report.summary.warningAccounts).toBe(1);
   });
@@ -162,6 +164,8 @@ describe('analyzeSocialDataQuality', () => {
     expect(issue).toBeDefined();
     expect(issue!.severity).toBe('warning');
     expect(issue!.metricDate).toBe(staleMonthly);
+    // The stale issue is tied to the specific latest metric row.
+    expect(issue!.metricId).toBe(String(metrics[0].id));
     expect(report.accounts[0].status).toBe('warning');
   });
 
@@ -181,7 +185,9 @@ describe('analyzeSocialDataQuality', () => {
     expect(negative[0].severity).toBe('critical');
     expect(negative[0].field).toBe('followers');
     expect(negative[0].details).toEqual({ storedValue: -5 });
+    expect(negative[0].metricId).toBe(String(metrics[0].id));
     expect(negative[1].field).toBe('likes');
+    expect(negative[1].metricId).toBe(String(metrics[1].id));
     expect(report.accounts[0].status).toBe('critical');
   });
 
@@ -219,6 +225,8 @@ describe('analyzeSocialDataQuality', () => {
     expect(orphan).toHaveLength(1);
     expect(orphan[0].severity).toBe('critical');
     expect(orphan[0].accountId).toBe('missing-account');
+    // The orphan metric row exists, so it carries its real metric id.
+    expect(orphan[0].metricId).toBe(String(metrics[0].id));
     // Orphans have no account row, so they never count as a critical account.
     expect(report.summary.criticalAccounts).toBe(0);
     expect(report.summary.totalIssues).toBe(1);
@@ -269,6 +277,8 @@ describe('analyzeSocialDataQuality', () => {
     expect(info).toHaveLength(1);
     expect(info[0].severity).toBe('info');
     expect(info[0].field).toBe('storyViews');
+    // Account-level absence — no metric row to reference.
+    expect(info[0].metricId).toBeNull();
     expect(report.issues.some((i) => i.severity === 'critical')).toBe(false);
     // Info-only account stays healthy.
     expect(report.accounts[0].status).toBe('healthy');

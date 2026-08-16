@@ -351,8 +351,15 @@ export default function SocialAccountsPage() {
       {/* Platform overview + sync health */}
       <SyncOverviewSection overview={overview} />
 
-      {/* Data quality (read-only) */}
-      <DataQualityPanel accounts={accounts} reloadKey={reloadKey} />
+      {/* Data quality (read-only) + review center */}
+      <DataQualityPanel
+        accounts={accounts}
+        reloadKey={reloadKey}
+        onManageAccount={(accountId) => {
+          setRecordAccountId(accountId);
+          setRecordOpen(true);
+        }}
+      />
 
       {/* Filters */}
       <div className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-surface/60 p-4 sm:grid-cols-3">

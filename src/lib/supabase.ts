@@ -24,5 +24,13 @@ export const supabase: SupabaseClient = createClient(
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
+    global: {
+      // Next.js App Router patches global fetch and caches GET responses in
+      // its Data Cache (revalidate ~1 year). Supabase reads must always be
+      // live, so opt every request out of that cache. Without this, API
+      // routes can serve stale rows (e.g. an empty review list) until the
+      // cache expires or is cleared.
+      fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }),
+    },
   },
 );
