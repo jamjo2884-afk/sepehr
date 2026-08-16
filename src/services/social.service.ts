@@ -582,7 +582,7 @@ interface MetricRow {
   updated_at: string;
 }
 
-function toSocialAccount(row: AccountRow): SocialAccount {
+export function toSocialAccount(row: AccountRow): SocialAccount {
   return {
     id: row.id,
     brand: row.brand,
@@ -601,7 +601,7 @@ function toSocialAccount(row: AccountRow): SocialAccount {
   };
 }
 
-function toSocialMetric(row: MetricRow): SocialMetric {
+export function toSocialMetric(row: MetricRow): SocialMetric {
   return {
     id: String(row.id),
     accountId: row.account_id,
@@ -835,7 +835,7 @@ export async function getSocialMetrics(
 }
 
 /** Read every matching metric row, paginating past the 1000-row cap. */
-async function fetchAllMetricRows(
+export async function fetchAllMetricRows(
   supabase: SupabaseClient,
   accountIds: string[] | undefined,
   period: SocialMetricPeriod | undefined,

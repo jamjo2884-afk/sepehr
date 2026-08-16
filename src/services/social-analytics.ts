@@ -729,7 +729,7 @@ export function buildBrandPlatformTimeline(
 }
 
 /** Approximate age in days of a 'YYYY-MM' Jalali label vs. now (end of month). */
-function ageOfPeriodLabelDays(label: string, now: Date): number | null {
+export function ageOfPeriodLabelDays(label: string, now: Date): number | null {
   const m = label.match(/^(\d{4})-(\d{2})$/);
   if (!m) return null;
   const jy = Number(m[1]);

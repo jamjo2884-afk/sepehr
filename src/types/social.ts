@@ -535,3 +535,70 @@ export type SocialMetricValues = Partial<{
   retweets: number | null;
   subscribers: number | null;
 }>;
+
+/* =========================================================================
+ * Data Quality (social-data-quality service)
+ * ========================================================================= */
+
+/** Severity of one data-quality issue. */
+export type SocialDataQualitySeverity = 'critical' | 'warning' | 'info';
+
+/** Overall health status of one account (critical > warning > healthy). */
+export type SocialDataQualityStatus = 'healthy' | 'warning' | 'critical';
+
+/** Machine-readable type of a data-quality issue. */
+export type SocialDataQualityIssueType =
+  | 'negative_metric'
+  | 'invalid_engagement_rate'
+  | 'future_metric'
+  | 'stale_account'
+  | 'temporal_gap'
+  | 'orphan_metric'
+  | 'duplicate_metric'
+  | 'missing_optional_field'
+  | 'account_without_metrics';
+
+/** One detected data-quality problem. */
+export interface SocialDataQualityIssue {
+  /** Stable, deterministic issue id. */
+  id: string;
+  severity: SocialDataQualitySeverity;
+  type: SocialDataQualityIssueType;
+  /** Account the issue belongs to (dangling id for orphan metrics). */
+  accountId: string | null;
+  platform: SocialPlatform | null;
+  /** Period label of the related metric, when the issue concerns one. */
+  metricDate: string | null;
+  /** Metric field the issue concerns (e.g. 'storyViews'), when applicable. */
+  field: SocialMetricFieldKey | null;
+  /** Persian, human-readable message. */
+  message: string;
+  /** Optional structured context (e.g. { storedValue, gapMonths }). */
+  details: Record<string, unknown> | null;
+}
+
+/** Per-account data-quality status. */
+export interface SocialDataQualityAccountStatus {
+  accountId: string;
+  status: SocialDataQualityStatus;
+  issueCount: number;
+  criticalCount: number;
+  warningCount: number;
+  infoCount: number;
+}
+
+/** Headline counts for the data-quality report. */
+export interface SocialDataQualitySummary {
+  totalAccounts: number;
+  healthyAccounts: number;
+  warningAccounts: number;
+  criticalAccounts: number;
+  totalIssues: number;
+}
+
+/** Full read-only data-quality report. */
+export interface SocialDataQualityReport {
+  summary: SocialDataQualitySummary;
+  issues: SocialDataQualityIssue[];
+  accounts: SocialDataQualityAccountStatus[];
+}

@@ -153,3 +153,22 @@ export const PLATFORM_METRIC_FIELDS: Record<
     'engagementRate',
   ],
 };
+
+/**
+ * The metric columns that exist ONLY for one platform (a subset of
+ * `PLATFORM_METRIC_FIELDS`). Used by data quality to report platform
+ * fields that were never recorded, without inventing new metrics.
+ */
+export const PLATFORM_SPECIFIC_METRIC_FIELDS: Record<
+  SocialPlatform,
+  SocialMetricFieldKey[]
+> = {
+  instagram: ['storyViews'],
+  telegram: ['channelMembers'],
+  youtube: ['subscribers'],
+  twitter: ['retweets'],
+  bale: ['channelMembers'],
+  eita: ['channelMembers'],
+  rubika: ['channelMembers'],
+  soroushplus: ['channelMembers'],
+};

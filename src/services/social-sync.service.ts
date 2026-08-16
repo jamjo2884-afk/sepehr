@@ -6,7 +6,10 @@ import type {
   SocialMetricPeriod,
   SocialSyncRunStatus,
 } from '@/types/social';
-import { SOCIAL_METRIC_FIELDS } from '@/constants/social-fields';
+import {
+  SOCIAL_METRIC_FIELDS,
+  type SocialMetricFieldKey,
+} from '@/constants/social-fields';
 import type {
   SocialCredential,
   SocialPlatformConnector,
@@ -67,6 +70,32 @@ const COUNT_KEYS = new Set([
 ]);
 
 /**
+ * Validate a single normalized value against the project rules: count
+ * fields must be non-negative and engagement rate must be within 0..100.
+ * Returns a Persian error message, or null when the value is valid (or
+ * not a number at all — null/absent values are not validated).
+ *
+ * Shared by the sync pipeline and the data-quality analyzer so both
+ * consumers always apply the exact same rules.
+ */
+export function validateNormalizedMetricValue(
+  key: SocialMetricFieldKey,
+  value: number | null,
+): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  if (COUNT_KEYS.has(key) && value < 0) {
+    return `مقدار «${SOCIAL_METRIC_FIELDS[key]?.label ?? key}» نمی‌تواند منفی باشد.`;
+  }
+  if (
+    key === 'engagementRate' &&
+    (value < 0 || value > SOCIAL_ENGAGEMENT_RATE_CAP * 10)
+  ) {
+    return 'نرخ تعامل باید بین ۰ تا ۱۰۰ باشد.';
+  }
+  return null;
+}
+
+/**
  * Validate a normalized metric: reject negative counts and engagement
  * rates outside 0..100. Returns ok + the first error message (Persian,
  * technical detail limited — no secrets).
@@ -75,22 +104,11 @@ export function validateNormalizedMetric(
   metric: NormalizedSocialMetric,
 ): ValidationResult {
   for (const [key, value] of Object.entries(metric.values)) {
-    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
-    if (COUNT_KEYS.has(key) && value < 0) {
-      return {
-        ok: false,
-        error: `مقدار «${SOCIAL_METRIC_FIELDS[key as keyof typeof SOCIAL_METRIC_FIELDS]?.label ?? key}» نمی‌تواند منفی باشد.`,
-      };
-    }
-    if (
-      key === 'engagementRate' &&
-      (value < 0 || value > SOCIAL_ENGAGEMENT_RATE_CAP * 10)
-    ) {
-      return {
-        ok: false,
-        error: 'نرخ تعامل باید بین ۰ تا ۱۰۰ باشد.',
-      };
-    }
+    const error = validateNormalizedMetricValue(
+      key as SocialMetricFieldKey,
+      value as number | null,
+    );
+    if (error) return { ok: false, error };
   }
   return { ok: true, error: null };
 }

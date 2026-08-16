@@ -49,6 +49,7 @@ import { MetricFormDialog } from '@/components/social/metric-form-dialog';
 import { BulkMetricFormDialog } from '@/components/social/bulk-metric-form-dialog';
 import { BulkImportDialog } from '@/components/social/bulk-import-dialog';
 import { AccountFormDialog } from '@/components/social/account-form-dialog';
+import { DataQualityPanel } from '@/components/social/data-quality/data-quality-panel';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -349,6 +350,9 @@ export default function SocialAccountsPage() {
 
       {/* Platform overview + sync health */}
       <SyncOverviewSection overview={overview} />
+
+      {/* Data quality (read-only) */}
+      <DataQualityPanel accounts={accounts} reloadKey={reloadKey} />
 
       {/* Filters */}
       <div className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-surface/60 p-4 sm:grid-cols-3">
