@@ -988,8 +988,9 @@ export async function getMetricsForDateRange(
   return metricsInRange(metrics, start, end);
 }
 
-/** snake_case column for each input key. */
-const METRIC_COLUMN_BY_KEY: Record<keyof SocialMetricValues, string> = {
+/** snake_case column for each input key. Shared by every metric write
+ * path (record / bulk record / update) — never duplicated elsewhere. */
+export const METRIC_COLUMN_BY_KEY: Record<keyof SocialMetricValues, string> = {
   followers: 'followers',
   following: 'following',
   posts: 'posts',
@@ -1185,10 +1186,16 @@ export async function recordSocialMetricsBulk(
  * Update an existing metric row by id. Only the keys present in `values`
  * are written; `null` clears a nullable column, `followers` falls back to 0
  * (NOT NULL schema). Returns the updated row, or null on failure.
+ *
+ * Optional optimistic concurrency: when `expectedUpdatedAt` is provided the
+ * row is only updated when its `updated_at` still matches (a compare-and-
+ * swap). A null return then means the row was changed or deleted by another
+ * process after the caller read it — never overwrite in that case.
  */
 export async function updateSocialMetric(
   metricId: string | number,
   values: SocialMetricValues,
+  options: { expectedUpdatedAt?: string | null } = {},
 ): Promise<SocialMetric | null> {
   try {
     const { supabase } = await import('@/lib/supabase');
@@ -1198,13 +1205,15 @@ export async function updateSocialMetric(
       row[METRIC_COLUMN_BY_KEY[key]] =
         value ?? (key === 'followers' ? 0 : null);
     }
-    const { data, error } = await supabase
-      .from('social_metrics')
-      .update(row)
-      .eq('id', metricId)
-      .select()
-      .single();
+    let query = supabase.from('social_metrics').update(row).eq('id', metricId);
+    if (options.expectedUpdatedAt) {
+      query = query.eq('updated_at', options.expectedUpdatedAt);
+    }
+    const { data, error } = await query.select().maybeSingle();
     if (error) throw error;
+    // No row matched the id (+ expected updated_at) — either the metric no
+    // longer exists or it was changed concurrently. Same null contract.
+    if (!data) return null;
     return toSocialMetric(data as unknown as MetricRow);
   } catch (err) {
     console.warn('[social] Could not update social metric.', err);

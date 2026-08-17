@@ -9,6 +9,7 @@ import {
   Eye,
   History,
   Pencil,
+  PenLine,
   Plus,
   Power,
   RefreshCw,
@@ -47,6 +48,7 @@ import { formatJalaliDate, formatNumber } from '@/utils/persian';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { MetricFormDialog } from '@/components/social/metric-form-dialog';
 import { BulkMetricFormDialog } from '@/components/social/bulk-metric-form-dialog';
+import { BulkEditDialog } from '@/components/social/bulk-edit-dialog';
 import { BulkImportDialog } from '@/components/social/bulk-import-dialog';
 import { AccountFormDialog } from '@/components/social/account-form-dialog';
 import { DataQualityPanel } from '@/components/social/data-quality/data-quality-panel';
@@ -87,6 +89,7 @@ export default function SocialAccountsPage() {
     undefined,
   );
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<SocialAccount | null>(
@@ -330,6 +333,16 @@ export default function SocialAccountsPage() {
             >
               <ClipboardList className="h-3.5 w-3.5" />
               ثبت انبوه
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5 text-xs"
+              onClick={() => setBulkEditOpen(true)}
+              title="ویرایش رکوردهای آماری موجود به‌صورت گروهی"
+            >
+              <PenLine className="h-3.5 w-3.5" />
+              ویرایش انبوه
             </Button>
             <Button
               variant="outline"
@@ -649,6 +662,13 @@ export default function SocialAccountsPage() {
           setBulkOpen(false);
           setReloadKey((k) => k + 1);
         }}
+      />
+      <BulkEditDialog
+        open={bulkEditOpen}
+        onOpenChange={setBulkEditOpen}
+        accounts={accounts}
+        metrics={metrics}
+        onSaved={() => setReloadKey((k) => k + 1)}
       />
       <BulkImportDialog
         open={importOpen}
