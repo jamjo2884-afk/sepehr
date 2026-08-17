@@ -5,7 +5,8 @@
 @layer base {
   :root {
     /* ============================================================
-       MEDIA DECK — Design Tokens (Dark Data Dashboard)
+       MEDIA DECK — Design Tokens
+       Light theme (default). Dark theme lives in `.dark`.
        Primary   #1677FF   Electric Cyan #16C7D9   Deep Navy #071426
        ============================================================ */
 
@@ -16,6 +17,107 @@
     --brand-navy: #071426;
     --brand-navy-surface: #0d1b2e;
     --brand-blue-surface: #102544;
+
+    --bg-main: #f4f7fb;
+    --bg-surface: #ffffff;
+    --bg-surface-2: #eef2f8;
+
+    --text-primary: #0b1424;
+    --text-secondary: #5b6b84;
+
+    --border-color: #d9dfe9;
+
+    --success: #16a34a;
+    --warning: #d97706;
+    --danger: #dc2626;
+
+    /* ---- Surfaces ---- */
+    --background: 220 25% 97%; /* #F4F7FB */
+    --foreground: 219 55% 10%; /* #0B1424 */
+
+    --surface: 0 0% 100%; /* #FFFFFF */
+    --surface-raised: 0 0% 100%; /* #FFFFFF */
+    --surface-foreground: 219 55% 10%;
+
+    --card: 0 0% 100%; /* #FFFFFF */
+    --card-foreground: 219 55% 10%;
+
+    --popover: 0 0% 100%; /* #FFFFFF */
+    --popover-foreground: 219 55% 10%;
+
+    /* ---- Brand ---- */
+    --primary: 216 100% 54%; /* #1677FF */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 220 18% 93%; /* #E9EDF4 */
+    --secondary-foreground: 219 55% 10%;
+
+    --muted: 220 18% 93%;
+    --muted-foreground: 215 20% 42%; /* #64748B */
+
+    --accent: 186 72% 47%; /* #16C7D9 */
+    --accent-foreground: 219 55% 10%;
+
+    --cyan: 186 72% 47%; /* #16C7D9 */
+    --purple: 239 84% 67%; /* #6366F1 */
+
+    --destructive: 0 72% 51%; /* #E11D48-ish red */
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 58% 42%; /* #16A34A */
+    --success-foreground: 210 40% 98%;
+
+    --warning: 38 92% 45%; /* #D97706 */
+    --warning-foreground: 38 100% 8%;
+
+    --border: 220 18% 88%; /* #DCE1EA */
+    --input: 220 18% 88%;
+    --ring: 216 100% 54%;
+
+    /* ---- Chart palette (single shared language) ---- */
+    --chart-1: 216 100% 54%; /* #1677FF */
+    --chart-2: 186 72% 47%; /* #16C7D9 */
+    --chart-3: 239 84% 67%; /* #6366F1 */
+    --chart-4: 142 58% 45%; /* #22C55E */
+    --chart-5: 38 92% 50%; /* #F59E0B */
+
+    /* ===== Brand Ramp (Blue, #1677FF at 500) ===== */
+    --brand-50: 216 100% 97%;
+    --brand-100: 216 96% 90%;
+    --brand-200: 216 91% 80%;
+    --brand-300: 216 87% 69%;
+    --brand-400: 216 82% 61%;
+    --brand-500: 216 100% 54%;
+    --brand-600: 215 86% 46%;
+    --brand-700: 217 76% 38%;
+    --brand-800: 218 66% 30%;
+    --brand-900: 219 56% 22%;
+
+    /* ===== Radius (8 / 12 / 16 / 20 / 24) ===== */
+    --radius-sm: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.25rem;
+    --radius-2xl: 1.5rem;
+
+    /* ===== Shadows (very subtle, light-theme) ===== */
+    --shadow-xs: 0 1px 2px 0 rgb(7 20 38 / 0.05);
+    --shadow-sm:
+      0 1px 3px 0 rgb(7 20 38 / 0.08), 0 1px 2px -1px rgb(7 20 38 / 0.06);
+    --shadow-md:
+      0 4px 6px -1px rgb(7 20 38 / 0.07), 0 2px 4px -2px rgb(7 20 38 / 0.05);
+    --shadow-lg:
+      0 10px 15px -3px rgb(7 20 38 / 0.08), 0 4px 6px -4px rgb(7 20 38 / 0.05);
+    --shadow-xl:
+      0 20px 25px -5px rgb(7 20 38 / 0.1), 0 8px 10px -6px rgb(7 20 38 / 0.06);
+    --shadow-glow:
+      0 0 0 1px rgb(22 119 255 / 0.18), 0 0 24px -6px rgb(22 119 255 / 0.25);
+  }
+
+  .dark {
+    /* ============================================================
+       Dark Data Dashboard — Deep Navy
+       ============================================================ */
 
     --bg-main: #071426;
     --bg-surface: #0d1b2e;
@@ -73,14 +175,14 @@
     --input: 217 33% 17%;
     --ring: 216 100% 54%;
 
-    /* ---- Chart palette (single shared language) ---- */
-    --chart-1: 216 100% 54%; /* #1677FF */
-    --chart-2: 186 72% 47%; /* #16C7D9 */
-    --chart-3: 239 84% 67%; /* #6366F1 */
-    --chart-4: 142 58% 45%; /* #22C55E */
-    --chart-5: 38 92% 50%; /* #F59E0B */
+    /* ---- Chart palette ---- */
+    --chart-1: 216 100% 54%;
+    --chart-2: 186 72% 47%;
+    --chart-3: 239 84% 67%;
+    --chart-4: 142 58% 45%;
+    --chart-5: 38 92% 50%;
 
-    /* ===== Brand Ramp (Blue, #1677FF at 500) ===== */
+    /* ===== Brand Ramp ===== */
     --brand-50: 216 100% 97%;
     --brand-100: 216 96% 90%;
     --brand-200: 216 91% 80%;
@@ -91,13 +193,6 @@
     --brand-700: 217 76% 38%;
     --brand-800: 218 66% 30%;
     --brand-900: 219 56% 22%;
-
-    /* ===== Radius (8 / 12 / 16 / 20 / 24) ===== */
-    --radius-sm: 0.5rem;
-    --radius-md: 0.75rem;
-    --radius-lg: 1rem;
-    --radius-xl: 1.25rem;
-    --radius-2xl: 1.5rem;
 
     /* ===== Shadows (very subtle, navy-tinted) ===== */
     --shadow-xs: 0 1px 2px 0 rgb(7 20 38 / 0.35);
@@ -111,53 +206,6 @@
       0 20px 25px -5px rgb(7 20 38 / 0.55), 0 8px 10px -6px rgb(7 20 38 / 0.5);
     --shadow-glow:
       0 0 0 1px rgb(22 119 255 / 0.2), 0 0 24px -6px rgb(22 119 255 / 0.4);
-  }
-
-  .dark {
-    /* Dark theme is the single source of truth — tokens mirror :root. */
-    --background: 215 7% 9%;
-    --foreground: 210 40% 98%;
-    --surface: 215 7% 12%;
-    --surface-raised: 216 12% 16%;
-    --surface-foreground: 210 40% 98%;
-    --card: 215 7% 12%;
-    --card-foreground: 210 40% 98%;
-    --popover: 216 14% 13%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 216 100% 54%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 216 12% 16%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 216 12% 16%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 186 72% 47%;
-    --accent-foreground: 210 40% 98%;
-    --cyan: 186 72% 47%;
-    --purple: 239 84% 67%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 142 58% 45%;
-    --success-foreground: 210 40% 98%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 38 100% 8%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 216 100% 54%;
-    --chart-1: 216 100% 54%;
-    --chart-2: 186 72% 47%;
-    --chart-3: 239 84% 67%;
-    --chart-4: 142 58% 45%;
-    --chart-5: 38 92% 50%;
-    --brand-50: 216 100% 97%;
-    --brand-100: 216 96% 90%;
-    --brand-200: 216 91% 80%;
-    --brand-300: 216 87% 69%;
-    --brand-400: 216 82% 61%;
-    --brand-500: 216 100% 54%;
-    --brand-600: 215 86% 46%;
-    --brand-700: 217 76% 38%;
-    --brand-800: 218 66% 30%;
-    --brand-900: 219 56% 22%;
   }
 
   * {

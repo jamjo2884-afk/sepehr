@@ -1,4 +1,7 @@
-import { useId } from 'react';
+'use client';
+
+import { useEffect, useId, useState } from 'react';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 
 /* ============================================================
@@ -161,7 +164,7 @@ function Wordmark({ theme = 'dark', className, twoLine }: WordmarkProps) {
       <span
         dir="ltr"
         className={cn(
-          'font-inter flex flex-col font-bold leading-none tracking-[0.12em]',
+          'flex flex-col font-inter font-bold leading-none tracking-[0.12em]',
           className,
         )}
       >
@@ -197,37 +200,46 @@ interface LogoProps {
  * stacked:    mark above a two-line wordmark
  * icon:       mark only
  * wordmark:   text only
- */
-export function Logo({
+ */export function Logo({
   className,
   variant = 'horizontal',
-  theme = 'dark',
+  theme,
   showText,
 }: LogoProps) {
+  const { resolvedTheme } = useTheme();
+  // Gate theme-dependent rendering until mount so the server and the first
+  // client render agree (avoids React hydration mismatches); after mount
+  // the logo follows the active app theme unless a theme is forced.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const effectiveTheme: LogoTheme =
+    theme ?? (!mounted || resolvedTheme !== 'light' ? 'dark' : 'light');
   const effectiveVariant: LogoVariant =
     showText === false ? 'icon' : variant;
 
   if (effectiveVariant === 'icon') {
-    return <LogoMark className={className} theme={theme} />;
+    return <LogoMark className={className} theme={effectiveTheme} />;
   }
 
   if (effectiveVariant === 'wordmark') {
-    return <Wordmark theme={theme} className={className} />;
+    return <Wordmark theme={effectiveTheme} className={className} />;
   }
 
   if (effectiveVariant === 'stacked') {
     return (
       <div className={cn('flex flex-col items-center gap-2', className)}>
-        <LogoMark theme={theme} />
-        <Wordmark theme={theme} twoLine className="text-[13px]" />
+        <LogoMark theme={effectiveTheme} />
+        <Wordmark theme={effectiveTheme} twoLine className="text-[13px]" />
       </div>
     );
   }
 
   return (
     <div className={cn('flex items-center gap-2.5', className)}>
-      <LogoMark theme={theme} />
-      <Wordmark theme={theme} twoLine className="text-[13px]" />
+      <LogoMark theme={effectiveTheme} />
+      <Wordmark theme={effectiveTheme} twoLine className="text-[13px]" />
     </div>
   );
 }

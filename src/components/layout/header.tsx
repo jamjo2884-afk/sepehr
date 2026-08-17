@@ -8,10 +8,13 @@ import {
   ChevronDown,
   LogOut,
   Menu as MenuIcon,
+  Moon,
   Search,
   Settings,
+  Sun,
   UserCircle,
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,6 +63,8 @@ export function Header() {
   const router = useRouter();
   const { toggleSidebar } = useUIStore();
   const isMobile = useIsMobile();
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const profile = useAuthStore((s) => s.profile);
   const workspace = useAuthStore((s) => s.workspace);
   const [notifications, setNotifications] = useState(SAMPLE_NOTIFICATIONS);
@@ -115,6 +120,16 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-1.5">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setTheme(isDark ? 'light' : 'dark')}
+          aria-label={isDark ? 'فعال‌سازی تم روشن' : 'فعال‌سازی تم تاریک'}
+          title={isDark ? 'تم روشن' : 'تم تاریک'}
+        >
+          {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </Button>
+
         <Popover>
           <PopoverTrigger asChild>
             <Button
