@@ -72,6 +72,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 
 const MAX_COMPARE_BRANDS = 5;
 
@@ -701,33 +707,48 @@ export default function SocialPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Accordion
+            type="multiple"
+            defaultValue={[
+              groupedAccounts.find(([p]) => p === 'instagram')?.[0] ??
+                groupedAccounts[0]?.[0],
+            ]}
+            className="flex flex-col gap-3"
+          >
             {groupedAccounts.map(([platform, accounts]) => (
-              <div key={platform} className="flex flex-col gap-3">
-                <div className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-2">
-                  <SocialPlatformIcon
-                    platform={platform}
-                    className="h-6 w-6 rounded-md"
-                    iconClassName="h-3.5 w-3.5"
-                  />
-                  <span className="text-xs font-semibold text-foreground">
-                    {SOCIAL_PLATFORM_LABELS[platform]}
+              <AccordionItem
+                key={platform}
+                value={platform}
+                className="overflow-hidden rounded-xl border border-border bg-surface/60"
+              >
+                <AccordionTrigger className="gap-2 px-4 py-3 hover:no-underline">
+                  <span className="flex items-center gap-2">
+                    <SocialPlatformIcon
+                      platform={platform}
+                      className="h-6 w-6 rounded-md"
+                      iconClassName="h-3.5 w-3.5"
+                    />
+                    <span className="text-xs font-semibold text-foreground">
+                      {SOCIAL_PLATFORM_LABELS[platform]}
+                    </span>
                   </span>
-                  <span className="mr-auto text-[11px] text-muted-foreground">
+                  <span className="text-[11px] text-muted-foreground">
                     {formatNumber(accounts.length)} اکانت
                   </span>
-                </div>
-                <div className="flex flex-col gap-3">
-                  {accounts.map((account, i) => (
-                    <SocialAccountCard
-                      key={`${account.brand}-${account.platform}-${account.handle}-${i}`}
-                      account={account}
-                    />
-                  ))}
-                </div>
-              </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4 pt-1">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {accounts.map((account, i) => (
+                      <SocialAccountCard
+                        key={`${account.brand}-${account.platform}-${account.handle}-${i}`}
+                        account={account}
+                      />
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
             ))}
-          </div>
+          </Accordion>
         )}
       </section>
     </motion.div>

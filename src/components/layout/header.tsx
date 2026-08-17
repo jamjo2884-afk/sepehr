@@ -83,7 +83,7 @@ export function Header() {
   const displayEmail = profile?.email || '—';
   const displayInitial = displayName.charAt(0) || 'م';
   const roleLabel = profile ? ROLE_LABELS[profile.role] : null;
-  const workspaceName = workspace?.name || 'فضای کاری پیش‌فرض';
+  const workspaceName = workspace?.name || 'Media Deck';
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-surface/80 px-4 backdrop-blur-md lg:px-6">

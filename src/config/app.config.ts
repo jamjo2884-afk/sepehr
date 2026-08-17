@@ -5,7 +5,7 @@ export const appConfig = {
   version: '0.1.0',
   locale: 'fa-IR',
   direction: 'rtl' as const,
-  defaultWorkspace: 'فضای کاری پیش‌فرض',
+  defaultWorkspace: 'Media Deck',
 };
 
 export type AppConfig = typeof appConfig;

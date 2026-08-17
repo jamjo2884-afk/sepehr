@@ -184,7 +184,7 @@ export default function CommandCenterPage() {
     );
   }, []);
 
-  const workspaceName = workspace?.name ?? 'فضای کاری پیش‌فرض';
+  const workspaceName = workspace?.name ?? 'Media Deck';
 
   return (
     <motion.div

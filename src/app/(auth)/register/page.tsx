@@ -58,8 +58,8 @@ export default function RegisterPage() {
       <AuthShell title="حساب ساخته شد" subtitle="حساب شما با موفقیت ایجاد شد.">
         <div className="flex flex-col gap-4 text-center">
           <p className="text-sm text-muted-foreground">
-            فضای کاری پیش‌فرض شما ایجاد شد و نقش «مالک» به شما اختصاص یافت.
-            اکنون می‌توانید وارد شوید.
+            فضای کاری «Media Deck» برای شما ایجاد شد و نقش «مالک» به شما اختصاص
+            یافت. اکنون می‌توانید وارد شوید.
           </p>
           <Button
             type="button"
@@ -163,7 +163,7 @@ export default function RegisterPage() {
         </Button>
         <p className="text-center text-xs text-muted-foreground">
           با ساخت حساب، نقش «مالک» به شما اختصاص می‌یابد ({toPersianDigits(1)}{' '}
-          فضای کاری پیش‌فرض).
+          فضای کاری «Media Deck»).
         </p>
       </form>
     </AuthShell>
