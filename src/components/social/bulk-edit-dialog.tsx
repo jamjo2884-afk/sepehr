@@ -321,7 +321,6 @@ export function BulkEditDialog({
       }
       setResult(data);
       setStep('result');
-      onSaved();
     } catch {
       setFormError('ویرایش انبوه انجام نشد.');
     } finally {
@@ -334,10 +333,19 @@ export function BulkEditDialog({
     [filteredAccounts, metricByAccount],
   );
 
+  // Reload the page data only AFTER the dialog closes from the result
+  // step, so the result summary (موفق / تعارض / رد شده / خطا) stays
+  // visible. Refreshing while the dialog is open unmounts it (the accounts
+  // page shows a full loading skeleton during the refetch).
+  const handleOpenChange = (next: boolean) => {
+    if (!next && step === 'result' && result) onSaved();
+    onOpenChange(next);
+  };
+
   const isOpen = open;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>ویرایش انبوه آمار</DialogTitle>
@@ -498,7 +506,6 @@ export function BulkEditDialog({
                         <div className="flex items-center justify-between gap-2">
                           <Label className="text-xs text-foreground">
                             {spec.label}
-                            {spec.kind === 'percent' ? ' (٪)' : ''}
                           </Label>
                           <Select
                             value={mode}
@@ -808,7 +815,7 @@ export function BulkEditDialog({
           {step === 'result' ? (
             <Button
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleOpenChange(false)}
               disabled={saving}
             >
               پایان
