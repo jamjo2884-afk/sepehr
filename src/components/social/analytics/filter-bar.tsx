@@ -8,6 +8,7 @@ import { SOCIAL_RANGE_PRESET_LABELS } from '@/types/social';
 import type { SocialMonthRange, SocialRangePreset } from '@/types/social';
 import { jalaliMonthName } from '@/services/social-analytics';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
+import { BrandLogo } from '@/components/common/brand-logo';
 import { cn } from '@/lib/utils';
 import {
   Select,
@@ -91,6 +92,13 @@ export function AnalyticsFilterBar({
               key={brand}
               active={selectedBrands.includes(brand)}
               onClick={() => onToggleBrand(brand)}
+              icon={
+                <BrandLogo
+                  brand={brand}
+                  className="h-6 w-6 rounded-full"
+                  iconClassName="text-[11px]"
+                />
+              }
               label={brand}
             />
           ))}

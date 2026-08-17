@@ -46,6 +46,7 @@ import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { jalaliMonthName } from '@/services/social-analytics';
 import { formatJalaliDate, formatNumber } from '@/utils/persian';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
+import { BrandLogo } from '@/components/common/brand-logo';
 import { MetricFormDialog } from '@/components/social/metric-form-dialog';
 import { BulkMetricFormDialog } from '@/components/social/bulk-metric-form-dialog';
 import { BulkEditDialog } from '@/components/social/bulk-edit-dialog';
@@ -487,8 +488,15 @@ export default function SocialAccountsPage() {
                     key={account.id}
                     className="border-b border-border/50 last:border-0 hover:bg-surface/40"
                   >
-                    <td className="px-4 py-2.5 font-medium text-foreground">
-                      {account.brand}
+                    <td className="px-4 py-2.5">
+                      <span className="flex items-center gap-2 font-medium text-foreground">
+                        <BrandLogo
+                          brand={account.brand}
+                          className="h-6 w-6 rounded-md"
+                          iconClassName="text-xs"
+                        />
+                        {account.brand}
+                      </span>
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
@@ -649,6 +657,7 @@ export default function SocialAccountsPage() {
         onOpenChange={setRecordOpen}
         accounts={accounts}
         defaultAccountId={recordAccountId}
+        existingMetrics={metrics}
         onSaved={() => {
           setRecordOpen(false);
           setReloadKey((k) => k + 1);

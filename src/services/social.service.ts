@@ -1183,9 +1183,33 @@ export async function recordSocialMetricsBulk(
 }
 
 /**
+ * Identity/lifecycle fields for `updateSocialMetric`. These define the
+ * (account_id, period, period_label) row key — providing any of them moves
+ * the row instead of only changing metric values.
+ */
+export interface SocialMetricIdentity {
+  /** Move the row to another account. */
+  accountId?: string;
+  /** Change the period granularity (monthly/weekly/daily). */
+  period?: SocialMetricPeriod;
+  /**
+   * Anchor date used to derive `period_label` and `period_start/end`
+   * through the same canonical helpers as `recordSocialMetrics`. Required
+   * for weekly rows (labels can't be converted back to a range).
+   */
+  date?: Date;
+}
+
+/**
  * Update an existing metric row by id. Only the keys present in `values`
  * are written; `null` clears a nullable column, `followers` falls back to 0
  * (NOT NULL schema). Returns the updated row, or null on failure.
+ *
+ * `identity` (optional) also moves the row's lifecycle fields — account,
+ * period, period label and the derived start/end range. The label/range
+ * are computed exactly like `recordSocialMetrics` so the row key stays
+ * consistent, and a duplicate (account, period, label) key on ANOTHER row
+ * is rejected before the write (the UNIQUE constraint would fail anyway).
  *
  * Optional optimistic concurrency: when `expectedUpdatedAt` is provided the
  * row is only updated when its `updated_at` still matches (a compare-and-
@@ -1195,16 +1219,68 @@ export async function recordSocialMetricsBulk(
 export async function updateSocialMetric(
   metricId: string | number,
   values: SocialMetricValues,
-  options: { expectedUpdatedAt?: string | null } = {},
+  options: {
+    expectedUpdatedAt?: string | null;
+    identity?: SocialMetricIdentity;
+  } = {},
 ): Promise<SocialMetric | null> {
   try {
     const { supabase } = await import('@/lib/supabase');
-    const row: Record<string, number | null> = {};
+    const row: Record<string, number | string | null> = {};
     for (const key of Object.keys(values) as Array<keyof SocialMetricValues>) {
       const value = values[key];
       row[METRIC_COLUMN_BY_KEY[key]] =
         value ?? (key === 'followers' ? 0 : null);
     }
+
+    // Identity/lifecycle move: recompute label + range from the same
+    // canonical helpers as recordSocialMetrics, then reject the write when
+    // the target (account, period, label) key already belongs to another row.
+    let targetAccountId: string | undefined;
+    let targetPeriod: SocialMetricPeriod | undefined;
+    let targetLabel: string | undefined;
+    if (options.identity) {
+      const { accountId, period, date } = options.identity;
+      const anchor = date ?? new Date();
+      if (accountId) row.account_id = accountId;
+      if (period) {
+        row.period = period;
+        const label = periodLabelForDate(anchor, period);
+        row.period_label = label;
+        const range =
+          period === 'weekly'
+            ? weeklyRangeForDate(anchor)
+            : periodRangeForLabel(period, label);
+        if (range?.start) row.period_start = range.start;
+        if (range?.end) row.period_end = range.end;
+      }
+      targetAccountId = accountId;
+      targetPeriod = period;
+      targetLabel = period ? periodLabelForDate(date ?? new Date(), period) : undefined;
+
+      const { data: current } = await supabase
+        .from('social_metrics')
+        .select('id, account_id, period, period_label')
+        .eq('id', metricId)
+        .maybeSingle();
+      if (!current) return null;
+      const { data: clash } = await supabase
+        .from('social_metrics')
+        .select('id')
+        .eq('account_id', targetAccountId ?? (current.account_id as string))
+        .eq('period', targetPeriod ?? (current.period as string))
+        .eq('period_label', targetLabel ?? (current.period_label as string))
+        .neq('id', metricId)
+        .maybeSingle();
+      if (clash) {
+        console.warn(
+          '[social] Duplicate metric key on update; aborted.',
+          { metricId, row },
+        );
+        return null;
+      }
+    }
+
     let query = supabase.from('social_metrics').update(row).eq('id', metricId);
     if (options.expectedUpdatedAt) {
       query = query.eq('updated_at', options.expectedUpdatedAt);
@@ -1218,6 +1294,31 @@ export async function updateSocialMetric(
   } catch (err) {
     console.warn('[social] Could not update social metric.', err);
     return null;
+  }
+}
+
+/**
+ * Delete a metric row by id. Related rows follow the schema's ON DELETE
+ * CASCADE: `social_data_quality_reviews` and `social_metric_edit_logs` for
+ * that metric are removed with it. Returns false when nothing was deleted
+ * (row missing, or `expectedUpdatedAt` no longer matches).
+ */
+export async function deleteSocialMetric(
+  metricId: string | number,
+  options: { expectedUpdatedAt?: string | null } = {},
+): Promise<boolean> {
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    let query = supabase.from('social_metrics').delete().eq('id', metricId);
+    if (options.expectedUpdatedAt) {
+      query = query.eq('updated_at', options.expectedUpdatedAt);
+    }
+    const { data, error } = await query.select('id');
+    if (error) throw error;
+    return (data?.length ?? 0) > 0;
+  } catch (err) {
+    console.warn('[social] Could not delete social metric.', err);
+    return false;
   }
 }
 

@@ -6,6 +6,7 @@ import { encodeAccountKey } from '@/services/social.service';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { formatNumber } from '@/utils/persian';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
+import { BrandLogo } from '@/components/common/brand-logo';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -26,6 +27,11 @@ export function SocialAccountCard({ account }: { account: SocialAccountRow }) {
             platform={account.platform}
             className="h-11 w-11 shrink-0 rounded-xl"
             iconClassName="h-6 w-6"
+          />
+          <BrandLogo
+            brand={account.brand}
+            className="h-9 w-9 shrink-0 rounded-lg"
+            iconClassName="text-sm"
           />
           <div className="flex min-w-0 flex-col">
             <span className="truncate text-sm font-semibold text-foreground">

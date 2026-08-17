@@ -43,6 +43,7 @@ import { PlatformBreakdown } from '@/components/social/platform-breakdown';
 import { PlatformComparisonTable } from '@/components/social/analytics/platform-comparison-table';
 import { SectionTitle } from '@/components/social/analytics/shared';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
+import { BrandLogo } from '@/components/common/brand-logo';
 import { formatNumber } from '@/utils/persian';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -411,8 +412,15 @@ export default function AudiencePage() {
                           </span>
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-muted-foreground">
-                        {account.brand}
+                      <td className="px-3 py-3">
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                          <BrandLogo
+                            brand={account.brand}
+                            className="h-5 w-5 rounded-md"
+                            iconClassName="text-[10px]"
+                          />
+                          {account.brand}
+                        </span>
                       </td>
                       <td className="px-3 py-3 tabular-nums text-foreground">
                         {formatNumber(account.latest?.value ?? 0)}

@@ -6,6 +6,7 @@ import type { SocialBrandOverview } from '@/types/social';
 import { jalaliMonthName } from '@/services/social-analytics';
 import { formatNumber } from '@/utils/persian';
 import { Button } from '@/components/ui/button';
+import { BrandLogo } from '@/components/common/brand-logo';
 import { GrowthPill, ValueOrDash } from './shared';
 
 /**
@@ -33,9 +34,16 @@ export function BrandHeader({
       </Button>
 
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          {brand}
-        </h1>
+        <div className="flex items-center gap-3">
+          <BrandLogo
+            brand={brand}
+            className="h-11 w-11 shrink-0 rounded-xl"
+            iconClassName="text-lg"
+          />
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            {brand}
+          </h1>
+        </div>
         <p className="text-sm text-muted-foreground">
           تحلیل عملکرد برند در شبکه‌های اجتماعی
         </p>

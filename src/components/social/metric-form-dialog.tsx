@@ -85,8 +85,10 @@ function jalaliDateFromISO(iso: string | null): string {
  *   in the schema and defaults to 0); an explicit 0 is stored as 0.
  * - Duplicates are impossible: re-recording the same account + period +
  *   label updates the existing row (UNIQUE constraint).
- * - Editing keeps the row identity (account / period / label) fixed and
- *   updates only the metric values.
+ * - Editing can change EVERY option — account, period, month/date and the
+ *   metric values. Moving a row onto an existing (account, period, label)
+ *   key is rejected (client-side when `existingMetrics` is provided, and
+ *   always by the service).
  */
 export function MetricFormDialog({
   open,
@@ -94,6 +96,7 @@ export function MetricFormDialog({
   accounts,
   defaultAccountId,
   metric,
+  existingMetrics,
   onSaved,
 }: {
   open: boolean;
@@ -103,6 +106,8 @@ export function MetricFormDialog({
   defaultAccountId?: string;
   /** When set, the dialog edits this existing metric. */
   metric?: SocialMetric | null;
+  /** All loaded metrics — enables a friendly duplicate-key pre-check. */
+  existingMetrics?: SocialMetric[];
   onSaved: (metric: SocialMetric, mode: 'create' | 'update') => void;
 }) {
   const isEdit = Boolean(metric);
@@ -184,6 +189,38 @@ export function MetricFormDialog({
     });
   };
 
+  /** The (account, period, periodLabel) key the form would write. */
+  const targetIdentity = (): {
+    accountId: string;
+    period: SocialMetricPeriod;
+    periodLabel: string;
+  } | null => {
+    if (period === 'monthly') {
+      const [jy, jm] = monthlyLabel.split('-').map(Number);
+      if (!jy || !jm) return null;
+      return { accountId, period, periodLabel: monthlyLabel };
+    }
+    const date = parseJalaliDate(dateInput);
+    if (!date) return null;
+    return { accountId, period, periodLabel: periodLabelForDate(date, period) };
+  };
+
+  /** Another row already occupying the target key (edit mode only). */
+  const findDuplicate = (): SocialMetric | null => {
+    if (!isEdit || !metric || !existingMetrics) return null;
+    const target = targetIdentity();
+    if (!target) return null;
+    return (
+      existingMetrics.find(
+        (m) =>
+          m.id !== metric.id &&
+          m.accountId === target.accountId &&
+          m.period === target.period &&
+          m.periodLabel === target.periodLabel,
+      ) ?? null
+    );
+  };
+
   const validate = (): string | null => {
     const errors: Record<string, string> = {};
     for (const key of platformFields) {
@@ -236,6 +273,27 @@ export function MetricFormDialog({
     }
 
     const payload = buildPayload();
+
+    // Resolve the anchor date for the chosen period — it defines the row
+    // key (period_label + range) through the canonical helpers.
+    let date = new Date();
+    if (period === 'monthly') {
+      const [jy, jm] = monthlyLabel.split('-').map(Number);
+      if (!jy || !jm) {
+        setFormError('ماه نامعتبر است.');
+        return;
+      }
+      date = jalaaliToDateObject(jy, jm, 1);
+    } else {
+      const parsed = parseJalaliDate(dateInput);
+      if (!parsed) {
+        setFormError('تاریخ شمسی نامعتبر است.');
+        setSaving(false);
+        return;
+      }
+      date = parsed;
+    }
+
     setSaving(true);
     setFormError(null);
 
@@ -243,7 +301,22 @@ export function MetricFormDialog({
       await import('@/services/social.service');
 
     if (isEdit && metric) {
-      const updated = await updateSocialMetric(metric.id, payload);
+      const duplicate = findDuplicate();
+      if (duplicate) {
+        const label =
+          duplicate.period === 'monthly'
+            ? jalaliMonthName(duplicate.periodLabel)
+            : toPersianDigits(duplicate.periodLabel);
+        setFormError(
+          `این دوره (${label}) برای این حساب قبلاً ثبت شده است.`,
+        );
+        setSaving(false);
+        return;
+      }
+      const updated = await updateSocialMetric(metric.id, payload, {
+        identity: { accountId, period, date },
+        expectedUpdatedAt: metric.updatedAt,
+      });
       if (!updated) {
         setFormError('ذخیره تغییرات انجام نشد. لطفاً دوباره تلاش کنید.');
         setSaving(false);
@@ -251,19 +324,6 @@ export function MetricFormDialog({
       }
       onSaved(updated, 'update');
     } else {
-      let date = new Date();
-      if (period === 'monthly') {
-        const [jy, jm] = monthlyLabel.split('-').map(Number);
-        date = jalaaliToDateObject(jy, jm, 1);
-      } else {
-        const parsed = parseJalaliDate(dateInput);
-        if (!parsed) {
-          setFormError('تاریخ شمسی نامعتبر است.');
-          setSaving(false);
-          return;
-        }
-        date = parsed;
-      }
       const created = await recordSocialMetrics(account.id, period, payload, {
         date,
       });
@@ -285,7 +345,7 @@ export function MetricFormDialog({
           <DialogTitle>{isEdit ? 'ویرایش آمار' : 'ثبت آمار جدید'}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? 'مقادیر این دوره را ویرایش کنید. دوره و حساب قابل تغییر نیستند.'
+              ? 'حساب، دوره و مقادیر را ویرایش کنید. اگر دورهٔ انتخابی برای این حساب قبلاً ثبت شده باشد، ذخیره انجام نمی‌شود.'
               : 'آمار این دوره برای حساب انتخاب‌شده ثبت می‌شود. ثبت مجدد همان دوره، رکورد قبلی را به‌روزرسانی می‌کند.'}
           </DialogDescription>
         </DialogHeader>
@@ -294,11 +354,7 @@ export function MetricFormDialog({
           {/* Account */}
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">حساب</Label>
-            <Select
-              value={accountId}
-              onValueChange={setAccountId}
-              disabled={isEdit}
-            >
+            <Select value={accountId} onValueChange={setAccountId}>
               <SelectTrigger className="h-9 text-xs">
                 <SelectValue placeholder="انتخاب حساب…" />
               </SelectTrigger>
@@ -323,7 +379,6 @@ export function MetricFormDialog({
                   setPeriod(v as SocialMetricPeriod);
                   setFormError(null);
                 }}
-                disabled={isEdit}
               >
                 <SelectTrigger className="h-9 text-xs">
                   <SelectValue />
@@ -351,7 +406,6 @@ export function MetricFormDialog({
                 <Select
                   value={monthlyLabel}
                   onValueChange={setMonthlyLabel}
-                  disabled={isEdit}
                 >
                   <SelectTrigger className="h-9 text-xs">
                     <SelectValue />
@@ -375,22 +429,19 @@ export function MetricFormDialog({
                       setFormError(null);
                     }}
                     placeholder="۱۴۰۵-۰۵-۲۳"
-                    disabled={isEdit}
                   />
-                  {!isEdit ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 shrink-0 text-xs"
-                      onClick={() => {
-                        setDateInput(todayJalaliString());
-                        setFormError(null);
-                      }}
-                    >
-                      امروز
-                    </Button>
-                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 shrink-0 text-xs"
+                    onClick={() => {
+                      setDateInput(todayJalaliString());
+                      setFormError(null);
+                    }}
+                  >
+                    امروز
+                  </Button>
                 </div>
               )}
               {period === 'weekly' && weeklyInfo ? (

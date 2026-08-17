@@ -10,6 +10,7 @@ import type {
 import type { SocialAccount } from '@/types/social';
 import { formatNumber, toPersianDigits } from '@/utils/persian';
 import { cn } from '@/lib/utils';
+import { BrandLogo } from '@/components/common/brand-logo';
 import { SectionTitle } from './analytics/shared';
 
 /**
@@ -155,12 +156,22 @@ export function ScoreRankingTable({
                     {href ? (
                       <Link
                         href={href}
-                        className="font-medium text-foreground transition-colors hover:text-primary"
+                        className="flex items-center gap-2 font-medium text-foreground transition-colors hover:text-primary"
                       >
+                        <BrandLogo
+                          brand={row.brand}
+                          className="h-6 w-6 rounded-md"
+                          iconClassName="text-xs"
+                        />
                         {row.brand}
                       </Link>
                     ) : (
-                      <span className="font-medium text-foreground">
+                      <span className="flex items-center gap-2 font-medium text-foreground">
+                        <BrandLogo
+                          brand={row.brand}
+                          className="h-6 w-6 rounded-md"
+                          iconClassName="text-xs"
+                        />
                         {row.brand}
                       </span>
                     )}

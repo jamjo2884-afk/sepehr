@@ -6,6 +6,7 @@ import type { SocialBrandStat } from '@/types/social';
 import { formatNumber } from '@/utils/persian';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
+import { BrandLogo } from '@/components/common/brand-logo';
 import { formatSigned, GrowthPill } from './shared';
 
 type SortKey =
@@ -109,8 +110,15 @@ export function BrandComparisonTable({
                       aria-label={`انتخاب ${row.brand} برای مقایسه`}
                     />
                   </td>
-                  <td className="px-3 py-2.5 font-medium text-foreground">
-                    {row.brand}
+                  <td className="px-3 py-2.5">
+                    <span className="flex items-center gap-2 font-medium text-foreground">
+                      <BrandLogo
+                        brand={row.brand}
+                        className="h-6 w-6 rounded-md"
+                        iconClassName="text-xs"
+                      />
+                      {row.brand}
+                    </span>
                   </td>
                   <td className="px-3 py-2.5 tabular-nums text-foreground">
                     {formatNumber(row.followers)}
