@@ -98,7 +98,7 @@ const DAILY_LABEL_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const WEEKLY_LABEL_RE = /^(\d{4})-W(\d{2})$/;
 
 /**
- * Normalize a period label cell into the canonical MediaOS format:
+ * Normalize a period label cell into the canonical Media Deck format:
  * - monthly: '1405-05' (accepts '1405-05' or 'مرداد ۱۴۰۵' / 'مرداد 1405')
  * - daily:   '1405-05-23'
  * - weekly:  '1405-W33'

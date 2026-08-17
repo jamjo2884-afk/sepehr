@@ -37,8 +37,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   profile: null,
   workspace: {
     id: 'demo',
-    name: 'MediaOS Demo Workspace',
-    slug: 'mediaos-demo',
+    name: 'Media Deck — فضای کاری دمو',
+    slug: 'media-deck-demo',
     logoUrl: null,
     createdAt: new Date().toISOString(),
   },

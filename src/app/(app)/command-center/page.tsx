@@ -7,9 +7,26 @@ import {
   ArrowLeft,
   Bell,
   Clock,
+  FileText,
   FolderKanban,
+  HeartPulse,
+  MessageSquareText,
+  Radio,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { useAuthStore } from '@/stores/auth.store';
 import { navItems } from '@/config/navigation.config';
 import { PROJECT_STATUS_LABELS, type Project } from '@/types/domain';
@@ -40,6 +57,89 @@ const STATUS_TONE: Record<string, string> = {
   completed: 'bg-muted text-muted-foreground',
   archived: 'bg-muted text-muted-foreground',
 };
+
+/* ===== KPI cards (sample overview values) ===== */
+const KPIS: {
+  id: string;
+  label: string;
+  value: string;
+  growth: string;
+  icon: LucideIcon;
+}[] = [
+  {
+    id: 'reach',
+    label: 'دسترسی کل',
+    value: '۲٫۴۵M',
+    growth: '+۱۲٫۵٪',
+    icon: Radio,
+  },
+  {
+    id: 'engagement',
+    label: 'نرخ تعامل',
+    value: '۱۸٫۶٪',
+    growth: '+۸٫۷٪',
+    icon: HeartPulse,
+  },
+  {
+    id: 'content',
+    label: 'محتوای کل',
+    value: '۳۴۲',
+    growth: '+۵٫۲٪',
+    icon: FileText,
+  },
+  {
+    id: 'mentions',
+    label: 'اشاره‌های رسانه‌ای',
+    value: '۸٬۴۲۱',
+    growth: '+۱۴٫۲٪',
+    icon: MessageSquareText,
+  },
+];
+
+/* ===== Chart data (media monitoring overview) ===== */
+const REACH_DATA = [
+  { day: 'ش', reach: 182, engagement: 14.2 },
+  { day: 'ی', reach: 214, engagement: 15.6 },
+  { day: 'د', reach: 198, engagement: 14.9 },
+  { day: 'س', reach: 256, engagement: 17.3 },
+  { day: 'چ', reach: 240, engagement: 16.8 },
+  { day: 'پ', reach: 288, engagement: 18.4 },
+  { day: 'ج', reach: 301, engagement: 18.6 },
+];
+
+const SENTIMENT_DATA = [
+  { name: 'مثبت', value: 62, color: 'hsl(var(--success))' },
+  { name: 'خنثی', value: 26, color: 'hsl(var(--muted-foreground))' },
+  { name: 'منفی', value: 12, color: 'hsl(var(--destructive))' },
+];
+
+const SENTIMENT_TOTAL = '۸٬۴۲۱';
+
+function ChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: { name?: string; value?: number; color?: string }[];
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-lg">
+      <p className="mb-1 font-medium text-muted-foreground">{label}</p>
+      {payload.map((item) => (
+        <p key={item.name} className="flex items-center gap-1.5 font-medium">
+          <span
+            className="h-2 w-2 rounded-full"
+            style={{ background: item.color }}
+          />
+          {item.name}: {toFa(Number(item.value))}
+        </p>
+      ))}
+    </div>
+  );
+}
 
 export default function CommandCenterPage() {
   const workspace = useAuthStore((s) => s.workspace);
@@ -93,15 +193,201 @@ export default function CommandCenterPage() {
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="flex flex-col gap-6"
     >
-      <header className="flex flex-col gap-1">
+      {/* Welcome / overview */}
+      <header className="brand-glow flex flex-col gap-1 rounded-xl border border-border p-5 sm:p-6">
         <p className="text-sm text-muted-foreground">{jalali}</p>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
           مرکز فرمان
         </h1>
         <p className="text-sm text-muted-foreground">
-          {workspaceName} — نمای کلی عملیات رسانه‌ای شما
+          {workspaceName} — نمای کلی وضعیت رسانه‌ها، عملکرد محتوا و اشاره‌های
+          رسانه‌ای شما
         </p>
       </header>
+
+      {/* KPI cards */}
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {KPIS.map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <div
+              key={kpi.id}
+              className="group flex flex-col gap-3 rounded-xl border border-border bg-surface p-5 transition-colors duration-200 hover:border-primary/30"
+            >
+              <div className="flex items-center justify-between">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-105">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span
+                  dir="ltr"
+                  className="flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success"
+                >
+                  <TrendingUp className="h-3 w-3" />
+                  {kpi.growth}
+                </span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span
+                  dir="ltr"
+                  className="text-3xl font-bold tracking-tight text-foreground"
+                >
+                  {kpi.value}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {kpi.label}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </section>
+
+      {/* Charts — media monitoring overview */}
+      <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 lg:col-span-2">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <span className="h-2 w-2 rounded-full bg-primary" />
+              دسترسی و تعامل — ۷ روز اخیر
+            </h2>
+            <span className="text-xs text-muted-foreground">هزار (K)</span>
+          </div>
+          <div dir="ltr" className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={REACH_DATA}
+                margin={{ top: 4, right: 4, left: -12, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="reachFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="0%"
+                      stopColor="hsl(var(--chart-1))"
+                      stopOpacity={0.35}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor="hsl(var(--chart-1))"
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                  <linearGradient id="engFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="0%"
+                      stopColor="hsl(var(--chart-2))"
+                      stopOpacity={0.3}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor="hsl(var(--chart-2))"
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(var(--border))"
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="day"
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  tick={{
+                    fill: 'hsl(var(--muted-foreground))',
+                    fontSize: 11,
+                  }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v: number) => toFa(v)}
+                />
+                <Tooltip
+                  content={<ChartTooltip />}
+                  cursor={{ stroke: 'hsl(var(--border))' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="reach"
+                  name="دسترسی"
+                  stroke="hsl(var(--chart-1))"
+                  strokeWidth={2}
+                  fill="url(#reachFill)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="engagement"
+                  name="تعامل"
+                  stroke="hsl(var(--chart-2))"
+                  strokeWidth={2}
+                  fill="url(#engFill)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <span className="h-2 w-2 rounded-full bg-cyan" />
+            احساسات رسانه
+          </h2>
+          <div className="relative h-56 w-full">
+            <div dir="ltr" className="absolute inset-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={SENTIMENT_DATA}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={58}
+                    outerRadius={84}
+                    paddingAngle={3}
+                    strokeWidth={0}
+                  >
+                    {SENTIMENT_DATA.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span
+                dir="ltr"
+                className="text-2xl font-bold tracking-tight text-foreground"
+              >
+                {SENTIMENT_TOTAL}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                اشاره‌های رسانه‌ای
+              </span>
+            </div>
+          </div>
+          <ul className="flex flex-col gap-2">
+            {SENTIMENT_DATA.map((item) => (
+              <li
+                key={item.name}
+                className="flex items-center justify-between text-sm"
+              >
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ background: item.color }}
+                  />
+                  {item.name}
+                </span>
+                <span className="font-semibold text-foreground">
+                  {toFa(item.value)}٪
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
 
       <section>
         <SectionTitle icon={Clock} title="ادامه کار" href="/projects" />
@@ -110,7 +396,7 @@ export default function CommandCenterPage() {
             <Link
               key={project.id}
               href="/projects"
-              className="group flex flex-col gap-2 rounded-xl border border-border bg-surface/60 p-4 transition-colors hover:border-primary/40"
+              className="group flex flex-col gap-2 rounded-xl border border-border bg-surface/60 p-4 transition-colors duration-200 hover:border-primary/40"
             >
               <div className="flex items-center justify-between">
                 <span
@@ -153,7 +439,7 @@ export default function CommandCenterPage() {
         />
         <div className="overflow-hidden rounded-xl border border-border">
           <table className="w-full text-sm">
-            <thead className="bg-surface/60 text-xs text-muted-foreground">
+            <thead className="bg-surface-2 text-xs text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 text-right font-medium">نام پروژه</th>
                 <th className="hidden px-4 py-3 text-right font-medium sm:table-cell">
@@ -171,7 +457,7 @@ export default function CommandCenterPage() {
               {recentProjects.map((project) => (
                 <tr
                   key={project.id}
-                  className="transition-colors hover:bg-surface/40"
+                  className="transition-colors duration-150 hover:bg-primary/5"
                 >
                   <td className="px-4 py-3 font-medium text-foreground">
                     {project.name}
@@ -210,9 +496,9 @@ export default function CommandCenterPage() {
               <Link
                 key={item.id}
                 href={item.href}
-                className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-surface/60 p-4 text-center transition-colors hover:border-primary/40 hover:bg-surface"
+                className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-surface/60 p-4 text-center transition-colors duration-200 hover:border-primary/40 hover:bg-surface"
               >
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform group-hover:scale-110">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform duration-200 group-hover:scale-110">
                   <Icon className="h-5 w-5" />
                 </span>
                 <span className="text-xs font-medium text-foreground">
@@ -299,7 +585,7 @@ function SectionTitle({
 function ActivityRow({ activity }: { activity: ActivityItem }) {
   return (
     <li className="flex items-start gap-3 rounded-xl border border-border bg-surface/60 p-4">
-      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" />
+      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-cyan" />
       <div className="flex flex-1 flex-col gap-0.5">
         <p className="text-sm font-medium text-foreground">{activity.title}</p>
         <p className="text-xs text-muted-foreground">{activity.description}</p>

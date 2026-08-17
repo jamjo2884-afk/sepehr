@@ -21,7 +21,7 @@ export async function GET(req: Request): Promise<NextResponse> {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition':
-            'attachment; filename="mediaos-import-template.csv"',
+            'attachment; filename="media-deck-import-template.csv"',
         },
       });
     }
@@ -36,7 +36,7 @@ export async function GET(req: Request): Promise<NextResponse> {
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition':
-          'attachment; filename="mediaos-import-template.xlsx"',
+          'attachment; filename="media-deck-import-template.xlsx"',
       },
     });
   } catch (err) {

@@ -153,7 +153,12 @@ export default function RegisterPage() {
           </p>
         ) : null}
 
-        <Button type="submit" disabled={isSubmitting} className="h-10 w-full">
+        <Button
+          type="submit"
+          variant="brand"
+          disabled={isSubmitting}
+          className="h-10 w-full"
+        >
           {isSubmitting ? 'در حال ساخت حساب…' : 'ساخت حساب'}
         </Button>
         <p className="text-center text-xs text-muted-foreground">

@@ -270,7 +270,7 @@ export const mockSocialAccounts: SocialAccount[] = [
   {
     id: 'soc-instagram',
     platform: 'instagram',
-    handle: '@mediaos.ir',
+    handle: '@mediadeck.ir',
     followers: 184_500,
     posts: 842,
     avgEngagement: 4_320,
@@ -284,7 +284,7 @@ export const mockSocialAccounts: SocialAccount[] = [
   {
     id: 'soc-telegram',
     platform: 'telegram',
-    handle: '@mediaos_channel',
+    handle: '@mediadeck_channel',
     followers: 96_800,
     posts: 1_540,
     avgEngagement: 2_180,
@@ -298,7 +298,7 @@ export const mockSocialAccounts: SocialAccount[] = [
   {
     id: 'soc-youtube',
     platform: 'youtube',
-    handle: 'MediaOS',
+    handle: 'MediaDeck',
     followers: 42_300,
     posts: 168,
     avgEngagement: 1_640,
@@ -312,7 +312,7 @@ export const mockSocialAccounts: SocialAccount[] = [
   {
     id: 'soc-twitter',
     platform: 'twitter',
-    handle: '@mediaos',
+    handle: '@mediadeck',
     followers: 28_700,
     posts: 3_120,
     avgEngagement: 980,
@@ -326,7 +326,7 @@ export const mockSocialAccounts: SocialAccount[] = [
   {
     id: 'soc-eita',
     platform: 'eita',
-    handle: '@mediaos',
+    handle: '@mediadeck',
     followers: 15_200,
     posts: 640,
     avgEngagement: 540,
@@ -340,7 +340,7 @@ export const mockSocialAccounts: SocialAccount[] = [
   {
     id: 'soc-rubika',
     platform: 'rubika',
-    handle: '@mediaos',
+    handle: '@mediadeck',
     followers: 11_400,
     posts: 510,
     avgEngagement: 430,
@@ -354,7 +354,7 @@ export const mockSocialAccounts: SocialAccount[] = [
   {
     id: 'soc-soroushplus',
     platform: 'soroushplus',
-    handle: '@mediaos',
+    handle: '@mediadeck',
     followers: 8_900,
     posts: 420,
     avgEngagement: 310,
@@ -368,7 +368,7 @@ export const mockSocialAccounts: SocialAccount[] = [
   {
     id: 'soc-bale',
     platform: 'bale',
-    handle: '@mediaos',
+    handle: '@mediadeck',
     followers: 6_300,
     posts: 380,
     avgEngagement: 240,

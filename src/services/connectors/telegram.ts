@@ -23,7 +23,7 @@ import { fetchAllPages, fetchWithRetry, HttpError } from './utils';
  * - NO per-post views/likes/comments endpoint in the Bot API → content
  *   metrics are NOT advertised here.
  *
- * Everything returned is normalized: dates become MediaOS Jalali period
+ * Everything returned is normalized: dates become Media Deck Jalali period
  * labels via `periodLabelForDate`, and only `followers` / `channelMembers`
  * are ever emitted (the columns Telegram can genuinely fill).
  */

@@ -4,120 +4,160 @@
 
 @layer base {
   :root {
-    /* ===== Color Tokens (Dark Theme — Premium, Minimal) ===== */
-    --background: 222 47% 6%;
-    --foreground: 210 20% 96%;
+    /* ============================================================
+       MEDIA DECK — Design Tokens (Dark Data Dashboard)
+       Primary   #1677FF   Electric Cyan #16C7D9   Deep Navy #071426
+       ============================================================ */
 
-    --surface: 222 40% 8%;
-    --surface-raised: 222 38% 11%;
-    --surface-foreground: 210 20% 96%;
+    /* ---- Brand (hex, for direct CSS use) ---- */
+    --brand-primary: #1677ff;
+    --brand-cyan: #16c7d9;
+    --brand-purple: #6366f1;
+    --brand-navy: #071426;
+    --brand-navy-surface: #0d1b2e;
+    --brand-blue-surface: #102544;
 
-    --card: 222 40% 9%;
-    --card-foreground: 210 20% 96%;
+    --bg-main: #071426;
+    --bg-surface: #0d1b2e;
+    --bg-surface-2: #102544;
 
-    --popover: 222 42% 8%;
-    --popover-foreground: 210 20% 96%;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
 
-    --primary: 199 89% 52%;
+    --border-color: #1e293b;
+
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+
+    /* ---- Surfaces ---- */
+    --background: 215 7% 9%; /* #071426 */
+    --foreground: 210 40% 98%; /* #F8FAFC */
+
+    --surface: 215 7% 12%; /* #0D1B2E */
+    --surface-raised: 216 12% 16%; /* #102544 */
+    --surface-foreground: 210 40% 98%;
+
+    --card: 215 7% 12%; /* #0D1B2E */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 216 14% 13%; /* slightly raised popover surface */
+    --popover-foreground: 210 40% 98%;
+
+    /* ---- Brand ---- */
+    --primary: 216 100% 54%; /* #1677FF */
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 222 24% 14%;
-    --secondary-foreground: 210 20% 96%;
+    --secondary: 216 12% 16%; /* #102544 */
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 222 22% 14%;
-    --muted-foreground: 220 12% 62%;
+    --muted: 216 12% 16%;
+    --muted-foreground: 215 20% 65%; /* #94A3B8 */
 
-    --accent: 199 80% 48%;
+    --accent: 186 72% 47%; /* #16C7D9 */
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 72% 52%;
+    --cyan: 186 72% 47%; /* #16C7D9 */
+    --purple: 239 84% 67%; /* #6366F1 */
+
+    --destructive: 0 84% 60%; /* #EF4444 */
     --destructive-foreground: 210 40% 98%;
 
-    --success: 152 62% 45%;
+    --success: 142 58% 45%; /* #22C55E */
     --success-foreground: 210 40% 98%;
 
-    --warning: 38 92% 55%;
+    --warning: 38 92% 50%; /* #F59E0B */
     --warning-foreground: 38 100% 8%;
 
-    --border: 222 22% 16%;
-    --input: 222 22% 16%;
-    --ring: 199 89% 52%;
+    --border: 217 33% 17%; /* #1E293B */
+    --input: 217 33% 17%;
+    --ring: 216 100% 54%;
 
-    --chart-1: 199 89% 52%;
-    --chart-2: 152 62% 45%;
-    --chart-3: 38 92% 55%;
-    --chart-4: 280 65% 65%;
-    --chart-5: 340 75% 60%;
+    /* ---- Chart palette (single shared language) ---- */
+    --chart-1: 216 100% 54%; /* #1677FF */
+    --chart-2: 186 72% 47%; /* #16C7D9 */
+    --chart-3: 239 84% 67%; /* #6366F1 */
+    --chart-4: 142 58% 45%; /* #22C55E */
+    --chart-5: 38 92% 50%; /* #F59E0B */
 
-    /* ===== Brand Ramp (Cyan-Blue) ===== */
-    --brand-50: 199 100% 95%;
-    --brand-100: 199 95% 88%;
-    --brand-200: 199 92% 80%;
-    --brand-300: 199 90% 70%;
-    --brand-400: 199 90% 60%;
-    --brand-500: 199 89% 52%;
-    --brand-600: 201 80% 45%;
-    --brand-700: 203 70% 38%;
-    --brand-800: 205 60% 32%;
-    --brand-900: 207 50% 25%;
+    /* ===== Brand Ramp (Blue, #1677FF at 500) ===== */
+    --brand-50: 216 100% 97%;
+    --brand-100: 216 96% 90%;
+    --brand-200: 216 91% 80%;
+    --brand-300: 216 87% 69%;
+    --brand-400: 216 82% 61%;
+    --brand-500: 216 100% 54%;
+    --brand-600: 215 86% 46%;
+    --brand-700: 217 76% 38%;
+    --brand-800: 218 66% 30%;
+    --brand-900: 219 56% 22%;
 
-    /* ===== Radius ===== */
-    --radius-sm: 0.375rem;
-    --radius-md: 0.5rem;
-    --radius-lg: 0.75rem;
-    --radius-xl: 1rem;
-    --radius-2xl: 1.25rem;
+    /* ===== Radius (8 / 12 / 16 / 20 / 24) ===== */
+    --radius-sm: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.25rem;
+    --radius-2xl: 1.5rem;
 
-    /* ===== Shadows ===== */
-    --shadow-xs: 0 1px 2px 0 hsl(222 40% 4% / 0.4);
+    /* ===== Shadows (very subtle, navy-tinted) ===== */
+    --shadow-xs: 0 1px 2px 0 rgb(7 20 38 / 0.35);
     --shadow-sm:
-      0 1px 3px 0 hsl(222 40% 4% / 0.5), 0 1px 2px -1px hsl(222 40% 4% / 0.5);
+      0 1px 3px 0 rgb(7 20 38 / 0.4), 0 1px 2px -1px rgb(7 20 38 / 0.4);
     --shadow-md:
-      0 4px 6px -1px hsl(222 40% 4% / 0.55),
-      0 2px 4px -2px hsl(222 40% 4% / 0.5);
+      0 4px 6px -1px rgb(7 20 38 / 0.45), 0 2px 4px -2px rgb(7 20 38 / 0.4);
     --shadow-lg:
-      0 10px 15px -3px hsl(222 40% 4% / 0.6),
-      0 4px 6px -4px hsl(222 40% 4% / 0.5);
+      0 10px 15px -3px rgb(7 20 38 / 0.5), 0 4px 6px -4px rgb(7 20 38 / 0.45);
     --shadow-xl:
-      0 20px 25px -5px hsl(222 40% 4% / 0.65),
-      0 8px 10px -6px hsl(222 40% 4% / 0.5);
+      0 20px 25px -5px rgb(7 20 38 / 0.55), 0 8px 10px -6px rgb(7 20 38 / 0.5);
     --shadow-glow:
-      0 0 0 1px hsl(199 89% 52% / 0.25), 0 0 24px -4px hsl(199 89% 52% / 0.45);
+      0 0 0 1px rgb(22 119 255 / 0.2), 0 0 24px -6px rgb(22 119 255 / 0.4);
   }
 
   .dark {
     /* Dark theme is the single source of truth — tokens mirror :root. */
-    --background: 222 47% 6%;
-    --foreground: 210 20% 96%;
-    --surface: 222 40% 8%;
-    --surface-raised: 222 38% 11%;
-    --surface-foreground: 210 20% 96%;
-    --card: 222 40% 9%;
-    --card-foreground: 210 20% 96%;
-    --popover: 222 42% 8%;
-    --popover-foreground: 210 20% 96%;
-    --primary: 199 89% 52%;
+    --background: 215 7% 9%;
+    --foreground: 210 40% 98%;
+    --surface: 215 7% 12%;
+    --surface-raised: 216 12% 16%;
+    --surface-foreground: 210 40% 98%;
+    --card: 215 7% 12%;
+    --card-foreground: 210 40% 98%;
+    --popover: 216 14% 13%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 216 100% 54%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 222 24% 14%;
-    --secondary-foreground: 210 20% 96%;
-    --muted: 222 22% 14%;
-    --muted-foreground: 220 12% 62%;
-    --accent: 199 80% 48%;
+    --secondary: 216 12% 16%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 216 12% 16%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 186 72% 47%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 72% 52%;
+    --cyan: 186 72% 47%;
+    --purple: 239 84% 67%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-    --success: 152 62% 45%;
+    --success: 142 58% 45%;
     --success-foreground: 210 40% 98%;
-    --warning: 38 92% 55%;
+    --warning: 38 92% 50%;
     --warning-foreground: 38 100% 8%;
-    --border: 222 22% 16%;
-    --input: 222 22% 16%;
-    --ring: 199 89% 52%;
-    --chart-1: 199 89% 52%;
-    --chart-2: 152 62% 45%;
-    --chart-3: 38 92% 55%;
-    --chart-4: 280 65% 65%;
-    --chart-5: 340 75% 60%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 216 100% 54%;
+    --chart-1: 216 100% 54%;
+    --chart-2: 186 72% 47%;
+    --chart-3: 239 84% 67%;
+    --chart-4: 142 58% 45%;
+    --chart-5: 38 92% 50%;
+    --brand-50: 216 100% 97%;
+    --brand-100: 216 96% 90%;
+    --brand-200: 216 91% 80%;
+    --brand-300: 216 87% 69%;
+    --brand-400: 216 82% 61%;
+    --brand-500: 216 100% 54%;
+    --brand-600: 215 86% 46%;
+    --brand-700: 217 76% 38%;
+    --brand-800: 218 66% 30%;
+    --brand-900: 219 56% 22%;
   }
 
   * {
@@ -149,6 +189,12 @@
     font-feature-settings: 'ss01';
   }
 
+  /* Latin wordmark / English text — Inter */
+  .font-inter {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'cv02';
+  }
+
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
@@ -172,5 +218,16 @@
     background: hsl(var(--surface) / 0.7);
     backdrop-filter: blur(12px) saturate(140%);
     -webkit-backdrop-filter: blur(12px) saturate(140%);
+  }
+
+  /* Subtle top glow used on surfaces (command-center feel) */
+  .brand-glow {
+    background:
+      radial-gradient(
+        60% 120% at 50% 0%,
+        rgb(22 119 255 / 0.08) 0%,
+        transparent 60%
+      ),
+      hsl(var(--surface));
   }
 }

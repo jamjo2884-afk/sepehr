@@ -19,13 +19,15 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ['var(--font-vazirmatn)', 'system-ui', 'sans-serif'],
+        inter: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic':
           'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
-        'gradient-brand':
-          'linear-gradient(135deg, hsl(var(--brand-500)) 0%, hsl(var(--accent-500)) 100%)',
+        'gradient-brand': 'linear-gradient(135deg, #1677ff 0%, #16c7d9 100%)',
+        'gradient-accent':
+          'linear-gradient(135deg, #1677ff 0%, #6366f1 50%, #a855f7 100%)',
       },
       borderRadius: {
         lg: 'var(--radius-lg)',
@@ -77,6 +79,19 @@ const config: Config = {
         warning: {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
+        },
+        cyan: {
+          DEFAULT: 'hsl(var(--cyan))',
+          foreground: 'hsl(var(--accent-foreground))',
+        },
+        purple: {
+          DEFAULT: 'hsl(var(--purple))',
+          foreground: 'hsl(var(--accent-foreground))',
+        },
+        navy: {
+          DEFAULT: 'hsl(var(--background))',
+          surface: 'hsl(var(--surface))',
+          'surface-2': 'hsl(var(--surface-raised))',
         },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',

@@ -65,17 +65,17 @@ export function Sidebar() {
                     title={collapsed ? item.label : undefined}
                     onClick={() => isMobile && setSidebarOpen(false)}
                     className={cn(
-                      'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                      'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200',
                       collapsed && 'justify-center',
                       active
-                        ? 'text-primary'
-                        : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                        ? 'text-foreground'
+                        : 'border border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground',
                     )}
                   >
                     {active ? (
                       <motion.span
                         layoutId="sidebar-active"
-                        className="absolute inset-0 -z-10 rounded-lg bg-primary/10"
+                        className="absolute inset-0 -z-10 rounded-lg border border-primary/25 bg-primary/10"
                         transition={{
                           type: 'spring',
                           stiffness: 380,
@@ -85,7 +85,7 @@ export function Sidebar() {
                     ) : null}
                     <Icon
                       className={cn(
-                        'h-5 w-5 shrink-0 transition-colors',
+                        'h-5 w-5 shrink-0 transition-colors duration-200',
                         active
                           ? 'text-primary'
                           : 'text-muted-foreground group-hover:text-foreground',

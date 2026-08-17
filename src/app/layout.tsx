@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { RouteGuard } from '@/components/common/route-guard';
@@ -10,10 +11,16 @@ const vazirmatn = localFont({
   display: 'swap',
 });
 
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: 'مدیا اواس | سیستم‌عامل رسانه‌ای هوشمند',
-  description: 'سیستم‌عامل رسانه‌ای مبتنی بر هوش مصنوعی',
-  themeColor: '#0a0e1a',
+  title: 'Media Deck | پلتفرم هوشمند مدیریت و تحلیل رسانه',
+  description: 'مرکز فرماندهی هوشمند رسانه — مدیریت، تحلیل و مانیتورینگ رسانه',
+  themeColor: '#071426',
   viewport: {
     width: 'device-width',
     initialScale: 1,
@@ -27,7 +34,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
-      <body className={`${vazirmatn.variable} font-sans`}>
+      <body className={`${vazirmatn.variable} ${inter.variable} font-sans`}>
         <Providers>
           <RouteGuard>{children}</RouteGuard>
         </Providers>

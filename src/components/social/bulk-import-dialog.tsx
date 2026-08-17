@@ -150,8 +150,8 @@ export function BulkImportDialog({
       a.href = url;
       a.download =
         format === 'xlsx'
-          ? 'mediaos-import-template.xlsx'
-          : 'mediaos-import-template.csv';
+          ? 'media-deck-import-template.xlsx'
+          : 'media-deck-import-template.csv';
       a.click();
       URL.revokeObjectURL(url);
     } catch {

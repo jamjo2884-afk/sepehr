@@ -12,7 +12,7 @@ import type {
  * A connector is the ONLY code that knows how to talk to one platform's
  * external API: its auth scheme, endpoint shapes, field names, date
  * formats and pagination. Everything the connector returns is already
- * normalized to MediaOS types (`NormalizedSocialMetric`,
+ * normalized to Media Deck types (`NormalizedSocialMetric`,
  * `SocialConnectorAccount`), so the sync service and the UI never see
  * platform-specific JSON.
  *
@@ -94,7 +94,7 @@ export interface SocialPage<T> {
 
 /**
  * Abstraction over one social platform's API. Implementations normalize
- * everything to MediaOS types; no platform-specific JSON escapes a
+ * everything to Media Deck types; no platform-specific JSON escapes a
  * connector.
  */
 export interface SocialPlatformConnector {
@@ -109,7 +109,7 @@ export interface SocialPlatformConnector {
   /**
    * Fetch account-level metrics for one period (or the latest period when
    * `period` is omitted). The connector decides how many points to return
-   * and maps external dates to MediaOS period labels.
+   * and maps external dates to Media Deck period labels.
    */
   fetchAccountMetrics(
     ctx: SocialConnectorContext,

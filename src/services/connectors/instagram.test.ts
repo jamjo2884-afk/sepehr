@@ -57,7 +57,7 @@ describe('Instagram connector — registry & capabilities', () => {
 });
 
 describe('Instagram connector — normalization', () => {
-  it('maps Graph API fields + insights to MediaOS values (null when missing)', async () => {
+  it('maps Graph API fields + insights to Media Deck values (null when missing)', async () => {
     const connector = new InstagramConnector();
     const fetchMock = vi.fn(async (url: string) => {
       if (url.includes('/insights')) {

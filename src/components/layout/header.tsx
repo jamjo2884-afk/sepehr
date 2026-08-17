@@ -51,7 +51,7 @@ const SAMPLE_NOTIFICATIONS = [
   {
     id: '2',
     title: 'خوش آمدید',
-    description: 'به مدیا اواس خوش آمدید',
+    description: 'به Media Deck خوش آمدید',
     read: false,
   },
 ];
@@ -73,7 +73,7 @@ export function Header() {
     setLoggingOut(true);
     try {
       await signOut();
-      router.replace('/login');
+      router.replace('/command-center');
     } catch {
       setLoggingOut(false);
     }

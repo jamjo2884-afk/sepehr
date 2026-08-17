@@ -50,7 +50,7 @@ export function AuthShell({
           <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>
         </div>
 
-        <div className="rounded-2xl border border-border bg-surface/60 p-6 shadow-lg backdrop-blur-md sm:p-8">
+        <div className="rounded-xl border border-border bg-surface/60 p-6 shadow-lg backdrop-blur-md sm:p-8">
           {children}
         </div>
 

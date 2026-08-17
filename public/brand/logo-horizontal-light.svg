@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 48" fill="none">
+  <defs>
+    <linearGradient id="mdg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1677FF"/>
+      <stop offset="1" stop-color="#16C7D9"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <rect x="1.5" y="1.5" width="45" height="45" rx="12" fill="#ffffff" stroke="rgba(7,20,38,0.14)" stroke-width="1.5"/>
+    <line x1="10" y1="37.5" x2="38" y2="37.5" stroke="rgba(7,20,38,0.18)" stroke-width="1"/>
+    <rect x="12.5" y="35" width="2" height="2.5" rx="0.75" fill="rgba(7,20,38,0.3)"/>
+    <rect x="33.5" y="35.5" width="2" height="2" rx="0.75" fill="rgba(7,20,38,0.3)"/>
+    <path d="M11 12 L16.5 12 L16.5 29 L24 34 L31.5 29 L31.5 12 L37 12 L37 34 L11 34 Z" fill="url(#mdg)"/>
+    <path d="M16.5 29 L24 34 L31.5 29 Z" fill="#16C7D9"/>
+    <circle cx="13.75" cy="12" r="2.4" fill="#ffffff"/>
+    <circle cx="34.25" cy="12" r="2.4" fill="#ffffff"/>
+  </g>
+  <text x="58" y="23" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1.5" fill="#071426">MEDIA</text>
+  <text x="58" y="39" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1.5" fill="#1677FF">DECK</text>
+</svg>
