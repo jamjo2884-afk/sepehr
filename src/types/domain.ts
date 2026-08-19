@@ -179,7 +179,9 @@ export type SocialPlatform =
   | 'bale'
   | 'eita'
   | 'rubika'
-  | 'soroushplus';
+  | 'soroushplus'
+  | 'aparat'
+  | 'threads';
 
 export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
   instagram: 'اینستاگرام',
@@ -190,6 +192,8 @@ export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
   eita: 'ایتا',
   rubika: 'روبیکا',
   soroushplus: 'سروش‌پلاس',
+  aparat: 'آپارات',
+  threads: 'تردز',
 };
 
 /** Brand metadata used for icons and accent colors. */
@@ -212,6 +216,8 @@ export const SOCIAL_PLATFORM_BRAND: Record<
   eita: { name: 'Eitaa', color: '#FC4F62' },
   rubika: { name: 'Rubika', color: '#7B61FF' },
   soroushplus: { name: 'SoroushPlus', color: '#2EB67D' },
+  aparat: { name: 'Aparat', color: '#ED1B2F' },
+  threads: { name: 'Threads', color: '#000000' },
 };
 
 /** A connected account on a social-media platform and its headline metrics. */

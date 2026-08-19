@@ -18,6 +18,7 @@ import {
   buildBrandTrends,
   buildFollowersTrend,
   buildPlatformStats,
+  buildPlatformTrends,
   computeKpiComparison,
   computeKpisForAccounts,
   distinctMonths,
@@ -40,6 +41,8 @@ import { AnalyticsKpiCards } from '@/components/social/analytics/kpi-cards';
 import { FollowersTrendChart } from '@/components/social/analytics/followers-trend-chart';
 import { MonthlyGrowthChart } from '@/components/social/analytics/monthly-growth-chart';
 import { PlatformBreakdownChart } from '@/components/social/analytics/platform-breakdown-chart';
+import { BrandAudienceTrendChart } from '@/components/social/analytics/brand-audience-trend-chart';
+import { PlatformAudienceTrendChart } from '@/components/social/analytics/platform-audience-trend-chart';
 import { BrandComparisonTable } from '@/components/social/analytics/brand-comparison-table';
 import { PeriodComparison } from '@/components/social/analytics/period-comparison';
 import { SectionTitle } from '@/components/social/analytics/shared';
@@ -154,6 +157,10 @@ export default function AnalyticsPage() {
 
   const brandTrends = useMemo(
     () => buildBrandTrends(filteredAccounts, metricsAll, range),
+    [filteredAccounts, metricsAll, range],
+  );
+  const platformTrends = useMemo(
+    () => buildPlatformTrends(filteredAccounts, metricsAll, range),
     [filteredAccounts, metricsAll, range],
   );
   const aggregateTrend = useMemo(
@@ -368,6 +375,38 @@ export default function AnalyticsPage() {
             <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface/60 p-4">
               <SectionTitle icon={PieChart} title="عملکرد شبکهها" />
               <PlatformBreakdownChart stats={platformStats} />
+            </div>
+          </section>
+
+          {/* Brand audience trend */}
+          <section>
+            <SectionTitle
+              icon={TrendingUp}
+              title="روند مخاطبان برندها"
+              extra={
+                <span className="text-[11px] text-muted-foreground">
+                  مقایسه روند دنبال‌کنندگان برندها در بازه زمانی انتخابی
+                </span>
+              }
+            />
+            <div className="rounded-xl border border-border bg-surface/60 p-4">
+              <BrandAudienceTrendChart trends={brandTrends} />
+            </div>
+          </section>
+
+          {/* Platform audience trend */}
+          <section>
+            <SectionTitle
+              icon={BarChart3}
+              title="روند مخاطبان سکوها"
+              extra={
+                <span className="text-[11px] text-muted-foreground">
+                  مقایسه روند دنبال‌کنندگان سکوها در بازه زمانی انتخابی
+                </span>
+              }
+            />
+            <div className="rounded-xl border border-border bg-surface/60 p-4">
+              <PlatformAudienceTrendChart trends={platformTrends} />
             </div>
           </section>
 

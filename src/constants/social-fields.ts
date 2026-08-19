@@ -152,6 +152,23 @@ export const PLATFORM_METRIC_FIELDS: Record<
     'shares',
     'engagementRate',
   ],
+  aparat: [
+    'followers',
+    'views',
+    'likes',
+    'comments',
+    'posts',
+  ],
+  threads: [
+    'followers',
+    'following',
+    'posts',
+    'views',
+    'likes',
+    'comments',
+    'shares',
+    'engagementRate',
+  ],
 };
 
 /**
@@ -171,4 +188,6 @@ export const PLATFORM_SPECIFIC_METRIC_FIELDS: Record<
   eita: ['channelMembers'],
   rubika: ['channelMembers'],
   soroushplus: ['channelMembers'],
+  aparat: [],
+  threads: [],
 };

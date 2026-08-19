@@ -78,6 +78,8 @@ export const SUPPORTED_PLATFORMS: SocialPlatform[] = [
   'eita',
   'rubika',
   'soroushplus',
+  'aparat',
+  'threads',
 ];
 
 /** A flattened account row: one brand × platform × handle, latest snapshot + series. */
@@ -362,6 +364,10 @@ export function socialAccountUrl(
     case 'rubika':
       // Rubika has no public per-channel web page.
       return null;
+    case 'aparat':
+      return `https://aparat.com/${h}`;
+    case 'threads':
+      return `https://www.threads.net/@${h}`;
     default:
       return null;
   }

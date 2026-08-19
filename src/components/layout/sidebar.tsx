@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { navItems } from '@/config/navigation.config';
 import { Logo } from '@/components/common/logo';
@@ -15,6 +16,13 @@ export function Sidebar() {
   const pathname = usePathname();
   const isMobile = useIsMobile();
   const { sidebarOpen, toggleSidebar, setSidebarOpen } = useUIStore();
+
+  // Keep the desktop default open without exposing the full sidebar on the
+  // first mobile render. This only runs when the breakpoint changes, so a
+  // manually opened drawer is not immediately closed again.
+  useEffect(() => {
+    if (isMobile) setSidebarOpen(false);
+  }, [isMobile, setSidebarOpen]);
 
   const collapsed = !sidebarOpen && !isMobile;
   const hidden = isMobile && !sidebarOpen;
@@ -33,7 +41,10 @@ export function Sidebar() {
         className={cn(
           'fixed inset-y-0 right-0 z-40 flex flex-col border-l border-border bg-surface transition-[width,transform] duration-300 ease-out',
           collapsed ? 'w-[76px]' : 'w-72',
-          hidden && 'translate-x-full',
+          // Do not leave a translated fixed drawer in the scrollable overflow
+          // area while it is closed on mobile. It must be removed from layout
+          // until the menu is opened.
+          hidden && 'hidden',
         )}
       >
         <div className="flex h-16 items-center justify-between px-4">

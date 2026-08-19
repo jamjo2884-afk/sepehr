@@ -347,6 +347,55 @@ export function monthlyGrowthSeries(
 }
 
 /* =========================================================================
+ * Platform trend series
+ * ========================================================================= */
+
+/** Follower trend of one platform (for multi-platform comparison). */
+export interface SocialPlatformTrend {
+  platform: SocialPlatform;
+  points: SocialTrendPoint[];
+}
+
+/**
+ * One follower trend per platform (multi-platform comparison chart).
+ * Aggregates followers across all accounts belonging to each platform.
+ * Months with no data for a platform are excluded (no fabricated values).
+ */
+export function buildPlatformTrends(
+  accounts: SocialAccount[],
+  metrics: SocialMetric[],
+  range: SocialMonthRange,
+): SocialPlatformTrend[] {
+  const platformSet = [...new Set(accounts.map((a) => a.platform))];
+  const idsByPlatform = new Map<SocialPlatform, Set<string>>();
+  for (const a of accounts) {
+    const set = idsByPlatform.get(a.platform) ?? new Set<string>();
+    set.add(a.id);
+    idsByPlatform.set(a.platform, set);
+  }
+  const inRange = metricsInMonthRange(metrics, range);
+  return platformSet.map((platform) => {
+    const ids = idsByPlatform.get(platform) ?? new Set<string>();
+    const byMonth = new Map<string, number>();
+    for (const m of inRange) {
+      if (!ids.has(m.accountId)) continue;
+      byMonth.set(
+        m.periodLabel,
+        (byMonth.get(m.periodLabel) ?? 0) + m.followers,
+      );
+    }
+    const points: SocialTrendPoint[] = [...byMonth.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+      .map(([month, followers]) => ({
+        month,
+        monthLabel: jalaliMonthName(month),
+        followers,
+      }));
+    return { platform, points };
+  });
+}
+
+/* =========================================================================
  * Brand performance analytics
  * ========================================================================= */
 

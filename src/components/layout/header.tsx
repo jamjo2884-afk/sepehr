@@ -93,7 +93,7 @@ export function Header() {
   const workspaceName = workspace?.name || 'Media Deck';
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-surface/80 px-4 backdrop-blur-md lg:px-6">
+    <header className="sticky top-0 z-20 flex h-16 min-w-0 items-center gap-2 border-b border-border bg-surface/80 px-2 backdrop-blur-md sm:gap-3 sm:px-4 lg:px-6">
       {isMobile ? (
         <Button
           variant="ghost"
@@ -105,14 +105,14 @@ export function Header() {
         </Button>
       ) : null}
 
-      <div className="flex flex-col">
+      <div className="hidden min-w-0 shrink-0 flex-col sm:flex">
         <span className="text-xs text-muted-foreground">{WORKSPACE_LABEL}</span>
         <span className="text-sm font-semibold text-foreground">
           {workspaceName}
         </span>
       </div>
 
-      <div className="relative mx-auto w-full max-w-md">
+      <div className="relative mx-0 min-w-0 flex-1 sm:mx-auto sm:max-w-md">
         <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
@@ -121,7 +121,7 @@ export function Header() {
         />
       </div>
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1.5">
         <Button
           variant="ghost"
           size="icon"
@@ -201,7 +201,7 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-secondary"
+              className="flex shrink-0 items-center gap-0 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-secondary sm:gap-2 sm:px-2"
               aria-label={PROFILE_LABEL}
             >
               <Avatar className="h-8 w-8">
@@ -215,7 +215,7 @@ export function Header() {
               <span className="hidden text-sm font-medium sm:inline">
                 {displayName}
               </span>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="hidden h-4 w-4 text-muted-foreground sm:block" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
