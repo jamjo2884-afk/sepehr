@@ -46,6 +46,11 @@ export const useSocialBrandEdits = create<SocialBrandEditsState>()(
 
       setEdits: (added, removed) => set({ added, removed }),
     }),
-    { name: 'mediaos-social-brand-edits' },
+    {
+      name: 'mediaos-social-brand-edits',
+      // Rehydrate after the first client render so localStorage never changes
+      // the HTML that React is trying to hydrate.
+      skipHydration: true,
+    },
   ),
 );

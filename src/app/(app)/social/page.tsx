@@ -109,6 +109,10 @@ export default function SocialPage() {
   const [draftRemoved, setDraftRemoved] = useState<string[]>([]);
 
   useEffect(() => {
+    void useSocialBrandEdits.persist.rehydrate();
+  }, []);
+
+  useEffect(() => {
     let active = true;
     setLoading(true);
     getSocialDashboardData()

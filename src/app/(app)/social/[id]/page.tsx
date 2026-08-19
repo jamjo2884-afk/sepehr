@@ -3,13 +3,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { AlertTriangle, History, Plus, Settings2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  ExternalLink,
+  History,
+  Plus,
+  Settings2,
+} from 'lucide-react';
 import Link from 'next/link';
 import {
   decodeAccountKey,
   getBrandSocialAnalytics,
   getSocialAccounts,
   getSocialMetrics,
+  socialAccountUrl,
 } from '@/services/social.service';
 import type { BrandSocialAnalytics } from '@/services/social.service';
 import {
@@ -267,6 +274,10 @@ export default function BrandPerformancePage() {
               const metrics = allMetrics.filter(
                 (m) => m.accountId === account.id,
               );
+              const accountUrl = socialAccountUrl(
+                account.platform,
+                account.username,
+              );
               return (
                 <div
                   key={account.id}
@@ -286,19 +297,38 @@ export default function BrandPerformancePage() {
                         {account.username}
                       </span>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1 text-xs"
-                      onClick={() => {
-                        setEditMetric(null);
-                        setDialogAccountId(account.id);
-                        setDialogOpen(true);
-                      }}
-                    >
-                      <Plus className="h-3 w-3" />
-                      ثبت آمار
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {accountUrl ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1 text-xs"
+                          asChild
+                        >
+                          <a
+                            href={accountUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            مشاهده در {SOCIAL_PLATFORM_LABELS[account.platform]}
+                          </a>
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1 text-xs"
+                        onClick={() => {
+                          setEditMetric(null);
+                          setDialogAccountId(account.id);
+                          setDialogOpen(true);
+                        }}
+                      >
+                        <Plus className="h-3 w-3" />
+                        ثبت آمار
+                      </Button>
+                    </div>
                   </div>
                   <MetricHistoryTable
                     metrics={metrics}

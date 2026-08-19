@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Bell,
@@ -64,7 +64,9 @@ export function Header() {
   const { toggleSidebar } = useUIStore();
   const isMobile = useIsMobile();
   const { resolvedTheme, setTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
+  const [themeMounted, setThemeMounted] = useState(false);
+  useEffect(() => setThemeMounted(true), []);
+  const isDark = themeMounted && resolvedTheme === 'dark';
   const profile = useAuthStore((s) => s.profile);
   const workspace = useAuthStore((s) => s.workspace);
   const [notifications, setNotifications] = useState(SAMPLE_NOTIFICATIONS);
