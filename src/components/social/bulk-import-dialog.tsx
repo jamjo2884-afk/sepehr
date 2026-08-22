@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -68,7 +68,20 @@ export function BulkImportDialog({
   const [summary, setSummary] = useState<SocialImportSummary | null>(null);
   const [sheetsUrl, setSheetsUrl] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const toggleRowErrors = useCallback((rowNumber: number) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowNumber)) {
+        next.delete(rowNumber);
+      } else {
+        next.add(rowNumber);
+      }
+      return next;
+    });
+  }, []);
 
   const validRows = rows.filter(
     (r) => r.errors.length === 0 && r.account != null,
@@ -401,6 +414,7 @@ export function BulkImportDialog({
                     }
                     const ok = issues.length === 0;
                     return (
+                      <>
                       <tr
                         key={r.rowNumber}
                         className={cn(
@@ -446,16 +460,36 @@ export function BulkImportDialog({
                               آماده
                             </span>
                           ) : (
-                            <span
-                              className="inline-flex items-center gap-1 text-[11px] text-destructive"
-                              title={issues.join(' | ')}
+                            <button
+                              type="button"
+                              onClick={() => toggleRowErrors(r.rowNumber)}
+                              className="inline-flex items-center gap-1 text-[11px] text-destructive hover:underline"
                             >
                               <AlertTriangle className="h-3 w-3 shrink-0" />
-                              خطا
-                            </span>
+                              خطا ({toPersianDigits(String(issues.length))})
+                              {expandedRows.has(r.rowNumber) ? ' ▾' : ' ▸'}
+                            </button>
                           )}
                         </td>
                       </tr>
+                      {!ok && expandedRows.has(r.rowNumber) ? (
+                        <tr key={`${r.rowNumber}-errors`} className="bg-destructive/[0.03]">
+                          <td colSpan={8} className="px-3 py-2">
+                            <ul className="flex flex-col gap-1">
+                              {issues.map((issue, i) => (
+                                <li
+                                  key={i}
+                                  className="flex items-start gap-1.5 text-[11px] text-destructive/80"
+                                >
+                                  <XCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                                  {issue}
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
+                        </tr>
+                      ) : null}
+                      </>
                     );
                   })}
                 </tbody>
@@ -466,9 +500,9 @@ export function BulkImportDialog({
               <div className="flex flex-col gap-1 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
                 <p className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                  {toPersianDigits(String(invalidRows))} ردیف خطا دارد. برای
-                  مشاهدهٔ جزئیات روی «خطا» بگذارید. فقط ردیف‌های معتبر ثبت
-                  می‌شوند.
+                  {toPersianDigits(String(invalidRows))} ردیف خطا دارد. روی دکمهٔ
+                  «خطا» کلیک کنید تا جزئیات هر ردیف نمایش داده شود. فقط ردیف‌های
+                  معتبر ثبت می‌شوند.
                 </p>
               </div>
             ) : null}

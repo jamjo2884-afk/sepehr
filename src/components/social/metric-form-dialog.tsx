@@ -23,6 +23,7 @@ import {
 import {
   PLATFORM_METRIC_FIELDS,
   SOCIAL_METRIC_FIELDS,
+  platformFollowersLabel,
   type SocialMetricFieldKey,
 } from '@/constants/social-fields';
 import { toLatinDigits, toPersianDigits } from '@/utils/persian';
@@ -457,11 +458,12 @@ export function MetricFormDialog({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {platformFields.map((key) => {
               const spec = SOCIAL_METRIC_FIELDS[key];
+              const fieldLabel = key === 'followers' && platform ? platformFollowersLabel(platform) : spec.label;
               const error = fieldErrors[key];
               return (
                 <div key={key} className="flex flex-col gap-1.5">
                   <Label className="text-xs text-muted-foreground">
-                    {spec.label}
+                    {fieldLabel}
                   </Label>
                   <Input
                     type="number"

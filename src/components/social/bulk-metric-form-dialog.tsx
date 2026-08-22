@@ -13,6 +13,7 @@ import {
 import {
   SOCIAL_METRIC_FIELDS,
   PLATFORM_METRIC_FIELDS,
+  platformFollowersLabel,
   type SocialMetricFieldKey,
 } from '@/constants/social-fields';
 import { toPersianDigits } from '@/utils/persian';
@@ -346,11 +347,14 @@ export function BulkMetricFormDialog({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {platformFields.map((key) => {
                 const spec = SOCIAL_METRIC_FIELDS[key];
+                const fieldLabel = key === 'followers' && selectedAccounts.length === 1
+                  ? platformFollowersLabel(selectedAccounts[0].platform)
+                  : spec.label;
                 const error = fieldErrors[key];
                 return (
                   <div key={key} className="flex flex-col gap-1.5">
                     <Label className="text-xs text-muted-foreground">
-                      {spec.label}
+                      {fieldLabel}
                     </Label>
                     <Input
                       type="number"
