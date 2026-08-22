@@ -158,4 +158,102 @@ describe('importSocialMetricsRows', () => {
     expect(summary.duplicate).toBe(0);
     expect(summary.inserted).toBe(2);
   });
+
+  // ── resolvedAccountId security ─────────────────────────────────────
+
+  it('accepts resolvedAccountId with same platform', async () => {
+    mock.pushStored({ id: 1, followers: 125000 });
+    const summary = await importSocialMetricsRows(
+      [
+        row({
+          rowNumber: 1,
+          platform: 'instagram',
+          accountIdentifier: 'nobody',
+          resolvedAccountId: accounts[0].id,
+        }),
+      ],
+      { accounts, supabase: mock.client as never },
+    );
+    expect(summary.inserted).toBe(1);
+    expect(summary.rejected).toBe(0);
+  });
+
+  it('rejects resolvedAccountId with different platform', async () => {
+    const summary = await importSocialMetricsRows(
+      [
+        row({
+          rowNumber: 1,
+          platform: 'telegram',
+          accountIdentifier: 'nobody',
+          resolvedAccountId: accounts[0].id, // instagram account
+        }),
+      ],
+      { accounts, supabase: mock.client as never },
+    );
+    expect(summary.rejected).toBe(1);
+    expect(summary.inserted).toBe(0);
+    expect(summary.errors[0].message).toContain('پلتفرم');
+  });
+
+  it('rejects nonexistent resolvedAccountId', async () => {
+    const summary = await importSocialMetricsRows(
+      [
+        row({
+          rowNumber: 1,
+          platform: 'instagram',
+          accountIdentifier: 'nobody',
+          resolvedAccountId: 'nonexistent-id-000',
+        }),
+      ],
+      { accounts, supabase: mock.client as never },
+    );
+    expect(summary.rejected).toBe(1);
+    expect(summary.inserted).toBe(0);
+    expect(summary.errors[0].message).toContain('پیدا نشد');
+  });
+
+  it('validates each row independently with different platforms', async () => {
+    mock.pushStored({ id: 1, followers: 100 });
+    mock.pushStored({ id: 2, followers: 200 });
+    // Row 1: valid resolvedAccountId (instagram account for instagram row)
+    // Row 2: invalid resolvedAccountId (instagram account for telegram row)
+    const summary = await importSocialMetricsRows(
+      [
+        row({
+          rowNumber: 1,
+          platform: 'instagram',
+          accountIdentifier: 'nobody',
+          resolvedAccountId: accounts[0].id, // instagram account
+        }),
+        row({
+          rowNumber: 2,
+          platform: 'telegram',
+          accountIdentifier: 'nobody',
+          resolvedAccountId: accounts[0].id, // instagram account → wrong platform
+        }),
+      ],
+      { accounts, supabase: mock.client as never },
+    );
+    expect(summary.inserted).toBe(1);
+    expect(summary.rejected).toBe(1);
+  });
+
+  it('rejected resolvedAccountId row must not write social_metrics', async () => {
+    // Only one row, with wrong platform → should be rejected, no write
+    const summary = await importSocialMetricsRows(
+      [
+        row({
+          rowNumber: 1,
+          platform: 'telegram',
+          accountIdentifier: 'nobody',
+          resolvedAccountId: accounts[0].id, // instagram account
+        }),
+      ],
+      { accounts, supabase: mock.client as never },
+    );
+    expect(summary.rejected).toBe(1);
+    expect(summary.inserted).toBe(0);
+    // upsert should never have been called
+    expect(mock.chain.upsert).not.toHaveBeenCalled();
+  });
 });

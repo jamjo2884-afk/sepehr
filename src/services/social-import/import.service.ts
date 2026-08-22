@@ -83,11 +83,20 @@ export async function importSocialMetricsRows(
     error: string | null;
   }> = rows.map((row) => {
     // If user resolved this row, use the resolved account directly.
+    // Security: verify the account exists AND belongs to the same platform.
     if (row.resolvedAccountId) {
       const found = accounts.find((a) => a.id === row.resolvedAccountId);
-      if (found) {
-        return { row, account: found, error: null };
+      if (!found) {
+        return { row, account: null, error: 'Account پیدا نشد.' };
       }
+      if (found.platform !== row.platform) {
+        return {
+          row,
+          account: null,
+          error: 'حساب انتخاب‌شده متعلق به این پلتفرم نیست.',
+        };
+      }
+      return { row, account: found, error: null };
     }
     const result = matchImportRowToAccount(accounts, row);
     if (result.status === 'matched') {
