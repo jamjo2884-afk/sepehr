@@ -80,6 +80,11 @@ export const SUPPORTED_PLATFORMS: SocialPlatform[] = [
   'soroushplus',
   'aparat',
   'threads',
+  'shad',
+  'igap',
+  'site',
+  'gap',
+  'virasty',
 ];
 
 /** A flattened account row: one brand × platform × handle, latest snapshot + series. */
@@ -368,6 +373,10 @@ export function socialAccountUrl(
       return `https://aparat.com/${h}`;
     case 'threads':
       return `https://www.threads.net/@${h}`;
+    case 'igap':
+      return `https://igap.net/${h}`;
+    case 'virasty':
+      return `https://virasty.com/${h}`;
     default:
       return null;
   }

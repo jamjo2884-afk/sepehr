@@ -103,7 +103,7 @@ export function templateGuideRows(): string[][] {
       'platform',
       'پلتفرم',
       'بله',
-      'instagram / telegram / youtube / twitter / bale / eita / rubika / soroushplus',
+      'instagram / telegram / youtube / twitter / bale / eita / rubika / soroushplus / aparat / threads / shad / igap / site / gap / virasty',
     ],
     [
       'account_identifier',

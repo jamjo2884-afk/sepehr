@@ -181,7 +181,12 @@ export type SocialPlatform =
   | 'rubika'
   | 'soroushplus'
   | 'aparat'
-  | 'threads';
+  | 'threads'
+  | 'shad'
+  | 'igap'
+  | 'site'
+  | 'gap'
+  | 'virasty';
 
 export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
   instagram: 'اینستاگرام',
@@ -194,6 +199,11 @@ export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
   soroushplus: 'سروش‌پلاس',
   aparat: 'آپارات',
   threads: 'تردز',
+  shad: 'شاد',
+  igap: 'آی‌گپ',
+  site: 'وب‌سایت',
+  gap: 'گپ',
+  virasty: 'ویراستی',
 };
 
 /** Brand metadata used for icons and accent colors. */
@@ -218,6 +228,11 @@ export const SOCIAL_PLATFORM_BRAND: Record<
   soroushplus: { name: 'SoroushPlus', color: '#2EB67D' },
   aparat: { name: 'Aparat', color: '#ED1B2F' },
   threads: { name: 'Threads', color: '#000000' },
+  shad: { name: 'Shad', color: '#00A86B' },
+  igap: { name: 'iGap', color: '#1E88E5' },
+  site: { name: 'Site', color: '#607D8B' },
+  gap: { name: 'Gap', color: '#FF6F00' },
+  virasty: { name: 'Virasty', color: '#D32F2F' },
 };
 
 /** A connected account on a social-media platform and its headline metrics. */

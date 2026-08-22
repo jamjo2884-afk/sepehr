@@ -66,6 +66,14 @@ export function normalizePlatform(raw: string): SocialPlatform | null {
     soroushplus: 'soroushplus',
     soroush: 'soroushplus',
     sapp: 'soroushplus',
+    splus: 'soroushplus',
+    aparat: 'aparat',
+    threads: 'threads',
+    shad: 'shad',
+    igap: 'igap',
+    site: 'site',
+    gap: 'gap',
+    virasty: 'virasty',
   };
   if (value in latin) return latin[value];
   // Persian labels from the app's own config.

@@ -75,6 +75,9 @@ describe('normalize helpers', () => {
     expect(normalizePlatform('تلگرام')).toBe('telegram');
     expect(normalizePlatform('x')).toBe('twitter');
     expect(normalizePlatform('بله')).toBe('bale');
+    expect(normalizePlatform('aparat')).toBe('aparat');
+    expect(normalizePlatform('threads')).toBe('threads');
+    expect(normalizePlatform('splus')).toBe('soroushplus');
     expect(normalizePlatform('unknown')).toBeNull();
   });
 
