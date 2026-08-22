@@ -5,7 +5,7 @@ import {
   normalizePlatform,
   parseImportNumber,
 } from '@/services/social-import/normalize';
-import { PLATFORM_METRIC_FIELDS } from '@/constants/social-fields';
+import { PLATFORM_METRIC_FIELDS, platformAudienceField } from '@/constants/social-fields';
 import type { SocialMetricFieldKey } from '@/constants/social-fields';
 import type {
   SocialMetricImportRow,
@@ -221,11 +221,23 @@ export function rowsToImportRows(matrix: string[][]): SocialImportParseResult {
     const values: Record<string, number | null> = {};
     const supported =
       platform !== null ? new Set(PLATFORM_METRIC_FIELDS[platform]) : null;
-    for (const { index, key } of metricCols) {
+    for (const { index, key: rawKey } of metricCols) {
       const raw = cellAt(index);
       if (raw.trim() === '') continue; // NULL = not provided
+
+      // Universal followers mapping: remap the generic "followers"
+      // column to the platform's canonical audience metric.
+      let key = rawKey;
+      if (key === 'followers' && platform !== null) {
+        const audienceField = platformAudienceField(platform);
+        if (audienceField !== 'followers') {
+          key = audienceField;
+        }
+      }
+
       if (supported !== null && !supported.has(key)) {
-        errors.push(`شاخص «${key}» برای این پلتفرم معتبر نیست.`);
+        // Skip unsupported metrics silently — the user may have
+        // extra columns that don't apply to every platform.
         continue;
       }
       try {

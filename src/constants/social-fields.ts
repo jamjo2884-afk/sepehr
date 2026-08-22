@@ -70,6 +70,34 @@ export const SOCIAL_METRIC_FIELDS: Record<
 };
 
 /**
+ * Platform-aware label for the primary audience metric.
+ * YouTube → سابسکرایبرها, channel-based → اعضای کانال, others → دنبال‌کنندگان.
+ */
+export function platformFollowersLabel(platform: SocialPlatform): string {
+  if (platform === 'youtube') return 'سابسکرایبرها';
+  if (PLATFORM_METRIC_FIELDS[platform].includes('channelMembers'))
+    return 'اعضای کانال';
+  return 'دنبال‌کنندگان';
+}
+
+/**
+ * Canonical audience metric field for a platform.
+ * Used by the import parser to remap the generic "followers" column.
+ *
+ * YouTube → subscribers
+ * Channel-based platforms (telegram, bale, eita, …) → channelMembers
+ * Others → followers
+ */
+export function platformAudienceField(
+  platform: SocialPlatform,
+): SocialMetricFieldKey {
+  if (platform === 'youtube') return 'subscribers';
+  if (PLATFORM_METRIC_FIELDS[platform].includes('channelMembers'))
+    return 'channelMembers';
+  return 'followers';
+}
+
+/**
  * The metric fields each platform can record, in display order. Everything
  * the dynamic form renders for a platform comes from this table.
  */

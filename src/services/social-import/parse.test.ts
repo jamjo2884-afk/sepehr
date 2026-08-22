@@ -161,7 +161,7 @@ describe('rowsToImportRows', () => {
     expect(result.rows[2].errors.some((e) => e.includes('منفی'))).toBe(true);
   });
 
-  it('rejects a metric not valid for the platform', () => {
+  it('skips unsupported metrics silently for the platform', () => {
     const result = rowsToImportRows(
       parseCsv(
         'platform,account_identifier,period,period_label,story_views\ninstagram,@azmaa,monthly,1405-05,5000\n',
@@ -170,14 +170,14 @@ describe('rowsToImportRows', () => {
     // story_views IS valid for instagram — should pass.
     expect(result.rows[0].errors).toEqual([]);
 
+    // story_views is NOT valid for telegram — should be skipped silently.
     const result2 = rowsToImportRows(
       parseCsv(
         'platform,account_identifier,period,period_label,story_views\ntelegram,@channel,monthly,1405-05,5000\n',
       ),
     );
-    expect(result2.rows[0].errors.some((e) => e.includes('معتبر نیست'))).toBe(
-      true,
-    );
+    expect(result2.rows[0].values.storyViews).toBeUndefined();
+    expect(result2.rows[0].errors).toEqual([]);
   });
 
   it('accepts Persian month names as period_label', () => {
@@ -197,6 +197,183 @@ describe('rowsToImportRows', () => {
       ),
     );
     expect(result.rows[0].values.followers).toBe(125000);
+  });
+
+  // ── Universal followers import mapping ──────────────────────────────
+
+  it('maps followers → followers for Instagram', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers\ninstagram,@azmaa,monthly,1405-05,1000\n',
+      ),
+    );
+    expect(result.rows[0].values.followers).toBe(1000);
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('maps followers → followers for Twitter', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers\ntwitter,@handle,monthly,1405-05,2000\n',
+      ),
+    );
+    expect(result.rows[0].values.followers).toBe(2000);
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('maps followers → followers for Threads', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers\nthreads,@handle,monthly,1405-05,3000\n',
+      ),
+    );
+    expect(result.rows[0].values.followers).toBe(3000);
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('maps followers → channelMembers for Telegram', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers\ntelegram,@channel,monthly,1405-05,25000\n',
+      ),
+    );
+    expect(result.rows[0].values.channelMembers).toBe(25000);
+    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('maps followers → channelMembers for Bale', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers\nbale,@channel,monthly,1405-05,8000\n',
+      ),
+    );
+    expect(result.rows[0].values.channelMembers).toBe(8000);
+    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('maps followers → channelMembers for Eitaa', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers\neita,@channel,monthly,1405-05,5000\n',
+      ),
+    );
+    expect(result.rows[0].values.channelMembers).toBe(5000);
+    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('maps followers → channelMembers for Rubika', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers\nrubika,@channel,monthly,1405-05,7000\n',
+      ),
+    );
+    expect(result.rows[0].values.channelMembers).toBe(7000);
+    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('maps followers → channelMembers for SoroushPlus', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers\nsoroushplus,@channel,monthly,1405-05,6000\n',
+      ),
+    );
+    expect(result.rows[0].values.channelMembers).toBe(6000);
+    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('maps followers → subscribers for YouTube', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers\nyoutube,@channel,monthly,1405-05,1000\n',
+      ),
+    );
+    expect(result.rows[0].values.subscribers).toBe(1000);
+    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('maps followers → followers for Aparat', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers\naparat,@channel,monthly,1405-05,4000\n',
+      ),
+    );
+    expect(result.rows[0].values.followers).toBe(4000);
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('YouTube: explicit subscribers takes precedence over followers', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers,subscribers\nyoutube,@channel,monthly,1405-05,1000,2000\n',
+      ),
+    );
+    expect(result.rows[0].values.subscribers).toBe(2000);
+    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('Telegram: explicit channelMembers takes precedence over followers', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers,channel_members\ntelegram,@channel,monthly,1405-05,1000,2000\n',
+      ),
+    );
+    expect(result.rows[0].values.channelMembers).toBe(2000);
+    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('empty followers does not produce any audience field', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers,views\ntelegram,@channel,monthly,1405-05,,400000\n',
+      ),
+    );
+    expect(result.rows[0].values.channelMembers).toBeUndefined();
+    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].values.views).toBe(400000);
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('unknown platform does not remap followers', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers\nunknown,@handle,monthly,1405-05,1000\n',
+      ),
+    );
+    // unknown platform → errors include platform error, followers is skipped
+    expect(result.rows[0].errors.some((e) => e.includes('platform'))).toBe(true);
+  });
+
+  it('does not affect other metric columns', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers,views,likes,comments\ninstagram,@azmaa,monthly,1405-05,1000,50000,3000,200\n',
+      ),
+    );
+    expect(result.rows[0].values.followers).toBe(1000);
+    expect(result.rows[0].values.views).toBe(50000);
+    expect(result.rows[0].values.likes).toBe(3000);
+    expect(result.rows[0].values.comments).toBe(200);
+    expect(result.rows[0].errors).toEqual([]);
+  });
+
+  it('Telegram: followers + views + likes all map correctly', () => {
+    const result = rowsToImportRows(
+      parseCsv(
+        'platform,account_identifier,period,period_label,followers,views,likes\ntelegram,@channel,monthly,1405-05,25000,400000,1800\n',
+      ),
+    );
+    expect(result.rows[0].values.channelMembers).toBe(25000);
+    expect(result.rows[0].values.views).toBe(400000);
+    expect(result.rows[0].values.likes).toBe(1800);
+    expect(result.rows[0].errors).toEqual([]);
   });
 });
 
