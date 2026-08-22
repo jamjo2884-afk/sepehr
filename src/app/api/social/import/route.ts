@@ -41,6 +41,7 @@ const rowSchema = z.object({
   periodLabel: z.string(),
   values: valueSchema,
   errors: z.array(z.string()),
+  resolvedAccountId: z.string().nullable().optional(),
 });
 
 const bodySchema = z.object({
@@ -73,6 +74,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     periodLabel: r.periodLabel,
     values: r.values as SocialMetricValues,
     errors: r.errors,
+    resolvedAccountId: r.resolvedAccountId ?? null,
   }));
 
   try {

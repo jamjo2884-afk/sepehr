@@ -16,7 +16,7 @@ import {
   buildCsvTemplate,
   buildXlsxTemplate,
 } from '@/services/social-import/template';
-import { matchImportRowToAccount } from '@/services/social-import/match';
+import { matchImportRowToAccount, normalizeSocialIdentifier } from '@/services/social-import/match';
 import type { SocialAccount } from '@/types/social';
 
 const CSV_HEADER =
@@ -431,7 +431,8 @@ describe('matchImportRowToAccount', () => {
       accountIdentifier: '@AZMAA',
       platform: 'instagram',
     });
-    expect('account' in r && r.account.id).toBe(accounts[0].id);
+    expect(r.status).toBe('matched');
+    if (r.status === 'matched') expect(r.account.id).toBe(accounts[0].id);
   });
 
   it('matches by external id', () => {
@@ -439,7 +440,8 @@ describe('matchImportRowToAccount', () => {
       accountIdentifier: '123456789',
       platform: 'telegram',
     });
-    expect('account' in r && r.account.id).toBe(accounts[1].id);
+    expect(r.status).toBe('matched');
+    if (r.status === 'matched') expect(r.account.id).toBe(accounts[1].id);
   });
 
   it('matches by account id', () => {
@@ -447,7 +449,8 @@ describe('matchImportRowToAccount', () => {
       accountIdentifier: '00000000-0000-0000-0000-000000000001',
       platform: 'instagram',
     });
-    expect('account' in r && r.account.id).toBe(accounts[0].id);
+    expect(r.status).toBe('matched');
+    if (r.status === 'matched') expect(r.account.id).toBe(accounts[0].id);
   });
 
   it('matches by display name', () => {
@@ -455,18 +458,19 @@ describe('matchImportRowToAccount', () => {
       accountIdentifier: 'کانال ازما',
       platform: 'telegram',
     });
-    expect('account' in r && r.account.id).toBe(accounts[1].id);
+    expect(r.status).toBe('matched');
+    if (r.status === 'matched') expect(r.account.id).toBe(accounts[1].id);
   });
 
-  it('rejects when no account matches', () => {
+  it('returns unmatched when no account matches', () => {
     const r = matchImportRowToAccount(accounts, {
       accountIdentifier: 'nobody',
       platform: 'instagram',
     });
-    expect('error' in r).toBe(true);
+    expect(r.status).toBe('unmatched');
   });
 
-  it('rejects ambiguous matches on the same platform', () => {
+  it('returns ambiguous when multiple accounts match', () => {
     const dup = [
       ...accounts,
       { ...accounts[0], id: '00000000-0000-0000-0000-000000000099' },
@@ -475,7 +479,8 @@ describe('matchImportRowToAccount', () => {
       accountIdentifier: 'azmaa',
       platform: 'instagram',
     });
-    expect('error' in r && r.error).toContain('یکتا');
+    expect(r.status).toBe('ambiguous');
+    if (r.status === 'ambiguous') expect(r.candidates.length).toBe(2);
   });
 
   it('never matches across platforms by guessing', () => {
@@ -483,7 +488,82 @@ describe('matchImportRowToAccount', () => {
       accountIdentifier: 'azmaa',
       platform: 'telegram',
     });
-    expect('error' in r).toBe(true);
+    expect(r.status).toBe('unmatched');
+  });
+
+  it('returns empty for blank identifier', () => {
+    const r = matchImportRowToAccount(accounts, {
+      accountIdentifier: '',
+      platform: 'instagram',
+    });
+    expect(r.status).toBe('empty');
+  });
+
+  it('normalizes URL identifiers', () => {
+    const withUrl = [
+      ...accounts,
+      {
+        ...accounts[0],
+        id: '00000000-0000-0000-0000-000000000050',
+        platform: 'aparat' as never,
+        username: 'darajee100',
+      },
+    ];
+    const r = matchImportRowToAccount(withUrl, {
+      accountIdentifier: 'https://www.aparat.com/darajee100',
+      platform: 'aparat',
+    });
+    expect(r.status).toBe('matched');
+  });
+
+  it('normalizes URL with query string', () => {
+    const withUrl = [
+      ...accounts,
+      {
+        ...accounts[0],
+        id: '00000000-0000-0000-0000-000000000051',
+        platform: 'aparat' as never,
+        username: 'darajee100',
+      },
+    ];
+    const r = matchImportRowToAccount(withUrl, {
+      accountIdentifier: 'https://www.aparat.com/darajee100?foo=bar',
+      platform: 'aparat',
+    });
+    expect(r.status).toBe('matched');
+  });
+
+  it('normalizes URL with fragment', () => {
+    const withUrl = [
+      ...accounts,
+      {
+        ...accounts[0],
+        id: '00000000-0000-0000-0000-000000000052',
+        platform: 'aparat' as never,
+        username: 'darajee100',
+      },
+    ];
+    const r = matchImportRowToAccount(withUrl, {
+      accountIdentifier: 'https://www.aparat.com/darajee100#profile',
+      platform: 'aparat',
+    });
+    expect(r.status).toBe('matched');
+  });
+
+  it('returns unmatched for unknown platform accounts', () => {
+    const r = matchImportRowToAccount([], {
+      accountIdentifier: 'darajee100',
+      platform: 'aparat',
+    });
+    expect(r.status).toBe('unmatched');
+  });
+
+  it('does not guess Persian identifiers', () => {
+    const r = matchImportRowToAccount(accounts, {
+      accountIdentifier: 'نود',
+      platform: 'youtube',
+    });
+    expect(r.status).toBe('unmatched');
   });
 });
 
@@ -496,5 +576,83 @@ describe('isExcelFile / size', () => {
 
   it('exposes the max size', () => {
     expect(IMPORT_MAX_FILE_BYTES).toBe(10 * 1024 * 1024);
+  });
+});
+
+describe('normalizeSocialIdentifier', () => {
+  it('strips leading @', () => {
+    const r = normalizeSocialIdentifier('@azmaa');
+    expect(r.identifier).toBe('azmaa');
+    expect(r.sourceType).toBe('raw');
+  });
+
+  it('lowercases identifiers', () => {
+    const r = normalizeSocialIdentifier('AZMAA');
+    expect(r.identifier).toBe('azmaa');
+  });
+
+  it('trims whitespace', () => {
+    const r = normalizeSocialIdentifier('  azmaa  ');
+    expect(r.identifier).toBe('azmaa');
+  });
+
+  it('parses Instagram URLs', () => {
+    const r = normalizeSocialIdentifier('https://www.instagram.com/darajee100/', 'instagram');
+    expect(r.identifier).toBe('darajee100');
+    expect(r.sourceType).toBe('url');
+  });
+
+  it('parses Telegram URLs', () => {
+    const r = normalizeSocialIdentifier('https://t.me/azmaa_channel', 'telegram');
+    expect(r.identifier).toBe('azmaa_channel');
+    expect(r.sourceType).toBe('url');
+  });
+
+  it('parses YouTube URLs', () => {
+    const r = normalizeSocialIdentifier('https://www.youtube.com/@kebritmedia', 'youtube');
+    expect(r.identifier).toBe('kebritmedia');
+    expect(r.sourceType).toBe('url');
+  });
+
+  it('parses Twitter/X URLs', () => {
+    const r = normalizeSocialIdentifier('https://x.com/azmaa_net', 'twitter');
+    expect(r.identifier).toBe('azmaa_net');
+    expect(r.sourceType).toBe('url');
+  });
+
+  it('parses Aparat URLs', () => {
+    const r = normalizeSocialIdentifier('https://www.aparat.com/darajee100', 'aparat');
+    expect(r.identifier).toBe('darajee100');
+    expect(r.sourceType).toBe('url');
+  });
+
+  it('strips query string from URLs', () => {
+    const r = normalizeSocialIdentifier('https://www.aparat.com/darajee100?foo=bar');
+    expect(r.identifier).toBe('darajee100');
+    expect(r.sourceType).toBe('url');
+  });
+
+  it('strips fragment from URLs', () => {
+    const r = normalizeSocialIdentifier('https://www.aparat.com/darajee100#profile');
+    expect(r.identifier).toBe('darajee100');
+    expect(r.sourceType).toBe('url');
+  });
+
+  it('returns empty for blank input', () => {
+    const r = normalizeSocialIdentifier('');
+    expect(r.identifier).toBe('');
+    expect(r.sourceType).toBe('raw');
+  });
+
+  it('returns raw for non-URL identifiers', () => {
+    const r = normalizeSocialIdentifier('azmaa_net');
+    expect(r.identifier).toBe('azmaa_net');
+    expect(r.sourceType).toBe('raw');
+  });
+
+  it('does not convert Persian to Latin', () => {
+    const r = normalizeSocialIdentifier('نود');
+    expect(r.identifier).toBe('نود');
+    expect(r.sourceType).toBe('raw');
   });
 });

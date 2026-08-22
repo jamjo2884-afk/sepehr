@@ -5,7 +5,7 @@ import {
   rowsToImportRows,
 } from '@/services/social-import/parse';
 import { getSocialAccounts } from '@/services/social.service';
-import { matchRowsToAccounts } from '@/services/social-import/match';
+import { matchImportRowToAccount } from '@/services/social-import/match';
 
 /**
  * POST /api/social/import/preview
@@ -52,25 +52,46 @@ export async function POST(req: Request): Promise<NextResponse> {
       return NextResponse.json({ fileErrors, rows: [] }, { status: 200 });
     }
     const accounts = await getSocialAccounts();
-    const matched = matchRowsToAccounts(accounts, rows);
-    const previewRows = matched.map(({ row, account, matchError }) => ({
-      rowNumber: row.rowNumber,
-      platform: row.platform,
-      accountIdentifier: row.accountIdentifier,
-      period: row.period,
-      periodLabel: row.periodLabel,
-      values: row.values,
-      errors: row.errors,
-      account: account
-        ? {
-            id: account.id,
-            brand: account.brand,
-            username: account.username,
-            displayName: account.displayName,
-          }
-        : null,
-      matchError,
-    }));
+    const previewRows = rows.map((row) => {
+      const result = matchImportRowToAccount(accounts, row);
+      const account =
+        result.status === 'matched'
+          ? {
+              id: result.account.id,
+              brand: result.account.brand,
+              username: result.account.username,
+              displayName: result.account.displayName,
+            }
+          : null;
+      const candidates =
+        result.status === 'ambiguous'
+          ? result.candidates.map((c) => ({
+              id: c.id,
+              brand: c.brand,
+              username: c.username,
+              displayName: c.displayName,
+            }))
+          : null;
+      const matchError =
+        result.status === 'empty'
+          ? 'شناسهٔ حساب وارد نشده است.'
+          : result.status === 'unmatched'
+            ? 'حسابی با این شناسه یافت نشد.'
+            : null;
+      return {
+        rowNumber: row.rowNumber,
+        platform: row.platform,
+        accountIdentifier: row.accountIdentifier,
+        period: row.period,
+        periodLabel: row.periodLabel,
+        values: row.values,
+        errors: row.errors,
+        account,
+        candidates,
+        matchStatus: result.status,
+        matchError,
+      };
+    });
     return NextResponse.json({ fileErrors: [], rows: previewRows });
   } catch (err) {
     console.warn('[social-import] Could not parse the uploaded file.', err);

@@ -82,11 +82,24 @@ export async function importSocialMetricsRows(
     account: SocialAccount | null;
     error: string | null;
   }> = rows.map((row) => {
+    // If user resolved this row, use the resolved account directly.
+    if (row.resolvedAccountId) {
+      const found = accounts.find((a) => a.id === row.resolvedAccountId);
+      if (found) {
+        return { row, account: found, error: null };
+      }
+    }
     const result = matchImportRowToAccount(accounts, row);
-    if ('account' in result) {
+    if (result.status === 'matched') {
       return { row, account: result.account, error: null };
     }
-    return { row, account: null, error: result.error };
+    const errorMsg =
+      result.status === 'empty'
+        ? 'شناسهٔ حساب وارد نشده است.'
+        : result.status === 'ambiguous'
+          ? 'حساب یکتا پیدا نشد.'
+          : 'حسابی با این شناسه یافت نشد.';
+    return { row, account: null, error: errorMsg };
   });
 
   const rejected: Array<{ rowNumber: number; message: string }> = [];

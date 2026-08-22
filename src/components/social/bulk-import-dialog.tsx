@@ -40,8 +40,10 @@ interface PreviewRow {
   errors: string[];
   /** Normalized metric values (keys present only when provided). */
   values: Record<string, number>;
-  account: { id: string; brand: string; username: string } | null;
+  account: { id: string; brand: string; username: string; displayName?: string | null } | null;
   matchError: string | null;
+  matchStatus?: 'matched' | 'ambiguous' | 'unmatched' | 'empty';
+  candidates?: Array<{ id: string; brand: string; username: string; displayName?: string | null }> | null;
 }
 
 type Stage = 'choose' | 'parsing' | 'preview' | 'saving' | 'done';
@@ -69,6 +71,9 @@ export function BulkImportDialog({
   const [sheetsUrl, setSheetsUrl] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [resolvedAccounts, setResolvedAccounts] = useState<
+    Map<number, { id: string; brand: string; username: string }>
+  >(new Map());
   const inputRef = useRef<HTMLInputElement>(null);
 
   const toggleRowErrors = useCallback((rowNumber: number) => {
@@ -83,9 +88,11 @@ export function BulkImportDialog({
     });
   }, []);
 
-  const validRows = rows.filter(
-    (r) => r.errors.length === 0 && r.account != null,
-  );
+  const validRows = rows.filter((r) => {
+    if (r.errors.length > 0) return false;
+    if (r.account != null) return true;
+    return resolvedAccounts.has(r.rowNumber);
+  });
   const invalidRows = rows.length - validRows.length;
 
   const reset = () => {
@@ -95,6 +102,7 @@ export function BulkImportDialog({
     setRows([]);
     setSummary(null);
     setSheetsUrl('');
+    setResolvedAccounts(new Map());
   };
 
   const parseFile = async (file: File) => {
@@ -188,6 +196,7 @@ export function BulkImportDialog({
             periodLabel: r.periodLabel,
             values: r.values,
             errors: [],
+            resolvedAccountId: resolvedAccounts.get(r.rowNumber)?.id ?? r.account?.id ?? null,
           })),
         }),
       });
@@ -367,11 +376,11 @@ export function BulkImportDialog({
                 </span>
               </span>
               <span className="rounded-full bg-success/10 px-2.5 py-1 text-success">
-                معتبر: {toPersianDigits(String(validRows.length))}
+                متصل: {toPersianDigits(String(validRows.length))}
               </span>
               {invalidRows > 0 ? (
                 <span className="rounded-full bg-destructive/10 px-2.5 py-1 text-destructive">
-                  دارای خطا: {toPersianDigits(String(invalidRows))}
+                  نیاز به بررسی: {toPersianDigits(String(invalidRows))}
                 </span>
               ) : null}
             </div>
@@ -457,18 +466,62 @@ export function BulkImportDialog({
                           {ok ? (
                             <span className="inline-flex items-center gap-1 text-[11px] text-success">
                               <CheckCircle2 className="h-3 w-3" />
-                              آماده
+                              متصل شد
                             </span>
+                          ) : r.matchStatus === 'ambiguous' ? (
+                            <div className="flex flex-col gap-1">
+                              <button
+                                type="button"
+                                onClick={() => toggleRowErrors(r.rowNumber)}
+                                className="inline-flex items-center gap-1 text-[11px] text-amber-500 hover:underline"
+                              >
+                                <AlertTriangle className="h-3 w-3 shrink-0" />
+                                نیاز به انتخاب
+                                {expandedRows.has(r.rowNumber) ? ' ▾' : ' ▸'}
+                              </button>
+                              {expandedRows.has(r.rowNumber) && r.candidates ? (
+                                <div className="flex flex-col gap-1 rounded border border-amber-500/20 bg-amber-500/5 p-1.5">
+                                  {r.candidates.map((c) => (
+                                    <button
+                                      key={c.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setResolvedAccounts((prev) => {
+                                          const next = new Map(prev);
+                                          next.set(r.rowNumber, { id: c.id, brand: c.brand, username: c.username });
+                                          return next;
+                                        });
+                                      }}
+                                      className={cn(
+                                        'rounded px-2 py-0.5 text-right text-[11px] hover:bg-amber-500/10',
+                                        resolvedAccounts.get(r.rowNumber)?.id === c.id && 'bg-amber-500/15 font-medium',
+                                      )}
+                                    >
+                                      {c.brand} / {c.username}
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => toggleRowErrors(r.rowNumber)}
-                              className="inline-flex items-center gap-1 text-[11px] text-destructive hover:underline"
-                            >
-                              <AlertTriangle className="h-3 w-3 shrink-0" />
-                              خطا ({toPersianDigits(String(issues.length))})
-                              {expandedRows.has(r.rowNumber) ? ' ▾' : ' ▸'}
-                            </button>
+                            <div className="flex flex-col gap-1">
+                              <button
+                                type="button"
+                                onClick={() => toggleRowErrors(r.rowNumber)}
+                                className="inline-flex items-center gap-1 text-[11px] text-destructive hover:underline"
+                              >
+                                <AlertTriangle className="h-3 w-3 shrink-0" />
+                                حساب پیدا نشد
+                                {expandedRows.has(r.rowNumber) ? ' ▾' : ' ▸'}
+                              </button>
+                              {expandedRows.has(r.rowNumber) ? (
+                                <div className="rounded border border-destructive/20 bg-destructive/5 p-1.5">
+                                  <p className="text-[10px] text-destructive/70">
+                                    برای ثبت این ردیف، ابتدا حساب مربوطه را از بخش مدیریت حساب‌ها اضافه کنید.
+                                  </p>
+                                </div>
+                              ) : null}
+                            </div>
                           )}
                         </td>
                       </tr>

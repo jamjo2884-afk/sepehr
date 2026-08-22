@@ -29,6 +29,8 @@ export interface SocialMetricImportRow {
   values: SocialMetricValues;
   /** Validation problems; empty = the row is valid. */
   errors: string[];
+  /** User-resolved account ID (set when user picks from ambiguous/unmatched). */
+  resolvedAccountId?: string | null;
 }
 
 /** A row with the account matched for preview display. */
@@ -37,6 +39,15 @@ export interface SocialImportPreviewRow extends SocialMetricImportRow {
   account: SocialAccount | null;
   /** Matching problem in Persian (null when matched / not attempted yet). */
   matchError: string | null;
+  /** Structured match status. */
+  matchStatus?: 'matched' | 'ambiguous' | 'unmatched' | 'empty';
+  /** Candidate accounts when ambiguous. */
+  candidates?: Array<{
+    id: string;
+    brand: string;
+    username: string;
+    displayName: string | null;
+  }> | null;
 }
 
 /** Parsed file content before row-level validation. */

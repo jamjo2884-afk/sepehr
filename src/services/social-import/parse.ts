@@ -6,6 +6,7 @@ import {
   parseImportNumber,
 } from '@/services/social-import/normalize';
 import { PLATFORM_METRIC_FIELDS, platformAudienceField } from '@/constants/social-fields';
+import { normalizeSocialIdentifier } from '@/services/social-import/match';
 import type { SocialMetricFieldKey } from '@/constants/social-fields';
 import type {
   SocialMetricImportRow,
@@ -189,7 +190,8 @@ export function rowsToImportRows(matrix: string[][]): SocialImportParseResult {
       );
     }
 
-    const accountIdentifier = cellAt(colAccount).trim().replace(/^@/, '');
+    const rawAccountCell = cellAt(colAccount);
+    const { identifier: accountIdentifier } = normalizeSocialIdentifier(rawAccountCell, platform ?? undefined);
     if (accountIdentifier === '') {
       errors.push('account_identifier وارد نشده است.');
     }
