@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   FolderKanban,
   ClipboardList,
+  ListTodo,
   Package,
   Rocket,
   Share2,
@@ -30,6 +31,13 @@ export const navItems: NavItem[] = [
     href: '/command-center',
     icon: LayoutDashboard,
     description: 'نمای کلی عملیات رسانه‌ای و نقطه شروع روزانه شما',
+  },
+  {
+    id: 'tasks',
+    label: 'کارها',
+    href: '/tasks',
+    icon: ListTodo,
+    description: 'مدیریت وظایف، پروژه‌ها و عملیات',
   },
   {
     id: 'projects',
