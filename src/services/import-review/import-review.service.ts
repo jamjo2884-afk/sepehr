@@ -24,6 +24,7 @@ import type { SocialAccount } from '@/types/social';
 import type { SocialMetricValues } from '@/types/social';
 import { matchImportRowToAccount } from '@/services/social-import/match';
 import { getSocialAccounts } from '@/services/social.service';
+import { detectAnomaliesForSession } from '@/services/import-review/anomaly-detection';
 import { periodRangeForLabel } from '@/services/social-metrics';
 import { METRIC_COLUMN_BY_KEY } from '@/services/social.service';
 
@@ -342,6 +343,30 @@ export async function validateSession(
       }, { supabase: sb });
       error++;
     }
+  }
+
+  // ── Anomaly Detection ─────────────────────────────────────────────
+  // After matching, run anomaly detection on all valid+resolved rows
+  // to flag unusual metric values.
+  try {
+    const anomalySummary = await detectAnomaliesForSession(sessionId, { supabase: sb });
+
+    // Store anomaly data on flagged rows via resolution_data
+    for (const report of anomalySummary.reports) {
+      await sb
+        .from('import_rows')
+        .update({
+          resolution_data: {
+            ...(await getImportRow(report.rowId, { supabase: sb }))?.resolution_data ?? {},
+            anomalies: report.anomalies,
+            anomaly_severity: report.overallSeverity,
+          },
+        })
+        .eq('id', report.rowId);
+    }
+  } catch (anomalyErr) {
+    // Anomaly detection failure should not block validation
+    console.warn('[import-review] Anomaly detection failed:', anomalyErr);
   }
 
   const summary: ImportSessionSummary = {

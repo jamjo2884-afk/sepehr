@@ -41,6 +41,10 @@ export type ImportErrorType =
   | 'PLATFORM_MISMATCH'
   | 'BRAND_MISMATCH'
   | 'ACCOUNT_INACTIVE'
+  | 'ANOMALY_HIGH'
+  | 'ANOMALY_LOW'
+  | 'ANOMALY_NEGATIVE'
+  | 'ANOMALY_SPIKE'
   | 'UNKNOWN_ERROR';
 
 export const ERROR_TYPE_LABELS: Record<ImportErrorType, string> = {
@@ -56,6 +60,10 @@ export const ERROR_TYPE_LABELS: Record<ImportErrorType, string> = {
   PLATFORM_MISMATCH: 'عدم تطابق پلتفرم',
   BRAND_MISMATCH: 'عدم تطابق برند',
   ACCOUNT_INACTIVE: 'حساب غیرفعال',
+  ANOMALY_HIGH: 'مقدار غیرعادی بالا',
+  ANOMALY_LOW: 'مقدار غیرعادی پایین',
+  ANOMALY_NEGATIVE: 'مقدار منفی',
+  ANOMALY_SPIKE: 'جهش ناگهانی',
   UNKNOWN_ERROR: 'خطای ناشناخته',
 };
 
@@ -193,6 +201,74 @@ export interface ImportCommitPreview {
   metrics_to_update: number;
   rows_to_import: number;
   rows_rejected: number;
+}
+
+/* ---------------------------------------------------------------------------
+ * Anomaly Detection Types
+ * --------------------------------------------------------------------------- */
+
+/** Severity of an anomaly detection. */
+export type AnomalySeverity = 'critical' | 'warning' | 'info';
+
+/** Type of anomaly detected. */
+export type AnomalyType =
+  | 'value_too_high'
+  | 'value_too_low'
+  | 'negative_value'
+  | 'sudden_spike'
+  | 'sudden_drop'
+  | 'impossible_engagement'
+  | 'zero_followers_with_data';
+
+/** A single anomaly detected in a metric value. */
+export interface MetricAnomaly {
+  field: string;
+  /** Persian label of the metric field. */
+  fieldLabel: string;
+  type: AnomalyType;
+  severity: AnomalySeverity;
+  /** The value in the import row. */
+  importValue: number;
+  /** The historical mean (null when no history). */
+  historicalMean: number | null;
+  /** The historical max. */
+  historicalMax: number | null;
+  /** The historical min. */
+  historicalMin: number | null;
+  /** The previous period value (null when not available). */
+  previousValue: number | null;
+  /** How many times the mean this value is (e.g. 5.2x). */
+  deviationFactor: number | null;
+  /** Human-readable Persian description. */
+  message: string;
+}
+
+/** Full anomaly report for one import row. */
+export interface RowAnomalyReport {
+  rowId: string;
+  rowNumber: number;
+  accountIdentifier: string;
+  platform: string;
+  brand: string | null;
+  anomalies: MetricAnomaly[];
+  /** Severity = worst severity among anomalies. */
+  overallSeverity: AnomalySeverity | null;
+}
+
+/** Summary of all anomalies in a session. */
+export interface SessionAnomalySummary {
+  /** Total rows with at least one anomaly. */
+  totalFlagged: number;
+  /** Anomalies by severity. */
+  critical: number;
+  warning: number;
+  info: number;
+  /** Anomalies grouped by metric field. */
+  byField: Record<string, number>;
+  /** Anomalies grouped by anomaly type. */
+  byType: Record<string, number>;
+  /** Individual row reports. */
+  reports: RowAnomalyReport[];
 }
 
 /** Summary returned after committing. */

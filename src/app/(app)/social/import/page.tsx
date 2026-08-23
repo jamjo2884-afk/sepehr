@@ -43,6 +43,10 @@ import type {
 } from '@/types/import-review';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import type { MetricAnomaly, RowAnomalyReport, SessionAnomalySummary } from '@/types/import-review';
+import { SOCIAL_METRIC_FIELDS } from '@/constants/social-fields';
+import type { SocialMetricFieldKey } from '@/constants/social-fields';
+import { AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 
 // ─── Status helpers ──────────────────────────────────────────────────────────
 
@@ -252,6 +256,8 @@ function ReviewView({ sessionId, onBack }: { sessionId: string; onBack: () => vo
   const [reviewRow, setReviewRow] = useState<ImportRow | null>(null);
   const [showCommitDialog, setShowCommitDialog] = useState(false);
   const [committing] = useState(false);
+  const [anomalySummary, setAnomalySummary] = useState<SessionAnomalySummary | null>(null);
+  const [anomalyFilter, setAnomalyFilter] = useState<'all' | 'flagged' | 'clean'>('all');
 
   const loadSession = useCallback(async () => {
     setLoading(true);
@@ -260,6 +266,14 @@ function ReviewView({ sessionId, onBack }: { sessionId: string; onBack: () => vo
       const data = await res.json();
       setSession(data.session);
       setRows(data.rows ?? []);
+      // Load anomaly summary
+      try {
+        const aRes = await fetch(`/api/social/import/review/sessions/${sessionId}/anomalies`);
+        const aData = await aRes.json();
+        setAnomalySummary(aData.summary ?? null);
+      } catch {
+        // Anomaly loading is non-blocking
+      }
     } catch {
       toast.error('خطا در خواندن جلسه.');
     } finally {
@@ -269,8 +283,18 @@ function ReviewView({ sessionId, onBack }: { sessionId: string; onBack: () => vo
 
   useEffect(() => { void loadSession(); }, [loadSession]);
 
+  // Map row IDs to anomaly reports
+  const anomalyMap = new Map<string, RowAnomalyReport>();
+  if (anomalySummary) {
+    for (const report of anomalySummary.reports) {
+      anomalyMap.set(report.rowId, report);
+    }
+  }
+
   const filteredRows = rows.filter((r) => {
     if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+    if (anomalyFilter === 'flagged' && !anomalyMap.has(r.id)) return false;
+    if (anomalyFilter === 'clean' && anomalyMap.has(r.id)) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const searchFields = [r.account_identifier, r.username, r.display_name, r.brand, r.platform].filter(Boolean).join(' ').toLowerCase();
@@ -324,6 +348,11 @@ function ReviewView({ sessionId, onBack }: { sessionId: string; onBack: () => vo
         <DashboardCard label="واردشده" value={counts.imported} tone="info" />
       </div>
 
+      {/* Anomaly Summary */}
+      {anomalySummary && anomalySummary.totalFlagged > 0 && (
+        <AnomalyDashboard summary={anomalySummary} />
+      )}
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -340,6 +369,18 @@ function ReviewView({ sessionId, onBack }: { sessionId: string; onBack: () => vo
             <SelectItem value="imported">واردشده</SelectItem>
           </SelectContent>
         </Select>
+        {anomalySummary && anomalySummary.totalFlagged > 0 && (
+          <Select value={anomalyFilter} onValueChange={(v) => setAnomalyFilter(v as 'all' | 'flagged' | 'clean')}>
+            <SelectTrigger className="w-36 h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">همه مقادیر</SelectItem>
+              <SelectItem value="flagged">⚠️ نیاز به بررسی</SelectItem>
+              <SelectItem value="clean">✅ بدون مشکل</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <div className="relative">
           <Search className="absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -406,7 +447,20 @@ function ReviewView({ sessionId, onBack }: { sessionId: string; onBack: () => vo
                   )}
                 </td>
                 <td className="px-3 py-1.5">
-                  {(r.status === 'error' || r.status === 'ambiguous' || r.status === 'pending') && (
+                  {/* Anomaly badge */}
+                  {anomalyMap.has(r.id) && (
+                    <Badge variant="outline" className={cn(
+                      'ml-1 text-[10px]',
+                      anomalyMap.get(r.id)!.overallSeverity === 'critical'
+                        ? 'border-red-500/30 bg-red-500/10 text-red-400'
+                        : anomalyMap.get(r.id)!.overallSeverity === 'warning'
+                          ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+                          : 'border-blue-500/30 bg-blue-500/10 text-blue-400',
+                    )}>
+                      {anomalyMap.get(r.id)!.anomalies.length} مورد مشکوک
+                    </Badge>
+                  )}
+                  {(r.status === 'error' || r.status === 'ambiguous' || r.status === 'pending' || anomalyMap.has(r.id)) && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -416,7 +470,7 @@ function ReviewView({ sessionId, onBack }: { sessionId: string; onBack: () => vo
                       بررسی
                     </Button>
                   )}
-                  {r.status === 'resolved' && (
+                  {r.status === 'resolved' && !anomalyMap.has(r.id) && (
                     <span className="text-[10px] text-success">✓ حل شده</span>
                   )}
                 </td>
@@ -447,6 +501,7 @@ function ReviewView({ sessionId, onBack }: { sessionId: string; onBack: () => vo
       {reviewRow && (
         <ReviewDialog
           row={reviewRow}
+          anomalies={anomalyMap.get(reviewRow.id)?.anomalies ?? []}
           onClose={() => setReviewRow(null)}
           onUpdated={() => { setReviewRow(null); void loadSession(); }}
         />
@@ -466,6 +521,213 @@ function ReviewView({ sessionId, onBack }: { sessionId: string; onBack: () => vo
 }
 
 // ─── Dashboard Card ──────────────────────────────────────────────────────────
+
+// ─── Anomaly Dashboard ───────────────────────────────────────────────────
+
+function AnomalyDashboard({ summary }: { summary: SessionAnomalySummary }) {
+  return (
+    <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+      <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium text-amber-600">
+        <AlertTriangle className="h-3.5 w-3.5" />
+        مقادیر نیاز به بررسی — {toPersianDigits(String(summary.totalFlagged))} ردیف
+      </h3>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {/* Severity counts */}
+        <div className="flex flex-col items-center gap-0.5 rounded-lg border border-red-500/20 bg-red-500/5 p-2">
+          <span className="text-sm font-bold text-red-400">{toPersianDigits(String(summary.critical))}</span>
+          <span className="text-[10px] text-red-400">بحرانی</span>
+        </div>
+        <div className="flex flex-col items-center gap-0.5 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2">
+          <span className="text-sm font-bold text-amber-400">{toPersianDigits(String(summary.warning))}</span>
+          <span className="text-[10px] text-amber-400">هشدار</span>
+        </div>
+        <div className="flex flex-col items-center gap-0.5 rounded-lg border border-blue-500/20 bg-blue-500/5 p-2">
+          <span className="text-sm font-bold text-blue-400">{toPersianDigits(String(summary.info))}</span>
+          <span className="text-[10px] text-blue-400">اطلاعاتی</span>
+        </div>
+        {/* Top fields */}
+        <div className="flex flex-col gap-0.5 rounded-lg border border-border bg-surface/50 p-2">
+          <span className="text-[10px] font-medium text-muted-foreground">بیشترین مشکل:</span>
+          {Object.entries(summary.byField)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 2)
+            .map(([field, count]) => {
+              const spec = SOCIAL_METRIC_FIELDS[field as SocialMetricFieldKey];
+              return (
+                <span key={field} className="text-[10px] text-foreground">
+                  {spec?.label ?? field}: {toPersianDigits(String(count))}
+                </span>
+              );
+            })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Anomaly Card ──────────────────────────────────────────────────────────
+
+function AnomalyCard({
+  anomaly,
+  fixing,
+  onFix,
+}: {
+  anomaly: MetricAnomaly;
+  fixing: boolean;
+  onFix: (value: number) => void;
+}) {
+  const [showSuggestion, setShowSuggestion] = useState(false);
+
+  const severityColor = {
+    critical: 'border-red-500/30 bg-red-500/5',
+    warning: 'border-amber-500/30 bg-amber-500/5',
+    info: 'border-blue-500/30 bg-blue-500/5',
+  }[anomaly.severity];
+
+  const severityText = {
+    critical: 'text-red-400',
+    warning: 'text-amber-400',
+    info: 'text-blue-400',
+  }[anomaly.severity];
+
+  return (
+    <div className={cn('rounded-lg border p-2', severityColor)}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          <div className="flex items-center gap-1.5">
+            {anomaly.type.includes('spike') || anomaly.type.includes('high') ? (
+              <TrendingUp className={cn('h-3 w-3', severityText)} />
+            ) : anomaly.type.includes('drop') || anomaly.type.includes('low') ? (
+              <TrendingDown className={cn('h-3 w-3', severityText)} />
+            ) : (
+              <AlertTriangle className={cn('h-3 w-3', severityText)} />
+            )}
+            <span className={cn('text-[11px] font-medium', severityText)}>
+              {anomaly.fieldLabel}
+            </span>
+          </div>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            {anomaly.message}
+          </p>
+          {/* Comparison table */}
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
+            <span className="text-foreground">
+              مقدار وارد شده: <strong>{toPersianDigits(String(anomaly.importValue))}</strong>
+            </span>
+            {anomaly.historicalMean !== null && (
+              <span className="text-muted-foreground">
+                میانگین تاریخی: {toPersianDigits(String(anomaly.historicalMean))}
+              </span>
+            )}
+            {anomaly.historicalMax !== null && (
+              <span className="text-muted-foreground">
+                بیشترین: {toPersianDigits(String(anomaly.historicalMax))}
+              </span>
+            )}
+            {anomaly.historicalMin !== null && (
+              <span className="text-muted-foreground">
+                کمترین: {toPersianDigits(String(anomaly.historicalMin))}
+              </span>
+            )}
+            {anomaly.previousValue !== null && (
+              <span className="text-muted-foreground">
+                دوره قبل: {toPersianDigits(String(anomaly.previousValue))}
+              </span>
+            )}
+            {anomaly.deviationFactor !== null && (
+              <span className={severityText}>
+                انحراف: {anomaly.deviationFactor.toFixed(1)}σ
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Fix: suggestion buttons — simple pick-one flow */}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {anomaly.historicalMean !== null && (
+          <SuggestionChip
+            label={`${toPersianDigits(String(Math.round(anomaly.historicalMean!)))} (میانگین)`}
+            disabled={fixing}
+            onClick={() => onFix(Math.round(anomaly.historicalMean!))}
+          />
+        )}
+        {anomaly.previousValue !== null && (
+          <SuggestionChip
+            label={`${toPersianDigits(String(anomaly.previousValue!))} (دوره قبل)`}
+            disabled={fixing}
+            onClick={() => onFix(anomaly.previousValue!)}
+          />
+        )}
+        {!showSuggestion && (
+          <button
+            type="button"
+            className="text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+            onClick={() => setShowSuggestion(true)}
+          >
+            یا مقدار دیگر...
+          </button>
+        )}
+      </div>
+
+      {showSuggestion && (
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <Input
+            type="number"
+            className="h-6 w-24 text-[10px]"
+            placeholder="مقدار..."
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const n = Number((e.target as HTMLInputElement).value);
+                if (!isNaN(n) && n >= 0) { onFix(n); setShowSuggestion(false); }
+              }
+            }}
+          />
+          <Button
+            size="sm"
+            className="h-6 px-2 text-[10px]"
+            onClick={(e) => {
+              const input = (e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement);
+              const n = Number(input?.value);
+              if (!isNaN(n) && n >= 0) { onFix(n); setShowSuggestion(false); }
+            }}
+          >
+            اعمال
+          </Button>
+          <button
+            type="button"
+            className="text-[10px] text-muted-foreground"
+            onClick={() => setShowSuggestion(false)}
+          >
+            انصراف
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Custom Value Input ────────────────────────────────────────────────────
+
+/** A small clickable suggestion chip for quick value fixes. */
+function SuggestionChip({ label, disabled, onClick }: { label: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary transition-colors hover:bg-primary/10',
+        disabled && 'opacity-50',
+      )}
+    >
+      <span className="i-lucide-check h-2.5 w-2.5" />
+      {label}
+    </button>
+  );
+}
+
 
 function DashboardCard({ label, value, tone }: { label: string; value: number; tone: string }) {
   const toneClass = {
@@ -491,10 +753,12 @@ function DashboardCard({ label, value, tone }: { label: string; value: number; t
 
 function ReviewDialog({
   row,
+  anomalies,
   onClose,
   onUpdated,
 }: {
   row: ImportRow;
+  anomalies: MetricAnomaly[];
   onClose: () => void;
   onUpdated: () => void;
 }) {
@@ -579,9 +843,78 @@ function ReviewDialog({
     }
   };
 
+  // Metric editing state
+  const [editingMetrics, setEditingMetrics] = useState(false);
+  const [metricValues, setMetricValues] = useState<Record<string, number>>(() => {
+    const nd = (row.normalized_data as Record<string, unknown>) ?? {};
+    const src = (nd.values && typeof nd.values === 'object' && !Array.isArray(nd.values))
+      ? nd.values as Record<string, unknown>
+      : nd;
+    const vals: Record<string, number> = {};
+    for (const [k, v] of Object.entries(src)) {
+      if (typeof v === 'number') vals[k] = v;
+      else if (v !== null && v !== undefined && v !== '') {
+        const n = Number(v);
+        if (!isNaN(n)) vals[k] = n;
+      }
+    }
+    return vals;
+  });
+  const [fixingAnomaly, setFixingAnomaly] = useState<string | null>(null);
+
   const raw = (row.raw_data as Record<string, unknown>) ?? {};
   const nd = (row.normalized_data as Record<string, unknown>) ?? {};
   const values = (nd.values as Record<string, unknown>) ?? {};
+
+  /** Fix a specific anomaly by setting the correct value. */
+  const fixAnomaly = async (field: string, suggestedValue: number) => {
+    setFixingAnomaly(field);
+    try {
+      const res = await fetch(`/api/social/import/review/sessions/${row.session_id}/anomalies`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rowId: row.id,
+          field,
+          newValue: suggestedValue,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`${field} به ${suggestedValue} اصلاح شد.`);
+        setMetricValues((prev) => ({ ...prev, [field]: suggestedValue }));
+        onUpdated();
+      } else {
+        toast.error(data.error || 'اصلاح انجام نشد.');
+      }
+    } catch {
+      toast.error('خطا در اصلاح مقدار.');
+    } finally {
+      setFixingAnomaly(null);
+    }
+  };
+
+  /** Save all metric edits at once. */
+  const saveAllMetrics = async () => {
+    try {
+      for (const [field, value] of Object.entries(metricValues)) {
+        await fetch(`/api/social/import/review/sessions/${row.session_id}/anomalies`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rowId: row.id,
+            field,
+            newValue: value,
+          }),
+        });
+      }
+      toast.success('تمام مقادیر ذخیره شد.');
+      setEditingMetrics(false);
+      onUpdated();
+    } catch {
+      toast.error('خطا در ذخیره مقادیر.');
+    }
+  };
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -639,6 +972,91 @@ function ReviewDialog({
                     </Button>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Anomaly Comparison Panel */}
+        {anomalies.length > 0 && !editing && !showReject && (
+          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium text-amber-600">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              مقادیر نیاز به بررسی ({toPersianDigits(String(anomalies.length))})
+            </h3>
+            <div className="flex flex-col gap-2">
+              {anomalies.map((a) => (
+                <AnomalyCard
+                  key={`${a.field}-${a.type}`}
+                  anomaly={a}
+                  fixing={fixingAnomaly === a.field}
+                  onFix={(val) => void fixAnomaly(a.field, val)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Metric Values Table */}
+        {Object.keys(values).length > 0 && !editing && !showReject && (
+          <div className="rounded-lg border border-border bg-surface/50 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-medium text-muted-foreground">مقادیر آماری</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[10px]"
+                onClick={() => setEditingMetrics(!editingMetrics)}
+              >
+                {editingMetrics ? 'بستن' : 'ویرایش مقادیر'}
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              {Object.entries(values).filter(([,v]) => v != null).map(([k, v]) => {
+                const spec = SOCIAL_METRIC_FIELDS[k as SocialMetricFieldKey];
+                const label = spec?.label ?? k;
+                const isAnomalyField = anomalies.some((a) => a.field === k);
+                if (editingMetrics) {
+                  return (
+                    <div key={k} className="flex items-center gap-1">
+                      <span className="w-20 text-muted-foreground">{label}:</span>
+                      <Input
+                        type="number"
+                        className="h-6 w-24 text-[10px]"
+                        value={metricValues[k] ?? ''}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          if (!isNaN(n)) setMetricValues((prev) => ({ ...prev, [k]: n }));
+                        }}
+                      />
+                    </div>
+                  );
+                }
+                return (
+                  <div key={k} className={cn(
+                    'flex items-center gap-1 rounded px-1 py-0.5',
+                    isAnomalyField && 'bg-amber-500/10',
+                  )}>
+                    <span className="text-muted-foreground">{label}:</span>
+                    <span className={cn(
+                      'font-medium',
+                      isAnomalyField ? 'text-amber-400' : 'text-foreground',
+                    )}>
+                      {toPersianDigits(String(v))}
+                    </span>
+                    {isAnomalyField && <AlertTriangle className="h-2.5 w-2.5 text-amber-400" />}
+                  </div>
+                );
+              })}
+            </div>
+            {editingMetrics && (
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" className="h-7 text-[10px]" onClick={() => void saveAllMetrics()}>
+                  ذخیره مقادیر
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => setEditingMetrics(false)}>
+                  انصراف
+                </Button>
               </div>
             )}
           </div>
