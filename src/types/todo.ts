@@ -57,6 +57,8 @@ export interface Task {
   priority: TaskPriority;
   dueDate: string | null; // shamsi date '1405-05-31'
   labels: string[];
+  color: string | null;   // hex color for the task
+  category: string | null; // grouping category like 'محتوا', 'طراحی', etc.
   assigneeId: string | null;
   sortOrder: number;
   completedAt: Timestamp | null;
@@ -82,6 +84,8 @@ export interface CreateTaskInput {
   priority?: TaskPriority;
   dueDate?: string | null;
   labels?: string[];
+  color?: string | null;
+  category?: string | null;
   assigneeId?: string | null;
   sortOrder?: number;
 }
@@ -96,6 +100,8 @@ export interface UpdateTaskInput {
   priority?: TaskPriority;
   dueDate?: string | null;
   labels?: string[];
+  color?: string | null;
+  category?: string | null;
   assigneeId?: string | null;
   sortOrder?: number;
 }
@@ -118,6 +124,32 @@ export interface TaskStats {
   dueThisWeek: number;
   highPriority: number;
 }
+
+/** Predefined task colors */
+export const TASK_COLORS = [
+  { name: 'بدون رنگ', value: '' },
+  { name: 'قرمز', value: '#ef4444' },
+  { name: 'نارنجی', value: '#f97316' },
+  { name: 'زرد', value: '#eab308' },
+  { name: 'سبز', value: '#22c55e' },
+  { name: 'آبی', value: '#3b82f6' },
+  { name: 'بنفش', value: '#8b5cf6' },
+  { name: 'صورتی', value: '#ec4899' },
+  { name: 'فیروزه‌ای', value: '#06b6d4' },
+  { name: 'خاکستری', value: '#6b7280' },
+] as const;
+
+/** Predefined task categories for grouping */
+export const TASK_CATEGORIES = [
+  { id: 'content', label: 'محتوا', color: '#3b82f6' },
+  { id: 'design', label: 'طراحی', color: '#8b5cf6' },
+  { id: 'dev', label: 'توسعه', color: '#22c55e' },
+  { id: 'social', label: 'شبکه اجتماعی', color: '#ec4899' },
+  { id: 'analytics', label: 'تحلیل و آمار', color: '#f59e0b' },
+  { id: 'strategy', label: 'استراتژی', color: '#ef4444' },
+  { id: 'ops', label: 'عملیات', color: '#06b6d4' },
+  { id: 'other', label: 'سایر', color: '#6b7280' },
+] as const;
 
 /** View modes for the Todo page */
 export type TaskViewMode = 'list' | 'board' | 'calendar';

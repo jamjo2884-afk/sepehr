@@ -43,6 +43,8 @@ interface TaskRow {
   priority: TaskPriority;
   due_date: string | null;
   labels: string[];
+  color: string | null;
+  category: string | null;
   assignee_id: string | null;
   sort_order: number;
   completed_at: string | null;
@@ -61,6 +63,8 @@ function taskFromRow(row: TaskRow): Task {
     priority: row.priority,
     dueDate: row.due_date,
     labels: arr(row.labels),
+    color: row.color ?? null,
+    category: row.category ?? null,
     assigneeId: row.assignee_id,
     sortOrder: num(row.sort_order),
     completedAt: row.completed_at,
@@ -79,6 +83,8 @@ function taskToRow(input: CreateTaskInput | UpdateTaskInput): Record<string, unk
   if ('priority' in input && input.priority !== undefined) row.priority = input.priority;
   if ('dueDate' in input && input.dueDate !== undefined) row.due_date = input.dueDate;
   if ('labels' in input && input.labels !== undefined) row.labels = input.labels;
+  if ('color' in input && input.color !== undefined) row.color = input.color || null;
+  if ('category' in input && input.category !== undefined) row.category = input.category || null;
   if ('assigneeId' in input && input.assigneeId !== undefined) row.assignee_id = input.assigneeId;
   if ('sortOrder' in input && input.sortOrder !== undefined) row.sort_order = input.sortOrder;
   return row;
@@ -118,28 +124,32 @@ const MOCK_TASKS: Task[] = [
     id: 'task-1', projectId: null, parentId: null,
     title: 'بررسی آمار شبکه‌های اجتماعی هفته', description: '',
     status: 'todo', priority: 'medium', dueDate: '1405-06-01',
-    labels: ['lbl-social'], assigneeId: null, sortOrder: 0,
+    labels: ['lbl-social'], color: '#ec4899', category: 'social',
+    assigneeId: null, sortOrder: 0,
     completedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   },
   {
     id: 'task-2', projectId: null, parentId: null,
     title: 'تهیه گزارش ماهانه عملکرد', description: '',
     status: 'in_progress', priority: 'high', dueDate: '1405-06-05',
-    labels: ['lbl-review'], assigneeId: null, sortOrder: 1,
+    labels: ['lbl-review'], color: '#f59e0b', category: 'analytics',
+    assigneeId: null, sortOrder: 1,
     completedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   },
   {
     id: 'task-3', projectId: null, parentId: null,
     title: 'طراحی پوستر کمپین تابستانه', description: '',
     status: 'todo', priority: 'medium', dueDate: '1405-06-10',
-    labels: ['lbl-design', 'lbl-content'], assigneeId: null, sortOrder: 2,
+    labels: ['lbl-design', 'lbl-content'], color: '#8b5cf6', category: 'design',
+    assigneeId: null, sortOrder: 2,
     completedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   },
   {
     id: 'task-4', projectId: null, parentId: null,
     title: 'انتشار محتوای هفته در شبکه‌ها', description: '',
     status: 'backlog', priority: 'low', dueDate: null,
-    labels: ['lbl-social'], assigneeId: null, sortOrder: 3,
+    labels: ['lbl-social'], color: '#3b82f6', category: 'content',
+    assigneeId: null, sortOrder: 3,
     completedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   },
 ];
@@ -234,6 +244,8 @@ export async function createTask(input: CreateTaskInput): Promise<string> {
       priority: input.priority ?? 'none',
       due_date: input.dueDate ?? null,
       labels: input.labels ?? [],
+      color: input.color ?? null,
+      category: input.category ?? null,
       assignee_id: input.assigneeId ?? null,
       sort_order: input.sortOrder ?? 0,
     };

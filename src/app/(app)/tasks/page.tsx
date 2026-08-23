@@ -32,6 +32,8 @@ import {
   TASK_PRIORITY_LABELS,
   TASK_PRIORITY_COLORS,
   TASK_PRIORITY_ICONS,
+  TASK_COLORS,
+  TASK_CATEGORIES,
   type Task,
   type TaskStatus,
   type TaskPriority,
@@ -42,6 +44,7 @@ import {
 } from '@/types/todo';
 
 import { cn } from '@/lib/utils';
+import { JalaliDatePicker } from '@/components/ui/jalali-date-picker';
 
 // ─── Status Config ───────────────────────────────────────────────────────────
 
@@ -147,6 +150,7 @@ function TaskRow({
         isSelected && 'border-primary/40 bg-primary/5',
         task.status === 'done' && 'opacity-60',
       )}
+      style={task.color ? { borderRightWidth: '3px', borderRightColor: task.color } : undefined}
     >
       {/* Status toggle */}
       <button
@@ -172,7 +176,7 @@ function TaskRow({
       </button>
 
       {/* Title + meta */}
-      <div className="min-w-0 flex-1 cursor-pointer" onClick={() => onSelect(task)}>
+      <button type="button" className="min-w-0 flex-1 cursor-pointer text-left" onClick={() => onSelect(task)}>
         <p className={cn('truncate text-sm font-medium text-foreground', task.status === 'done' && 'line-through text-muted-foreground')}>
           {task.title}
         </p>
@@ -195,8 +199,13 @@ function TaskRow({
               {taskLabels.map((l) => l.name).join('، ')}
             </span>
           )}
+          {task.category && (
+            <span className="rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {TASK_CATEGORIES.find((c) => c.id === task.category)?.label ?? task.category}
+            </span>
+          )}
         </div>
-      </div>
+      </button>
 
       {/* Actions */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -252,6 +261,8 @@ function TaskDetail({
   const [priority, setPriority] = useState<TaskPriority>(task.priority);
   const [dueDate, setDueDate] = useState(task.dueDate ?? '');
   const [selectedLabels, setSelectedLabels] = useState<string[]>(task.labels);
+  const [color, setColor] = useState<string | null>(task.color ?? null);
+  const [category, setCategory] = useState<string | null>(task.category ?? null);
 
 
   const handleSave = async () => {
@@ -262,20 +273,17 @@ function TaskDetail({
       priority,
       dueDate: dueDate || null,
       labels: selectedLabels,
+      color,
+      category,
     });
-    onUpdated();
   };
-
-  useEffect(() => {
-    handleSave();
-  }, [status, priority]);
 
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      className="fixed inset-y-0 left-0 z-50 w-full max-w-md border-r border-border bg-surface shadow-xl sm:relative sm:inset-auto sm:z-auto sm:max-w-sm"
+      className="w-full shrink-0 border border-border bg-surface rounded-xl sm:w-80 overflow-y-auto"
     >
       <div className="flex h-full flex-col">
         {/* Header */}
@@ -292,7 +300,6 @@ function TaskDetail({
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            onBlur={handleSave}
             className="w-full bg-transparent text-lg font-bold outline-none"
             placeholder="عنوان کار..."
           />
@@ -301,7 +308,6 @@ function TaskDetail({
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            onBlur={handleSave}
             rows={3}
             className="w-full resize-none rounded-lg border border-border bg-surface/60 p-2 text-sm outline-none focus:border-primary/50"
             placeholder="توضیحات..."
@@ -348,14 +354,14 @@ function TaskDetail({
           {/* Due Date (Shamsi) */}
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">تاریخ سررسید (شمسی)</label>
-            <input
-              type="text"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              onBlur={handleSave}
-              placeholder="1405-06-01"
-              className="w-full rounded-lg border border-border bg-surface/60 px-3 py-2 text-sm outline-none focus:border-primary/50 font-mono"
-              dir="ltr"
+            <JalaliDatePicker
+              value={dueDate || null}
+              onChange={(d) => {
+                setDueDate(d ?? '');
+                // Auto-save on date pick
+                updateTask(task.id, { dueDate: d ?? null });
+              }}
+              placeholder="انتخاب تاریخ سررسید"
             />
           </div>
 
@@ -386,12 +392,62 @@ function TaskDetail({
               ))}
             </div>
           </div>
+
+          {/* Color */}
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">رنگ</label>
+            <div className="flex flex-wrap gap-1.5">
+              {TASK_COLORS.map((c) => (
+                <button
+                  key={c.value || '__none'}
+                  onClick={() => setColor(c.value || null)}
+                  className={cn(
+                    'h-7 w-7 rounded-full border-2 transition-all hover:scale-110',
+                    color === c.value || (!color && !c.value)
+                      ? 'border-foreground scale-110'
+                      : 'border-transparent',
+                  )}
+                  style={c.value ? { backgroundColor: c.value } : { backgroundColor: 'transparent', border: '2px dashed var(--color-muted-foreground)' }}
+                  title={c.name}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">دسته‌بندی</label>
+            <div className="flex flex-wrap gap-1">
+              <button
+                onClick={() => setCategory(null)}
+                className={cn(
+                  'rounded-full px-2 py-1 text-xs font-medium transition-colors',
+                  !category ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                )}
+              >
+                بدون دسته
+              </button>
+              {TASK_CATEGORIES.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setCategory(c.id)}
+                  className={cn(
+                    'rounded-full px-2 py-1 text-xs font-medium transition-colors',
+                    category === c.id ? 'text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                  )}
+                  style={category === c.id ? { backgroundColor: c.color } : undefined}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
         <div className="border-t border-border px-4 py-3">
           <button
-            onClick={() => { handleSave(); onClose(); }}
+            onClick={async () => { await handleSave(); onUpdated(); onClose(); }}
             className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             ذخیره
@@ -472,6 +528,7 @@ export default function TasksPage() {
   const [viewMode, setViewMode] = useState<TaskViewMode>('list');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   const [search, setSearch] = useState('');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -519,6 +576,11 @@ export default function TasksPage() {
     let result = tasks;
     if (statusFilter !== 'all') result = result.filter((t) => t.status === statusFilter);
     if (priorityFilter !== 'all') result = result.filter((t) => t.priority === priorityFilter);
+    if (categoryFilter === '__none') {
+      result = result.filter((t) => !t.category);
+    } else if (categoryFilter !== 'all') {
+      result = result.filter((t) => t.category === categoryFilter);
+    }
 
     if (search) {
       const q = search.toLowerCase();
@@ -630,6 +692,18 @@ export default function TasksPage() {
             ))}
           </select>
 
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="rounded-lg border border-border bg-surface/60 px-3 py-2 text-sm outline-none"
+          >
+            <option value="all">همه دسته‌ها</option>
+            <option value="__none">بدون دسته</option>
+            {TASK_CATEGORIES.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
+            ))}
+          </select>
+
           <div className="relative sm:mr-auto">
             <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -642,59 +716,64 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* Task list / board */}
-      {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-14 animate-pulse rounded-xl border border-border bg-surface/60" />
-          ))}
+      {/* Content area: list + detail panel side by side */}
+      <div className="flex gap-4">
+        {/* Task list / board */}
+        <div className={cn('flex-1 min-w-0', selectedTask && 'hidden sm:block')}>
+          {loading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-14 animate-pulse rounded-xl border border-border bg-surface/60" />
+              ))}
+            </div>
+          ) : filteredTasks.length === 0 ? (
+            <div className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
+              <ListTodo className="mb-2 h-8 w-8 opacity-40" />
+              کاری با این فیلترها پیدا نشد.
+            </div>
+          ) : viewMode === 'board' ? (
+            <BoardView
+              tasks={filteredTasks}
+              labels={labels}
+              onToggle={handleToggle}
+              onStatusChange={handleStatusChange}
+              onPriorityChange={handlePriorityChange}
+              onDelete={handleDelete}
+              onSelect={setSelectedTask}
+            />
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <AnimatePresence>
+                {filteredTasks.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    labels={labels}
+                    onToggle={handleToggle}
+                    onStatusChange={handleStatusChange}
+                    onPriorityChange={handlePriorityChange}
+                    onDelete={handleDelete}
+                    onSelect={setSelectedTask}
+                    isSelected={selectedTask?.id === task.id}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
-      ) : filteredTasks.length === 0 ? (
-        <div className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
-          <ListTodo className="mb-2 h-8 w-8 opacity-40" />
-          کاری با این فیلترها پیدا نشد.
-        </div>
-      ) : viewMode === 'board' ? (
-        <BoardView
-          tasks={filteredTasks}
-          labels={labels}
-          onToggle={handleToggle}
-          onStatusChange={handleStatusChange}
-          onPriorityChange={handlePriorityChange}
-          onDelete={handleDelete}
-          onSelect={setSelectedTask}
-        />
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          <AnimatePresence>
-            {filteredTasks.map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                labels={labels}
-                onToggle={handleToggle}
-                onStatusChange={handleStatusChange}
-                onPriorityChange={handlePriorityChange}
-                onDelete={handleDelete}
-                onSelect={setSelectedTask}
-                isSelected={selectedTask?.id === task.id}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
 
-      {/* Detail panel */}
-      <AnimatePresence>
-        {selectedTask && (
-      <TaskDetail
-        task={selectedTask}
-        labels={labels}
-        onClose={() => setSelectedTask(null)}
-        onUpdated={() => { refresh(); setSelectedTask(null); }}
-      />
-        )}
-      </AnimatePresence>
+        {/* Detail panel */}
+        <AnimatePresence>
+          {selectedTask && (
+            <TaskDetail
+              task={selectedTask}
+              labels={labels}
+              onClose={() => setSelectedTask(null)}
+              onUpdated={() => { refresh(); setSelectedTask(null); }}
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </motion.div>
   );
 }
