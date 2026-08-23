@@ -354,6 +354,13 @@ export default function SocialAccountsPage() {
               <Upload className="h-3.5 w-3.5" />
               ورود انبوه
             </Button>
+            <Link
+              href="/social/import"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface"
+            >
+              <ClipboardList className="h-3.5 w-3.5" />
+              مرکز بررسی
+            </Link>
           </div>
         </div>
         <p className="text-sm text-muted-foreground">

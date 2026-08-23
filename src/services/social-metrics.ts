@@ -30,6 +30,18 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
 
+/** Convert a Jalali day-of-year (1-indexed) back to a Date. */
+function doyToDate(jy: number, doy: number): Date {
+  let remaining = doy;
+  for (let m = 1; m <= 12; m++) {
+    const len = jalaaliMonthLength(jy, m);
+    if (remaining <= len) return jalaaliToDateObject(jy, m, remaining);
+    remaining -= len;
+  }
+  // Fallback: shouldn't happen for a valid day-of-year.
+  return jalaaliToDateObject(jy, 12, jalaaliMonthLength(jy, 12));
+}
+
 /**
  * Build a sortable, human-readable period label for a date.
  *
@@ -91,9 +103,12 @@ export function weeklyRangeForDate(anchor: Date): {
   const startOfYear = j2d(jy, 1, 1);
   const dayOfYear = j2d(jy, jm, jd) - startOfYear + 1;
   const week = Math.ceil(dayOfYear / 7);
-  const start = jalaaliToDateObject(jy, jm, jd);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 6);
+  // Snap to the Saturday that starts this week.  The Jalali year always
+  // starts on a Saturday, so week N begins on day-of-year (N-1)*7+1.
+  const weekStartDoy = (week - 1) * 7 + 1;
+  const weekEndDoy = week * 7;
+  const start = doyToDate(jy, weekStartDoy);
+  const end = doyToDate(jy, weekEndDoy);
   return {
     label: `${jy}-W${pad2(week)}`,
     start: start.toISOString(),

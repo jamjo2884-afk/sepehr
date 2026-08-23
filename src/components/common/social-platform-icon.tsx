@@ -5,13 +5,19 @@ import { cn } from '@/lib/utils';
 
 /** Brand logos provided as image assets under public/platforms. */
 const IMAGE_LOGOS: Partial<Record<SocialPlatform, string>> = {
+  aparat: '/platforms/aparat.webp',
   bale: '/platforms/bale.png',
   eita: '/platforms/eita.png',
+  gap: '/platforms/gap.webp',
+  igap: '/platforms/igap.png',
   instagram: '/platforms/instagram.png',
   rubika: '/platforms/rubika.jpg',
+  shad: '/platforms/shad.png',
+  site: '/platforms/site.jpg',
   soroushplus: '/platforms/soroush.png',
   telegram: '/platforms/telegram.jpg',
   twitter: '/platforms/x.png',
+  virasty: '/platforms/virasty.jpg',
   youtube: '/platforms/youtube.png',
 };
 
