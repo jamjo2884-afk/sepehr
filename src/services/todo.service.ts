@@ -184,20 +184,6 @@ export async function getTasks(filters?: {
 
     const tasks = data.map(taskFromRow);
 
-    // Fetch project names if needed
-    const projectIds = [...new Set(tasks.map((t) => t.projectId).filter(Boolean))] as string[];
-    if (projectIds.length > 0) {
-      const { data: projects } = await sb
-        .from('projects')
-        .select('id,name')
-        .in('id', projectIds);
-      const projectMap = new Map((projects ?? []).map((p: { id: string; name: string }) => [p.id, p.name]));
-      return tasks.map((t) => ({
-        ...t,
-        projectName: t.projectId ? projectMap.get(t.projectId) ?? undefined : undefined,
-      }));
-    }
-
     return tasks;
   } catch (err) {
     console.warn('[todo] Could not read tasks from Supabase, falling back to mock data.', err);

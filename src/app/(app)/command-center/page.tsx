@@ -6,10 +6,9 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   Bell,
-  Clock,
   FileText,
-  FolderKanban,
   HeartPulse,
+  ListTodo,
   MessageSquareText,
   Radio,
   TrendingUp,
@@ -29,34 +28,20 @@ import {
 } from 'recharts';
 import { useAuthStore } from '@/stores/auth.store';
 import { navItems } from '@/config/navigation.config';
-import { PROJECT_STATUS_LABELS, type Project } from '@/types/domain';
+import { TASK_STATUS_LABELS, type Task } from '@/types/todo';
 import type { Notification } from '@/types/index';
 import type { ActivityItem } from '@/features/mock-data';
+import { getTasks } from '@/services/todo.service';
 import {
-  getProjects,
   getActivity,
   getNotifications,
 } from '@/services/data.service';
 import { formatJalaliDate, formatRelativeTime } from '@/utils/persian';
-import { cn } from '@/lib/utils';
-
-const QUICK_ACCESS_IDS = [
-  'projects',
-  'operations',
-  'assets',
-  'campaigns',
-  'distribution',
-  'social',
-  'analytics',
+import { cn } from '@/lib/utils';const QUICK_ACCESS_IDS = [
+  'tasks', 'assets', 'campaigns', 'distribution', 'social', 'analytics',
 ];
 
-const STATUS_TONE: Record<string, string> = {
-  active: 'bg-success/10 text-success',
-  planning: 'bg-primary/10 text-primary',
-  on_hold: 'bg-warning/10 text-warning',
-  completed: 'bg-muted text-muted-foreground',
-  archived: 'bg-muted text-muted-foreground',
-};
+
 
 /* ===== KPI cards (sample overview values) ===== */
 const KPIS: {
@@ -149,16 +134,16 @@ export default function CommandCenterPage() {
     [today],
   );
 
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
     let active = true;
-    Promise.all([getProjects(), getActivity(), getNotifications()])
-      .then(([p, a, n]) => {
+    Promise.all([getTasks(), getActivity(), getNotifications()])
+      .then(([t, a, n]) => {
         if (!active) return;
-        setProjects(p);
+        setTasks(t);
         setActivity(a);
         setNotifications(n);
       })
@@ -170,9 +155,9 @@ export default function CommandCenterPage() {
     };
   }, []);
 
-  const recentProjects = projects.slice(0, 4);
-  const continueWorking = projects
-    .filter((p) => p.status === 'active' || p.status === 'planning')
+  const recentTasks = tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled').slice(0, 4);
+  const activeTasks = tasks
+    .filter((t) => t.status === 'in_progress' || t.status === 'todo')
     .slice(0, 3);
   const recentActivity = activity.slice(0, 5);
   const unreadNotifications = notifications.filter((n) => !n.read);
@@ -390,42 +375,33 @@ export default function CommandCenterPage() {
       </section>
 
       <section>
-        <SectionTitle icon={Clock} title="ادامه کار" href="/projects" />
+        <SectionTitle icon={ListTodo} title="ادامه کار" href="/tasks" />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {continueWorking.map((project) => (
+          {activeTasks.map((task) => (
             <Link
-              key={project.id}
-              href="/projects"
+              key={task.id}
+              href="/tasks"
               className="group flex flex-col gap-2 rounded-xl border border-border bg-surface/60 p-4 transition-colors duration-200 hover:border-primary/40"
             >
               <div className="flex items-center justify-between">
                 <span
                   className={cn(
                     'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
-                    STATUS_TONE[project.status],
+                    task.status === 'in_progress' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
                   )}
                 >
-                  {PROJECT_STATUS_LABELS[project.status]}
+                  {TASK_STATUS_LABELS[task.status]}
                 </span>
                 <ArrowLeft className="h-4 w-4 text-muted-foreground transition-transform group-hover:-translate-x-1" />
               </div>
               <p className="text-sm font-semibold text-foreground">
-                {project.name}
+                {task.title}
               </p>
-              <p className="line-clamp-1 text-xs text-muted-foreground">
-                {project.description}
-              </p>
-              <div className="mt-1 flex items-center gap-2">
-                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${project.progress}%` }}
-                  />
-                </div>
-                <span className="text-[11px] text-muted-foreground">
-                  {toFa(project.progress)}٪
-                </span>
-              </div>
+              {task.dueDate && (
+                <p className="text-xs text-muted-foreground">
+                  مهلت: {task.dueDate}
+                </p>
+              )}
             </Link>
           ))}
         </div>
@@ -433,20 +409,20 @@ export default function CommandCenterPage() {
 
       <section>
         <SectionTitle
-          icon={FolderKanban}
-          title="پروژه‌های اخیر"
-          href="/projects"
+          icon={ListTodo}
+          title="کارهای اخیر"
+          href="/tasks"
         />
         <div className="overflow-hidden rounded-xl border border-border">
           <table className="w-full text-sm">
             <thead className="bg-surface-2 text-xs text-muted-foreground">
               <tr>
-                <th className="px-4 py-3 text-right font-medium">نام پروژه</th>
+                <th className="px-4 py-3 text-right font-medium">عنوان کار</th>
                 <th className="hidden px-4 py-3 text-right font-medium sm:table-cell">
                   وضعیت
                 </th>
                 <th className="hidden px-4 py-3 text-right font-medium md:table-cell">
-                  پیشرفت
+                  اولویت
                 </th>
                 <th className="px-4 py-3 text-right font-medium">
                   به‌روزرسانی
@@ -454,31 +430,31 @@ export default function CommandCenterPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {recentProjects.map((project) => (
+              {recentTasks.map((task) => (
                 <tr
-                  key={project.id}
+                  key={task.id}
                   className="transition-colors duration-150 hover:bg-primary/5"
                 >
                   <td className="px-4 py-3 font-medium text-foreground">
-                    {project.name}
+                    {task.title}
                   </td>
                   <td className="hidden px-4 py-3 sm:table-cell">
                     <span
                       className={cn(
                         'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
-                        STATUS_TONE[project.status],
+                        task.status === 'in_progress' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
                       )}
                     >
-                      {PROJECT_STATUS_LABELS[project.status]}
+                      {TASK_STATUS_LABELS[task.status]}
                     </span>
                   </td>
                   <td className="hidden px-4 py-3 md:table-cell">
                     <span className="text-muted-foreground">
-                      {toFa(project.progress)}٪
+                      {TASK_STATUS_LABELS[task.status]}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    {formatRelativeTime(new Date(project.updatedAt))}
+                    {formatRelativeTime(new Date(task.updatedAt))}
                   </td>
                 </tr>
               ))}

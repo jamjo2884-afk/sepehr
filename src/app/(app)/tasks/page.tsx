@@ -26,7 +26,7 @@ import {
   getLabels,
   getTaskStats,
 } from '@/services/todo.service';
-import { getProjects } from '@/services/data.service';
+
 import {
   TASK_STATUS_LABELS,
   TASK_PRIORITY_LABELS,
@@ -40,7 +40,7 @@ import {
   type TaskStats,
   type TaskViewMode,
 } from '@/types/todo';
-import type { Project } from '@/types/domain';
+
 import { cn } from '@/lib/utils';
 
 // ─── Status Config ───────────────────────────────────────────────────────────
@@ -238,13 +238,11 @@ function TaskRow({
 function TaskDetail({
   task,
   labels,
-  projects,
   onClose,
   onUpdated,
 }: {
   task: Task;
   labels: TaskLabel[];
-  projects: Project[];
   onClose: () => void;
   onUpdated: () => void;
 }) {
@@ -254,7 +252,7 @@ function TaskDetail({
   const [priority, setPriority] = useState<TaskPriority>(task.priority);
   const [dueDate, setDueDate] = useState(task.dueDate ?? '');
   const [selectedLabels, setSelectedLabels] = useState<string[]>(task.labels);
-  const [projectId, setProjectId] = useState(task.projectId ?? '');
+
 
   const handleSave = async () => {
     await updateTask(task.id, {
@@ -264,7 +262,6 @@ function TaskDetail({
       priority,
       dueDate: dueDate || null,
       labels: selectedLabels,
-      projectId: projectId || null,
     });
     onUpdated();
   };
@@ -362,21 +359,7 @@ function TaskDetail({
             />
           </div>
 
-          {/* Project */}
-          <div>
-            <label className="mb-1 block text-xs text-muted-foreground">پروژه</label>
-            <select
-              value={projectId}
-              onChange={(e) => { setProjectId(e.target.value); }}
-              onBlur={handleSave}
-              className="w-full rounded-lg border border-border bg-surface/60 px-3 py-2 text-sm outline-none focus:border-primary/50"
-            >
-              <option value="">بدون پروژه</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
+
 
           {/* Labels */}
           <div>
@@ -484,29 +467,26 @@ function BoardView({
 export default function TasksPage() {
   const [tasks, setTasks] = useState<TaskWithProject[]>([]);
   const [labels, setLabels] = useState<TaskLabel[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [stats, setStats] = useState<TaskStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<TaskViewMode>('list');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
-  const [projectFilter, setProjectFilter] = useState<string>('all');
+
   const [search, setSearch] = useState('');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const refresh = useCallback(async () => {
-    const [t, l, p, s] = await Promise.all([
-      getTasks({ status: statusFilter, priority: priorityFilter, projectId: projectFilter, search }),
+    const [t, l, s] = await Promise.all([
+      getTasks({ status: statusFilter, priority: priorityFilter, search }),
       getLabels(),
-      getProjects(),
       getTaskStats(),
     ]);
     setTasks(t);
     setLabels(l);
-    setProjects(p);
     setStats(s);
     setLoading(false);
-  }, [statusFilter, priorityFilter, projectFilter, search]);
+  }, [statusFilter, priorityFilter, search]);
 
   useEffect(() => {
     let active = true;
@@ -539,13 +519,13 @@ export default function TasksPage() {
     let result = tasks;
     if (statusFilter !== 'all') result = result.filter((t) => t.status === statusFilter);
     if (priorityFilter !== 'all') result = result.filter((t) => t.priority === priorityFilter);
-    if (projectFilter !== 'all') result = result.filter((t) => t.projectId === projectFilter);
+
     if (search) {
       const q = search.toLowerCase();
       result = result.filter((t) => t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q));
     }
     return result;
-  }, [tasks, statusFilter, priorityFilter, projectFilter, search]);
+  }, [tasks, statusFilter, priorityFilter, search]);
 
   return (
     <motion.div
@@ -649,16 +629,7 @@ export default function TasksPage() {
               <option key={f.id} value={f.id}>{f.label}</option>
             ))}
           </select>
-          <select
-            value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-            className="rounded-lg border border-border bg-surface/60 px-3 py-2 text-sm outline-none"
-          >
-            <option value="all">همه پروژه‌ها</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
+
           <div className="relative sm:mr-auto">
             <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -716,13 +687,12 @@ export default function TasksPage() {
       {/* Detail panel */}
       <AnimatePresence>
         {selectedTask && (
-          <TaskDetail
-            task={selectedTask}
-            labels={labels}
-            projects={projects}
-            onClose={() => setSelectedTask(null)}
-            onUpdated={() => { refresh(); setSelectedTask(null); }}
-          />
+      <TaskDetail
+        task={selectedTask}
+        labels={labels}
+        onClose={() => setSelectedTask(null)}
+        onUpdated={() => { refresh(); setSelectedTask(null); }}
+      />
         )}
       </AnimatePresence>
     </motion.div>

@@ -1,7 +1,5 @@
 import {
   LayoutDashboard,
-  FolderKanban,
-  ClipboardList,
   ListTodo,
   Package,
   Rocket,
@@ -38,20 +36,6 @@ export const navItems: NavItem[] = [
     href: '/tasks',
     icon: ListTodo,
     description: 'مدیریت وظایف، پروژه‌ها و عملیات',
-  },
-  {
-    id: 'projects',
-    label: 'پروژه‌ها',
-    href: '/projects',
-    icon: FolderKanban,
-    description: 'مدیریت پروژه‌های رسانه‌ای از ایده تا توزیع',
-  },
-  {
-    id: 'operations',
-    label: 'عملیات',
-    href: '/operations',
-    icon: ClipboardList,
-    description: 'هماهنگی و پیگیری کارهای عملیاتی هر پروژه',
   },
   {
     id: 'assets',
