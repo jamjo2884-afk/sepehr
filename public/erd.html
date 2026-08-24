@@ -1,0 +1,106 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>ERD</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0f172a;color:#e2e8f0;font-family:Segoe UI}h1{padding:20px;background:#1e293b;border-bottom:1px solid #334155;font-size:20px;color:#38bdf8}.m{display:flex;justify-content:center;padding:20px;overflow:auto}.m svg{max-width:100%;height:auto}</style>
+</head><body>
+<h1>ERD - Media Deck Database</h1>
+<div class="m">
+<div class="mermaid">
+erDiagram
+    workspaces {
+        uuid id PK
+        string name
+        string slug UK
+    }
+    profiles {
+        uuid id PK
+        string full_name
+        string role
+    }
+    workspace_members {
+        uuid id PK
+        uuid workspace_id FK
+        uuid user_id FK
+    }
+    social_accounts {
+        uuid id PK
+        string brand
+        string platform
+        string username
+        string display_name
+        string external_id
+        string status
+    }
+    social_metrics {
+        bigint id PK
+        uuid account_id FK
+        string period
+        string period_label
+        bigint followers
+        bigint views
+        bigint likes
+        bigint reach
+        numeric engagement_rate
+    }
+    social_sync_logs {
+        bigint id PK
+        uuid social_account_id FK
+        string status
+    }
+    social_data_quality_reviews {
+        uuid id PK
+        string issue_type
+        bigint metric_id FK
+    }
+    social_metric_edit_logs {
+        bigint id PK
+        bigint metric_id FK
+        string field
+    }
+    import_sessions {
+        uuid id PK
+        string filename
+        string status
+    }
+    import_rows {
+        uuid id PK
+        uuid session_id FK
+        uuid matched_account_id FK
+        string status
+    }
+    import_audit_log {
+        uuid id PK
+        uuid session_id FK
+        uuid row_id FK
+    }
+    tasks {
+        string id PK
+        string parent_id FK
+        string title
+        string status
+        string priority
+        string color
+        string category
+    }
+    task_labels {
+        string id PK
+        string name
+        string color
+    }
+    workspaces ||--o{ workspace_members : has
+    workspaces ||--o{ profiles : has
+    social_accounts ||--o{ social_metrics : has
+    social_accounts ||--o{ social_sync_logs : sync
+    social_accounts ||--o{ social_data_quality_reviews : issues
+    social_metrics ||--o{ social_metric_edit_logs : edit
+    social_metrics ||--o{ social_data_quality_reviews : issues
+    import_sessions ||--o{ import_rows : contains
+    import_sessions ||--o{ import_audit_log : audit
+    import_rows ||--o{ import_audit_log : actions
+    import_rows }o--o| social_accounts : matched
+    tasks ||--o{ tasks : subtasks
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+mermaid.initialize({startOnLoad:true,theme:"dark",themeVariables:{primaryColor:"#1e293b",primaryTextColor:"#e2e8f0",primaryBorderColor:"#475569",lineColor:"#38bdf8"},er:{layoutDirection:"TB",minEntityWidth:100,entityPadding:15,useMaxWidth:false}});
+</script>
+</body></html>
