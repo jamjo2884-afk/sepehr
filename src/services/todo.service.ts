@@ -190,10 +190,8 @@ export async function getTasks(filters?: {
 
     const { data, error } = await query;
     if (error) throw error;
-    if (!data || data.length === 0) return MOCK_TASKS;
-
-    const tasks = data.map(taskFromRow);
-
+    // Return empty array if table is empty — never show mock data on success
+    const tasks = (data ?? []).map(taskFromRow);
     return tasks;
   } catch (err) {
     console.warn('[todo] Could not read tasks from Supabase, falling back to mock data.', err);
@@ -208,8 +206,9 @@ export async function getTaskById(id: string): Promise<Task | null> {
     const { data, error } = await sb.from('tasks').select('*').eq('id', id).maybeSingle();
     if (error) throw error;
     return data ? taskFromRow(data as TaskRow) : null;
-  } catch {
-    return MOCK_TASKS.find((t) => t.id === id) ?? null;
+  } catch (err) {
+    console.warn('[todo] Could not read task by id from Supabase.', err);
+    return null;
   }
 }
 
@@ -224,8 +223,9 @@ export async function getSubtasks(parentId: string): Promise<Task[]> {
       .order('sort_order', { ascending: true });
     if (error) throw error;
     return (data ?? []).map(taskFromRow);
-  } catch {
-    return MOCK_TASKS.filter((t) => t.parentId === parentId);
+  } catch (err) {
+    console.warn('[todo] Could not read subtasks from Supabase.', err);
+    return [];
   }
 }
 
@@ -323,8 +323,8 @@ export async function getLabels(): Promise<TaskLabel[]> {
     const sb = await getSupabase();
     const { data, error } = await sb.from('task_labels').select('*').order('name');
     if (error) throw error;
-    if (!data || data.length === 0) return MOCK_LABELS;
-    return data.map(labelFromRow);
+    // Return empty array if table is empty — never show mock data on success
+    return (data ?? []).map(labelFromRow);
   } catch {
     return MOCK_LABELS;
   }
