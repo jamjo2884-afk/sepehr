@@ -10,19 +10,12 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
+import { getBrandColor, CHART_PALETTE } from '@/constants/brand-colors';
 
-export const BRAND_SERIES_COLORS = [
-  '#E1306C',
-  '#229ED9',
-  '#FF8200',
-  '#7B61FF',
-  '#2EB67D',
-  '#FC4F62',
-  '#00C2A8',
-  '#F5A623',
-  '#8B5CF6',
-  '#14B8A6',
-];
+/** Get brand color for chart series. */
+function brandChartColor(brandName: string, index: number): string {
+  return getBrandColor(brandName).chart ?? CHART_PALETTE[index % CHART_PALETTE.length];
+}
 
 export interface TrendSeries {
   name: string;
@@ -67,7 +60,7 @@ export function FollowersTrendChart({
     series.forEach((s, i) => {
       config[`s${i}`] = {
         label: s.name,
-        color: BRAND_SERIES_COLORS[i % BRAND_SERIES_COLORS.length],
+        color: brandChartColor(s.name, i),
       };
     });
     return config;
@@ -145,8 +138,7 @@ export function FollowersTrendChart({
               <span
                 className="h-2 w-2 rounded-[2px]"
                 style={{
-                  backgroundColor:
-                    BRAND_SERIES_COLORS[i % BRAND_SERIES_COLORS.length],
+                  backgroundColor: brandChartColor(s.name, i),
                 }}
               />
               {s.name}

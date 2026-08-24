@@ -59,6 +59,23 @@ var STATUS_MAP = {
   '\u0631\u0627\u06A9\u062F': 'inactive'
 };
 
+// Brands to ignore (zero data, deleted from DB)
+var IGNORED_BRANDS = [
+  '\u0622\u0648\u0627\u0646\u062F',
+  '\u0627\u0641\u0634\u0627\u06AF\u0631\u06CC',
+  '\u0627\u0642\u062A\u0635\u0627\u062F\u0627\u0646 \u0634\u0648\u06CC\u062F',
+  '\u0628\u0631\u062C\u0627\u0645',
+  '\u067E\u0627\u062F\u062A\u0646',
+  '\u067E\u0627\u0631\u0627\u06AF\u0631\u0627\u0641',
+  '\u062A\u0627\u0631\u06A9\u062F',
+  '\u062C\u0647\u0627\u0646 \u0646\u0645\u0627',
+  '\u0634\u0647\u0631\u0648\u0646\u062F \u0646\u06AF\u0627\u0631',
+  '\u0641\u0631\u062C\u0647',
+  '\u0641\u0631\u0647\u0646\u06AF',
+  '\u0645\u0627\u06CC\u0647 \u0634\u0631\u0645\u0633\u0627\u0631\u06CC',
+  '\u0645\u0633\u062A\u0642\u06CC\u0645 \u0628\u0647\u0634\u062F'
+];
+
 // Read source
 console.log('Reading: ' + INPUT);
 var wb = XLSX.readFile(INPUT);
@@ -89,6 +106,10 @@ var skipped = 0;
 for (var i = 1; i < rawData.length; i++) {
   var row = rawData[i];
   var brand = String(row[COL.brand] || '').trim();
+  if (IGNORED_BRANDS.indexOf(brand) !== -1) {
+    skipped++;
+    continue;
+  }
   var platformFa = String(row[COL.platform] || '').trim();
   var username = String(row[COL.username] || '').trim();
   var metricType = String(row[COL.metricType] || '').trim();

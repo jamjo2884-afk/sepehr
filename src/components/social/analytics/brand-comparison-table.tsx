@@ -7,6 +7,7 @@ import { formatNumber } from '@/utils/persian';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BrandLogo } from '@/components/common/brand-logo';
+import { getBrandColor } from '@/constants/brand-colors';
 import { formatSigned, GrowthPill } from './shared';
 
 type SortKey =
@@ -111,7 +112,7 @@ export function BrandComparisonTable({
                     />
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className="flex items-center gap-2 font-medium text-foreground">
+                    <span className="flex items-center gap-2 font-medium" style={{ color: getBrandColor(row.brand).primary }}>
                       <BrandLogo
                         brand={row.brand}
                         className="h-6 w-6 rounded-md"

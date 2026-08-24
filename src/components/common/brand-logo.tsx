@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { getBrandColor } from '@/constants/brand-colors';
 
 /**
  * Brand name → logo asset under `public/brands/`.
@@ -24,15 +25,6 @@ export const BRAND_LOGO_FILES: Record<string, string> = {
   مرورگر: '/brands/moroorger.png',
 };
 
-/** Deterministic brand accent (hue from the name) for the tile. */
-function brandAccent(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) {
-    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-  }
-  return `hsl(${hash % 360} 70% 62%)`;
-}
-
 /**
  * Renders the supplied logo when the brand has an asset; otherwise keeps a
  * deterministic initial-letter tile for brands without a supplied logo.
@@ -48,7 +40,7 @@ export function BrandLogo({
   /** Inner glyph sizing for the fallback initial-letter tile. */
   iconClassName?: string;
 }) {
-  const color = brandAccent(brand);
+  const { primary: color } = getBrandColor(brand);
   const logoFile = BRAND_LOGO_FILES[brand];
 
   if (logoFile) {

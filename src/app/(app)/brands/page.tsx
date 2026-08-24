@@ -8,6 +8,8 @@ import { getSocialAccounts, getSocialMetrics } from '@/services/social.service';
 import type { SocialAccount, SocialMetric } from '@/types/social';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
+import { BrandLogo } from '@/components/common/brand-logo';
+import { getBrandColor, isBrandIgnored } from '@/constants/brand-colors';
 import { toPersianDigits } from '@/utils/persian';
 
 interface BrandCard {
@@ -40,6 +42,7 @@ export default function BrandsPage() {
   const brands = useMemo<BrandCard[]>(() => {
     const brandMap = new Map<string, SocialAccount[]>();
     for (const account of accounts) {
+      if (isBrandIgnored(account.brand)) continue;
       const list = brandMap.get(account.brand) ?? [];
       list.push(account);
       brandMap.set(account.brand, list);
@@ -81,23 +84,12 @@ export default function BrandsPage() {
       .sort((a, b) => b.totalFollowers - a.totalFollowers);
   }, [accounts, metrics]);
 
-  // Generate a deterministic color for each brand
-  const brandColors = useMemo(() => {
-    const palette = [
-      'from-blue-500/20 to-blue-600/10 border-blue-500/30',
-      'from-purple-500/20 to-purple-600/10 border-purple-500/30',
-      'from-emerald-500/20 to-emerald-600/10 border-emerald-500/30',
-      'from-amber-500/20 to-amber-600/10 border-amber-500/30',
-      'from-rose-500/20 to-rose-600/10 border-rose-500/30',
-      'from-cyan-500/20 to-cyan-600/10 border-cyan-500/30',
-      'from-violet-500/20 to-violet-600/10 border-violet-500/30',
-      'from-teal-500/20 to-teal-600/10 border-teal-500/30',
-      'from-pink-500/20 to-pink-600/10 border-pink-500/30',
-      'from-indigo-500/20 to-indigo-600/10 border-indigo-500/30',
-    ];
-    const map = new Map<string, string>();
-    brands.forEach((b, i) => {
-      map.set(b.name, palette[i % palette.length]);
+  // Get brand colors from centralized palette
+  const brandColorMap = useMemo(() => {
+    const map = new Map<string, { primary: string; light: string }>();
+    brands.forEach((b) => {
+      const { primary, light } = getBrandColor(b.name);
+      map.set(b.name, { primary, light });
     });
     return map;
   }, [brands]);
@@ -152,7 +144,7 @@ export default function BrandsPage() {
           const encodedKey = encodeURIComponent(
             [brand.name, brand.accounts[0]?.platform ?? 'instagram', brand.accounts[0]?.username ?? ''].join('|'),
           );
-          const colorClass = brandColors.get(brand.name) ?? 'from-blue-500/20 to-blue-600/10 border-blue-500/30';
+          const bc = brandColorMap.get(brand.name) ?? { primary: '#6B7280', light: '#6B728018' };
 
           return (
             <motion.div
@@ -163,18 +155,25 @@ export default function BrandsPage() {
             >
               <Link
                 href={`/social/${encodedKey}`}
-                className={`group block rounded-2xl border bg-gradient-to-br p-5 transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 ${colorClass}`}
+                className="group block rounded-2xl border p-5 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
+                style={{
+                  background: `linear-gradient(135deg, ${bc.light}, transparent)`,
+                  borderColor: `${bc.primary}30`,
+                }}
               >
                 {/* Brand name + follower count */}
                 <div className="mb-4 flex items-start justify-between">
-                  <div>
-                    <h2 className="text-base font-bold text-foreground group-hover:text-primary transition-colors">
+                  <div className="flex items-center gap-2.5">
+                    <BrandLogo brand={brand.name} className="h-8 w-8 rounded-lg" iconClassName="text-xs" />
+                    <div>
+                    <h2 className="text-base font-bold text-foreground" style={{ color: bc.primary }}>
                       {brand.name}
                     </h2>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {toPersianDigits(String(brand.accountCount))} حساب در{' '}
                       {toPersianDigits(String(brand.platformCount))} پلتفرم
                     </p>
+                    </div>
                   </div>
                   <ExternalLink className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-colors shrink-0 mt-1" />
                 </div>

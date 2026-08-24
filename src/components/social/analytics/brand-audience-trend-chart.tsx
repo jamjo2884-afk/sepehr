@@ -11,24 +11,12 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
+import { getBrandColor, CHART_PALETTE } from '@/constants/brand-colors';
 
-export const BRAND_SERIES_COLORS = [
-  '#E1306C',
-  '#229ED9',
-  '#FF8200',
-  '#7B61FF',
-  '#2EB67D',
-  '#FC4F62',
-  '#00C2A8',
-  '#F5A623',
-  '#8B5CF6',
-  '#14B8A6',
-  '#EC4899',
-  '#3B82F6',
-  '#10B981',
-  '#F59E0B',
-  '#EF4444',
-];
+/** Get brand color for chart series — uses centralized palette. */
+function brandChartColor(brandName: string, index: number): string {
+  return getBrandColor(brandName).chart ?? CHART_PALETTE[index % CHART_PALETTE.length];
+}
 
 type BrandFilterPreset = 'all' | 'top5' | 'top10';
 
@@ -124,7 +112,7 @@ export function BrandAudienceTrendChart({
     filteredTrends.forEach((t, i) => {
       config[`s${i}`] = {
         label: t.brand,
-        color: BRAND_SERIES_COLORS[i % BRAND_SERIES_COLORS.length],
+        color: brandChartColor(t.brand, i),
       };
     });
     return config;
@@ -245,7 +233,7 @@ export function BrandAudienceTrendChart({
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-sm"
                       style={{
-                        backgroundColor: BRAND_SERIES_COLORS[i % BRAND_SERIES_COLORS.length],
+                        backgroundColor: brandChartColor(t.brand, i),
                         opacity: isHidden ? 0.3 : 1,
                       }}
                     />

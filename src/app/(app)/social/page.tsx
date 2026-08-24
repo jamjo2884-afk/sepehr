@@ -58,6 +58,7 @@ import { PeriodComparison } from '@/components/social/analytics/period-compariso
 import { SectionTitle } from '@/components/social/analytics/shared';
 import { ScoreRankingTable } from '@/components/social/score-ranking-table';
 import { SocialAccountCard } from '@/components/social/account-card';
+import { isBrandIgnored } from '@/constants/brand-colors';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { useSocialBrandEdits } from '@/stores/social-brands.store';
 import { formatNumber } from '@/utils/persian';
@@ -141,9 +142,9 @@ export default function SocialPage() {
   const visibleBrands = useMemo(() => {
     if (!raw) return [];
     const base = [...new Set(accountsAll.map((a) => a.brand))].filter(
-      (b) => !removed.includes(b),
+      (b) => !removed.includes(b) && !isBrandIgnored(b),
     );
-    return [...base, ...added.filter((a) => !base.includes(a))];
+    return [...base, ...added.filter((a) => !base.includes(a) && !isBrandIgnored(a))];
   }, [raw, accountsAll, added, removed]);
 
   const accountsBase = useMemo(

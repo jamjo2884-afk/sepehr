@@ -11,6 +11,7 @@ import type { SocialAccount } from '@/types/social';
 import { formatNumber, toPersianDigits } from '@/utils/persian';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/common/brand-logo';
+import { getBrandColor } from '@/constants/brand-colors';
 import { SectionTitle } from './analytics/shared';
 
 /**
@@ -153,28 +154,18 @@ export function ScoreRankingTable({
                     )}
                   </td>
                   <td className="px-3 py-2.5">
-                    {href ? (
-                      <Link
-                        href={href}
-                        className="flex items-center gap-2 font-medium text-foreground transition-colors hover:text-primary"
-                      >
-                        <BrandLogo
-                          brand={row.brand}
-                          className="h-6 w-6 rounded-md"
-                          iconClassName="text-xs"
-                        />
-                        {row.brand}
-                      </Link>
-                    ) : (
-                      <span className="flex items-center gap-2 font-medium text-foreground">
-                        <BrandLogo
-                          brand={row.brand}
-                          className="h-6 w-6 rounded-md"
-                          iconClassName="text-xs"
-                        />
-                        {row.brand}
-                      </span>
-                    )}
+                    <span className="flex items-center gap-2 font-medium" style={{ color: getBrandColor(row.brand).primary }}>
+                      <BrandLogo
+                        brand={row.brand}
+                        className="h-6 w-6 rounded-md"
+                        iconClassName="text-xs"
+                      />
+                      {href ? (
+                        <Link href={href} className="hover:opacity-80 transition-colors">
+                          {row.brand}
+                        </Link>
+                      ) : row.brand}
+                    </span>
                   </td>
                   <td className="px-3 py-2.5">
                     {row.score === null ? (
