@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { importSocialMetricsRows } from '@/services/social-import/import.service';
 import type { SocialMetricValues } from '@/types/social';
@@ -6,13 +5,8 @@ import type { SocialMetricValues } from '@/types/social';
 /**
  * POST /api/social/import
  *
- * Body: { rows: SocialMetricImportRow[] } — the VALIDATED rows from the
- * preview step. The server re-resolves every account and commits each row
- * through `recordSocialMetrics` (the same path as the manual form), so the
- * NULL-merge and duplicate-prevention behavior is identical to manual
- * entry. Rows that fail account matching are skipped and reported.
- *
- * The client never writes to Supabase directly — it only sends rows here.
+ * Uses SSE (Server-Sent Events) to stream real-time progress to the client.
+ * Each event is a JSON line: { type: 'progress' | 'done' | 'error', ... }
  */
 
 const valueSchema = z.object({
@@ -42,28 +36,31 @@ const rowSchema = z.object({
   values: valueSchema,
   errors: z.array(z.string()),
   resolvedAccountId: z.string().nullable().optional(),
+  brand: z.string().nullable().optional(),
+  link: z.string().nullable().optional(),
+  sourceStatus: z.string().nullable().optional(),
 });
 
 const bodySchema = z.object({
   rows: z.array(rowSchema).max(5000),
 });
 
-export async function POST(req: Request): Promise<NextResponse> {
+export async function POST(req: Request): Promise<Response> {
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: 'درخواست نامعتبر است.' },
-      { status: 400 },
-    );
+    return new Response(JSON.stringify({ error: 'درخواست نامعتبر است.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'دادهٔ ارسالی نامعتبر است.' },
-      { status: 400 },
-    );
+    return new Response(JSON.stringify({ error: 'دادهٔ ارسالی نامعتبر است.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   const rows = parsed.data.rows.map((r) => ({
@@ -74,17 +71,41 @@ export async function POST(req: Request): Promise<NextResponse> {
     periodLabel: r.periodLabel,
     values: r.values as SocialMetricValues,
     errors: r.errors,
-    resolvedAccountId: r.resolvedAccountId ?? null,
+    resolvedAccountId: r.resolvedAccountId ?? undefined,
+    brand: r.brand ?? undefined,
+    link: r.link ?? undefined,
+    sourceStatus: r.sourceStatus ?? undefined,
   }));
 
-  try {
-    const summary = await importSocialMetricsRows(rows);
-    return NextResponse.json(summary);
-  } catch (err) {
-    console.warn('[social-import] Import failed.', err);
-    return NextResponse.json(
-      { error: 'ثبت اطلاعات انجام نشد.' },
-      { status: 500 },
-    );
-  }
+  // Use SSE streaming for real-time progress
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (data: Record<string, unknown>) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+      };
+
+      try {
+        const summary = await importSocialMetricsRows(rows, {
+          onProgress: (progress) => {
+            send({ type: 'progress', ...progress });
+          },
+        });
+        send({ type: 'done', summary });
+        controller.close();
+      } catch (err) {
+        console.warn('[social-import] Import failed.', err);
+        send({ type: 'error', error: 'ثبت اطلاعات انجام نشد.' });
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
 }

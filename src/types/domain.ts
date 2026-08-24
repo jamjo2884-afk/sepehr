@@ -179,31 +179,37 @@ export type SocialPlatform =
   | 'bale'
   | 'eita'
   | 'rubika'
+  | 'rubino'
   | 'soroushplus'
   | 'aparat'
   | 'threads'
+  | 'clubhouse'
   | 'shad'
   | 'igap'
   | 'site'
   | 'gap'
-  | 'virasty';
+  | 'virasty'
+  | 'facebook';
 
 export const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
   instagram: 'اینستاگرام',
   telegram: 'تلگرام',
   youtube: 'یوتیوب',
-  twitter: 'توییتر / ایکس',
+  twitter: 'ایکس',
   bale: 'بله',
   eita: 'ایتا',
   rubika: 'روبیکا',
-  soroushplus: 'سروش‌پلاس',
+  rubino: 'روبینو',
+  soroushplus: 'سروش پلاس',
   aparat: 'آپارات',
   threads: 'تردز',
+  clubhouse: 'کلاب هاوس',
   shad: 'شاد',
-  igap: 'آی‌گپ',
-  site: 'وب‌سایت',
+  igap: 'آی گپ',
+  site: 'سایت',
   gap: 'گپ',
   virasty: 'ویراستی',
+  facebook: 'فیسبوک',
 };
 
 /** Brand metadata used for icons and accent colors. */
@@ -225,14 +231,17 @@ export const SOCIAL_PLATFORM_BRAND: Record<
   bale: { name: 'Bale', color: '#FF8200' },
   eita: { name: 'Eitaa', color: '#FC4F62' },
   rubika: { name: 'Rubika', color: '#7B61FF' },
+  rubino: { name: 'Rubino', color: '#00BCD4' },
   soroushplus: { name: 'SoroushPlus', color: '#2EB67D' },
   aparat: { name: 'Aparat', color: '#ED1B2F' },
   threads: { name: 'Threads', color: '#000000' },
+  clubhouse: { name: 'Clubhouse', color: '#262626' },
   shad: { name: 'Shad', color: '#00A86B' },
   igap: { name: 'iGap', color: '#1E88E5' },
   site: { name: 'Site', color: '#607D8B' },
   gap: { name: 'Gap', color: '#FF6F00' },
   virasty: { name: 'Virasty', color: '#D32F2F' },
+  facebook: { name: 'Facebook', color: '#1877F2' },
 };
 
 /** A connected account on a social-media platform and its headline metrics. */

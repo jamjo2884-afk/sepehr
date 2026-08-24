@@ -4,6 +4,7 @@ import {
   parseImportFile,
   rowsToImportRows,
 } from '@/services/social-import/parse';
+import { rowsToLongFormatImportRows } from '@/services/social-import/parse-long-format';
 import {
   createImportSession,
   createImportRows,
@@ -35,9 +36,22 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
 
   try {
-    // Parse file
+    // Parse file — auto-detect long vs wide format
     const matrix = await parseImportFile(file);
-    const { rows, fileErrors } = rowsToImportRows(matrix);
+    const headerLower = matrix[0]?.map((c: string) =>
+      c.replace(/[\s\u00A0]/g, '').toLowerCase(),
+    ) ?? [];
+    const isLongFormat = headerLower.some(
+      (h) =>
+        h === 'metric_type' ||
+        h === 'metric' ||
+        h === 'نوع_آمار' ||
+        h === 'shaaj' ||
+        h === 'شاخص',
+    );
+    const { rows, fileErrors } = isLongFormat
+      ? rowsToLongFormatImportRows(matrix)
+      : rowsToImportRows(matrix);
     if (fileErrors.length > 0) {
       return NextResponse.json({ fileErrors, sessionId: null }, { status: 200 });
     }

@@ -231,69 +231,64 @@ describe('rowsToImportRows', () => {
     expect(result.rows[0].errors).toEqual([]);
   });
 
-  it('maps followers → channelMembers for Telegram', () => {
+  it('maps followers → followers for Telegram (no remap)', () => {
     const result = rowsToImportRows(
       parseCsv(
         'platform,account_identifier,period,period_label,followers\ntelegram,@channel,monthly,1405-05,25000\n',
       ),
     );
-    expect(result.rows[0].values.channelMembers).toBe(25000);
-    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].values.followers).toBe(25000);
+    expect(result.rows[0].values.channelMembers).toBeUndefined();
     expect(result.rows[0].errors).toEqual([]);
   });
 
-  it('maps followers → channelMembers for Bale', () => {
+  it('maps followers → followers for Bale (no remap)', () => {
     const result = rowsToImportRows(
       parseCsv(
         'platform,account_identifier,period,period_label,followers\nbale,@channel,monthly,1405-05,8000\n',
       ),
     );
-    expect(result.rows[0].values.channelMembers).toBe(8000);
-    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].values.followers).toBe(8000);
     expect(result.rows[0].errors).toEqual([]);
   });
 
-  it('maps followers → channelMembers for Eitaa', () => {
+  it('maps followers → followers for Eitaa (no remap)', () => {
     const result = rowsToImportRows(
       parseCsv(
         'platform,account_identifier,period,period_label,followers\neita,@channel,monthly,1405-05,5000\n',
       ),
     );
-    expect(result.rows[0].values.channelMembers).toBe(5000);
-    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].values.followers).toBe(5000);
     expect(result.rows[0].errors).toEqual([]);
   });
 
-  it('maps followers → channelMembers for Rubika', () => {
+  it('maps followers → followers for Rubika (no remap)', () => {
     const result = rowsToImportRows(
       parseCsv(
         'platform,account_identifier,period,period_label,followers\nrubika,@channel,monthly,1405-05,7000\n',
       ),
     );
-    expect(result.rows[0].values.channelMembers).toBe(7000);
-    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].values.followers).toBe(7000);
     expect(result.rows[0].errors).toEqual([]);
   });
 
-  it('maps followers → channelMembers for SoroushPlus', () => {
+  it('maps followers → followers for SoroushPlus (no remap)', () => {
     const result = rowsToImportRows(
       parseCsv(
         'platform,account_identifier,period,period_label,followers\nsoroushplus,@channel,monthly,1405-05,6000\n',
       ),
     );
-    expect(result.rows[0].values.channelMembers).toBe(6000);
-    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].values.followers).toBe(6000);
     expect(result.rows[0].errors).toEqual([]);
   });
 
-  it('maps followers → subscribers for YouTube', () => {
+  it('maps followers → followers for YouTube (no remap)', () => {
     const result = rowsToImportRows(
       parseCsv(
         'platform,account_identifier,period,period_label,followers\nyoutube,@channel,monthly,1405-05,1000\n',
       ),
     );
-    expect(result.rows[0].values.subscribers).toBe(1000);
-    expect(result.rows[0].values.followers).toBeUndefined();
+    expect(result.rows[0].values.followers).toBe(1000);
     expect(result.rows[0].errors).toEqual([]);
   });
 
@@ -307,35 +302,34 @@ describe('rowsToImportRows', () => {
     expect(result.rows[0].errors).toEqual([]);
   });
 
-  it('YouTube: explicit subscribers takes precedence over followers', () => {
+  it('YouTube: followers and subscribers are independent columns', () => {
     const result = rowsToImportRows(
       parseCsv(
         'platform,account_identifier,period,period_label,followers,subscribers\nyoutube,@channel,monthly,1405-05,1000,2000\n',
       ),
     );
+    expect(result.rows[0].values.followers).toBe(1000);
     expect(result.rows[0].values.subscribers).toBe(2000);
-    expect(result.rows[0].values.followers).toBeUndefined();
     expect(result.rows[0].errors).toEqual([]);
   });
 
-  it('Telegram: explicit channelMembers takes precedence over followers', () => {
+  it('Telegram: followers and channelMembers are independent columns', () => {
     const result = rowsToImportRows(
       parseCsv(
         'platform,account_identifier,period,period_label,followers,channel_members\ntelegram,@channel,monthly,1405-05,1000,2000\n',
       ),
     );
+    expect(result.rows[0].values.followers).toBe(1000);
     expect(result.rows[0].values.channelMembers).toBe(2000);
-    expect(result.rows[0].values.followers).toBeUndefined();
     expect(result.rows[0].errors).toEqual([]);
   });
 
-  it('empty followers does not produce any audience field', () => {
+  it('empty followers produces no followers field', () => {
     const result = rowsToImportRows(
       parseCsv(
         'platform,account_identifier,period,period_label,followers,views\ntelegram,@channel,monthly,1405-05,,400000\n',
       ),
     );
-    expect(result.rows[0].values.channelMembers).toBeUndefined();
     expect(result.rows[0].values.followers).toBeUndefined();
     expect(result.rows[0].values.views).toBe(400000);
     expect(result.rows[0].errors).toEqual([]);
@@ -370,7 +364,7 @@ describe('rowsToImportRows', () => {
         'platform,account_identifier,period,period_label,followers,views,likes\ntelegram,@channel,monthly,1405-05,25000,400000,1800\n',
       ),
     );
-    expect(result.rows[0].values.channelMembers).toBe(25000);
+    expect(result.rows[0].values.followers).toBe(25000);
     expect(result.rows[0].values.views).toBe(400000);
     expect(result.rows[0].values.likes).toBe(1800);
     expect(result.rows[0].errors).toEqual([]);

@@ -44,9 +44,19 @@ interface PreviewRow {
   matchError: string | null;
   matchStatus?: 'matched' | 'ambiguous' | 'unmatched' | 'empty';
   candidates?: Array<{ id: string; brand: string; username: string; displayName?: string | null }> | null;
+  brand?: string | null;
+  link?: string | null;
+  sourceStatus?: string | null;
 }
 
-type Stage = 'choose' | 'parsing' | 'preview' | 'saving' | 'done';
+type Stage = 'choose' | 'parsing' | 'preview' | 'setting' | 'saving' | 'done';
+
+interface SavingProgress {
+  phase: 'accounts' | 'metrics' | 'done';
+  current: number;
+  total: number;
+  message: string;
+}
 
 const PERIOD_LABELS: Record<string, string> = {
   daily: 'روزانه',
@@ -71,6 +81,7 @@ export function BulkImportDialog({
   const [sheetsUrl, setSheetsUrl] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [saveProgress, setSaveProgress] = useState<SavingProgress | null>(null);
   const [resolvedAccounts, setResolvedAccounts] = useState<
     Map<number, { id: string; brand: string; username: string }>
   >(new Map());
@@ -180,13 +191,23 @@ export function BulkImportDialog({
     }
   };
 
+  const abortRef = useRef<AbortController | null>(null);
+
   const commitImport = async () => {
     if (validRows.length === 0) return;
-    setStage('saving');
+    setStage('setting');
+    setSaveProgress({ phase: 'accounts', current: 0, total: validRows.length, message: 'در حال آماده‌سازی...' });
+
+    const abortController = new AbortController();
+    abortRef.current = abortController;
+
+    const timeoutId = setTimeout(() => abortController.abort(), 5 * 60 * 1000);
+
     try {
       const res = await fetch('/api/social/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: abortController.signal,
         body: JSON.stringify({
           rows: validRows.map((r) => ({
             rowNumber: r.rowNumber,
@@ -197,23 +218,79 @@ export function BulkImportDialog({
             values: r.values,
             errors: [],
             resolvedAccountId: resolvedAccounts.get(r.rowNumber)?.id ?? r.account?.id ?? null,
+            brand: r.brand ?? null,
+            link: r.link ?? null,
+            sourceStatus: r.sourceStatus ?? null,
           })),
         }),
       });
-      const data = (await res.json()) as SocialImportSummary & {
-        error?: string;
-      };
-      if (!res.ok) {
-        setFileErrors([data.error ?? 'ثبت اطلاعات انجام نشد.']);
+
+      if (!res.ok || !res.body) {
+        clearTimeout(timeoutId);
+        const errData = await res.json().catch(() => ({ error: 'ثبت اطلاعات انجام نشد.' }));
+        setFileErrors([errData.error ?? 'ثبت اطلاعات انجام نشد.']);
         setStage('preview');
+        setSaveProgress(null);
         return;
       }
-      setSummary(data);
-      setStage('done');
-      onImported();
-    } catch {
-      setFileErrors(['ثبت اطلاعات انجام نشد.']);
+
+      // Read SSE stream for real-time progress
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const jsonStr = line.slice(6);
+          if (!jsonStr.trim()) continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === 'progress') {
+              setSaveProgress({
+                phase: event.phase,
+                current: event.current,
+                total: event.total,
+                message: event.message,
+              });
+            } else if (event.type === 'done') {
+              clearTimeout(timeoutId);
+              setSaveProgress({ phase: 'done', current: event.summary.total, total: event.summary.total, message: 'تکمیل شد!' });
+              setSummary(event.summary);
+              setStage('done');
+              setSaveProgress(null);
+              onImported();
+            } else if (event.type === 'error') {
+              clearTimeout(timeoutId);
+              setFileErrors([event.error ?? 'ثبت اطلاعات انجام نشد.']);
+              setStage('preview');
+              setSaveProgress(null);
+            }
+          } catch {
+            // Skip malformed JSON lines
+          }
+        }
+      }
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setFileErrors(['عملیات بیش از حد طول کشید. لطفاً دوباره تلاش کنید.']);
+      } else {
+        setFileErrors(['ثبت اطلاعات انجام نشد.']);
+      }
       setStage('preview');
+      setSaveProgress(null);
+    } finally {
+      abortRef.current = null;
     }
   };
 
@@ -225,9 +302,17 @@ export function BulkImportDialog({
     toast.info('اتصال Google Sheets در مرحله بعد فعال خواهد شد.');
   };
 
+  const cancelImport = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setSaveProgress(null);
+    setStage('preview');
+  };
+
   const close = () => {
+    abortRef.current?.abort();
     onOpenChange(false);
-    // Reset for the next open.
+    setSaveProgress(null);
     setTimeout(reset, 150);
   };
 
@@ -562,10 +647,44 @@ export function BulkImportDialog({
           </div>
         ) : null}
 
-        {stage === 'saving' ? (
-          <div className="flex flex-col items-center gap-3 py-10">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">در حال ثبت اطلاعات…</p>
+        {stage === 'saving' || stage === 'setting' ? (
+          <div className="flex flex-col items-center gap-4 py-8">
+            <div className="relative">
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-success flex items-center justify-center">
+                <FileSpreadsheet className="h-3 w-3 text-white" />
+              </div>
+            </div>
+            {saveProgress && (
+              <div className="w-full max-w-xs flex flex-col gap-2">
+                <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+                    style={{
+                      width: `${Math.round((saveProgress.current / saveProgress.total) * 100)}%`
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{saveProgress.message}</span>
+                  <span className="tabular-nums font-medium">
+                    {toPersianDigits(String(Math.round((saveProgress.current / saveProgress.total) * 100)))}%
+                  </span>
+                </div>
+              </div>
+            )}
+            <p className="text-sm text-muted-foreground">
+              {saveProgress?.phase === 'accounts'
+                ? 'در حال ساخت حساب‌های جدید...'
+                : saveProgress?.phase === 'metrics'
+                  ? 'در حال ثبت آمار...'
+                  : 'در حال ثبت اطلاعات...'}
+            </p>
+            <p className="text-xs text-muted-foreground/60">
+              لطفاً صفحه را نبندید
+            </p>
           </div>
         ) : null}
 
@@ -631,7 +750,17 @@ export function BulkImportDialog({
               </Button>
             </>
           ) : null}
-          {stage === 'done' ? <Button onClick={close}>پایان</Button> : null}
+          {(stage === 'saving' || stage === 'setting') ? (
+            <Button variant="outline" onClick={cancelImport}>
+              لغو
+            </Button>
+          ) : null}
+          {stage === 'done' ? (
+            <Button onClick={close} className="gap-1.5">
+              <CheckCircle2 className="h-4 w-4" />
+              پایان و ذخیره اطلاعات
+            </Button>
+          ) : null}
           {stage === 'choose' || stage === 'parsing' ? (
             <Button
               variant="outline"

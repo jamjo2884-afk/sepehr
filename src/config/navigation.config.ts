@@ -11,6 +11,7 @@ import {
   Bot,
   BookOpen,
   Settings,
+  Award,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -43,6 +44,13 @@ export const navItems: NavItem[] = [
     href: '/assets',
     icon: Package,
     description: 'آرشیو و مدیریت فایل‌ها و دارایی‌های رسانه‌ای',
+  },
+  {
+    id: 'brands',
+    label: 'برندها',
+    href: '/brands',
+    icon: Award,
+    description: 'مشاهده و مدیریت تمام برندها به صورت موزاییکی',
   },
   {
     id: 'distribution',

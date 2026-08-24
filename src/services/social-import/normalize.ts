@@ -41,6 +41,31 @@ export function parseImportNumber(raw: string): number | null {
   return n;
 }
 
+/**
+ * Normalize an account status from Persian/English source.
+ * Handles: فعال → active, غیر فعال → inactive, راکد → inactive,
+ *          suspended → suspended, etc.
+ */
+export function normalizeAccountStatus(
+  raw: string,
+): 'active' | 'inactive' | 'archived' | 'suspended' | null {
+  const value = raw.trim().toLowerCase();
+  if (value === '') return null;
+  const map: Record<string, 'active' | 'inactive' | 'archived' | 'suspended'> = {
+    فعال: 'active',
+    active: 'active',
+    'غیر فعال': 'inactive',
+    'غیرفعال': 'inactive',
+    inactive: 'inactive',
+    راکد: 'inactive',
+    بایگانی: 'archived',
+    archived: 'archived',
+    معلق: 'suspended',
+    suspended: 'suspended',
+  };
+  return map[value] ?? null;
+}
+
 /** Normalize a platform cell (Persian or Latin name, case-insensitive). */
 export function normalizePlatform(raw: string): SocialPlatform | null {
   const value = raw.trim().toLowerCase().replace(/[\s@]/g, '');
@@ -63,6 +88,7 @@ export function normalizePlatform(raw: string): SocialPlatform | null {
     eita: 'eita',
     eitaa: 'eita',
     rubika: 'rubika',
+    rubino: 'rubino',
     soroushplus: 'soroushplus',
     soroush: 'soroushplus',
     sapp: 'soroushplus',
@@ -76,7 +102,57 @@ export function normalizePlatform(raw: string): SocialPlatform | null {
     virasty: 'virasty',
   };
   if (value in latin) return latin[value];
-  // Persian labels from the app's own config.
+  // Persian aliases — covers every name that appears in the raw Excel
+  // (برند / سکو columns) plus the app's own SOCIAL_PLATFORM_LABELS.
+  // Persian aliases — covers every name in the raw Excel
+  // (note: normalizePlatform strips ALL whitespace before lookup,
+  //  so we include both with-space and no-space variants)
+  const persian: Record<string, SocialPlatform> = {
+    // Instagram
+    'اینستاگرام': 'instagram',
+    // Telegram
+    'تلگرام': 'telegram',
+    // YouTube
+    'یوتیوب': 'youtube',
+    // Twitter / X
+    'ایکس': 'twitter',
+    'توییتر': 'twitter',
+    // Bale
+    'بله': 'bale',
+    // Eitaa
+    'ایتا': 'eita',
+    'ایتائ': 'eita',
+    // Rubika
+    'روبیکا': 'rubika',
+    // Rubino (DIFFERENT from Rubika)
+    'روبینو': 'rubino',
+    // Soroush Plus
+    'سروشپلاس': 'soroushplus',
+    'سروش پلاس': 'soroushplus',
+    // Aparat
+    'آپارات': 'aparat',
+    // Clubhouse
+    'کلابهاوس': 'clubhouse',
+    'کلاب هاوس': 'clubhouse',
+    // Shad
+    'شاد': 'shad',
+    // iGap
+    'آیگپ': 'igap',
+    'آی گپ': 'igap',
+    // Site
+    'وبسایت': 'site',
+    'وب‌سایت': 'site',
+    'سایت': 'site',
+    // Gap
+    'گپ': 'gap',
+    // Virasty
+    'ویراستی': 'virasty',
+    // Facebook
+    'فیسبوک': 'facebook',
+    'فيسبوک': 'facebook',
+  };
+  if (value in persian) return persian[value];
+  // Try matching against the app's own SOCIAL_PLATFORM_LABELS.
   const fa = Object.entries(SOCIAL_PLATFORM_LABELS).find(
     ([, label]) => label.replace(/[\s]/g, '') === value,
   );

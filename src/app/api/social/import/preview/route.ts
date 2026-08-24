@@ -4,8 +4,10 @@ import {
   parseImportFile,
   rowsToImportRows,
 } from '@/services/social-import/parse';
-import { getSocialAccounts } from '@/services/social.service';
+import { rowsToLongFormatImportRows } from '@/services/social-import/parse-long-format';
+import { getSocialAccounts, createSocialAccount } from '@/services/social.service';
 import { matchImportRowToAccount } from '@/services/social-import/match';
+import { normalizeAccountStatus } from '@/services/social-import/normalize';
 
 /**
  * POST /api/social/import/preview
@@ -47,11 +49,56 @@ export async function POST(req: Request): Promise<NextResponse> {
 
   try {
     const matrix = await parseImportFile(file);
-    const { rows, fileErrors } = rowsToImportRows(matrix);
+
+    // Auto-detect format: if headers contain metric_type/type/شاخص,
+    // it's a long-format file (raw Excel export). Otherwise use the
+    // standard wide-format parser.
+    const headerLower = matrix[0]?.map((c: string) =>
+      c.replace(/[\s\u00A0]/g, '').toLowerCase(),
+    ) ?? [];
+    const isLongFormat = headerLower.some(
+      (h) =>
+        h === 'metric_type' ||
+        h === 'metric' ||
+        h === 'نوع_آمار' ||
+        h === 'shaaj' ||
+        h === 'شاخص',
+    );
+
+    const { rows, fileErrors } = isLongFormat
+      ? rowsToLongFormatImportRows(matrix)
+      : rowsToImportRows(matrix);
     if (fileErrors.length > 0) {
       return NextResponse.json({ fileErrors, rows: [] }, { status: 200 });
     }
-    const accounts = await getSocialAccounts();
+    let accounts = await getSocialAccounts();
+
+    // Auto-create missing accounts from the Excel data
+    // so the preview shows them as matched.
+    const existingKeys = new Set(
+      accounts.map((a) => `${a.platform}|${a.username}`),
+    );
+    const uniqueFromRows = new Map<string, typeof rows[0]>();
+    for (const row of rows) {
+      if (!row.accountIdentifier || !row.brand) continue;
+      const key = `${row.platform}|${row.accountIdentifier}`;
+      if (!uniqueFromRows.has(key) && !existingKeys.has(key)) {
+        uniqueFromRows.set(key, row);
+      }
+    }
+    for (const [, row] of uniqueFromRows) {
+      const created = await createSocialAccount({
+        brand: row.brand!,
+        platform: row.platform,
+        username: row.accountIdentifier,
+        url: row.link || null,
+        status: normalizeAccountStatus(row.sourceStatus ?? '') ?? 'active',
+      });
+      if (created) {
+        accounts = [...accounts, created];
+      }
+    }
+
     const previewRows = rows.map((row) => {
       const result = matchImportRowToAccount(accounts, row);
       const account =
@@ -90,6 +137,9 @@ export async function POST(req: Request): Promise<NextResponse> {
         candidates,
         matchStatus: result.status,
         matchError,
+        brand: row.brand ?? null,
+        link: row.link ?? null,
+        sourceStatus: row.sourceStatus ?? null,
       };
     });
     return NextResponse.json({ fileErrors: [], rows: previewRows });

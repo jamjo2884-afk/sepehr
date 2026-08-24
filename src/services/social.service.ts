@@ -77,14 +77,17 @@ export const SUPPORTED_PLATFORMS: SocialPlatform[] = [
   'bale',
   'eita',
   'rubika',
+  'rubino',
   'soroushplus',
   'aparat',
   'threads',
+  'clubhouse',
   'shad',
   'igap',
   'site',
   'gap',
   'virasty',
+  'facebook',
 ];
 
 /** A flattened account row: one brand × platform × handle, latest snapshot + series. */
@@ -377,6 +380,8 @@ export function socialAccountUrl(
       return `https://igap.net/${h}`;
     case 'virasty':
       return `https://virasty.com/${h}`;
+    case 'facebook':
+      return `https://facebook.com/${h}`;
     default:
       return null;
   }

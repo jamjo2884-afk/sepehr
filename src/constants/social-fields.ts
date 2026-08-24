@@ -82,18 +82,21 @@ export function platformFollowersLabel(platform: SocialPlatform): string {
 
 /**
  * Canonical audience metric field for a platform.
- * Used by the import parser to remap the generic "followers" column.
  *
- * YouTube → subscribers
- * Channel-based platforms (telegram, bale, eita, …) → channelMembers
- * Others → followers
+ * Always returns 'followers' — the generic "Followers" column from the
+ * import file (or raw Excel) maps directly to the `followers` column in
+ * `social_metrics` for ALL platforms. This prevents data loss that
+ * occurred when Telegram/Bale/Eita audience counts were remapped to
+ * `channelMembers` (leaving `followers` at 0) and YouTube subscribers
+ * were remapped to `subscribers` (also leaving `followers` at 0).
+ *
+ * The dashboard and analytics code already reads `followers` as the
+ * primary audience metric for all platforms. The UI label is determined
+ * by `platformFollowersLabel()`.
  */
 export function platformAudienceField(
-  platform: SocialPlatform,
+  _platform: SocialPlatform,
 ): SocialMetricFieldKey {
-  if (platform === 'youtube') return 'subscribers';
-  if (PLATFORM_METRIC_FIELDS[platform].includes('channelMembers'))
-    return 'channelMembers';
   return 'followers';
 }
 
@@ -129,7 +132,7 @@ export const PLATFORM_METRIC_FIELDS: Record<
     'shares',
     'engagementRate',
   ],
-  youtube: ['subscribers', 'views', 'likes', 'comments', 'posts'],
+  youtube: ['followers', 'subscribers', 'views', 'likes', 'comments', 'posts'],
   twitter: [
     'followers',
     'following',
@@ -170,6 +173,16 @@ export const PLATFORM_METRIC_FIELDS: Record<
     'shares',
     'engagementRate',
   ],
+  rubino: [
+    'followers',
+    'channelMembers',
+    'posts',
+    'views',
+    'likes',
+    'comments',
+    'shares',
+    'engagementRate',
+  ],
   soroushplus: [
     'followers',
     'channelMembers',
@@ -190,6 +203,15 @@ export const PLATFORM_METRIC_FIELDS: Record<
   threads: [
     'followers',
     'following',
+    'posts',
+    'views',
+    'likes',
+    'comments',
+    'shares',
+    'engagementRate',
+  ],
+  clubhouse: [
+    'followers',
     'posts',
     'views',
     'likes',
@@ -247,6 +269,18 @@ export const PLATFORM_METRIC_FIELDS: Record<
     'shares',
     'engagementRate',
   ],
+  facebook: [
+    'followers',
+    'following',
+    'posts',
+    'views',
+    'likes',
+    'comments',
+    'shares',
+    'reach',
+    'impressions',
+    'engagementRate',
+  ],
 };
 
 /**
@@ -265,12 +299,15 @@ export const PLATFORM_SPECIFIC_METRIC_FIELDS: Record<
   bale: ['channelMembers'],
   eita: ['channelMembers'],
   rubika: ['channelMembers'],
+  rubino: ['channelMembers'],
   soroushplus: ['channelMembers'],
   aparat: [],
   threads: [],
+  clubhouse: [],
   shad: ['channelMembers'],
   igap: ['channelMembers'],
   site: [],
   gap: ['channelMembers'],
   virasty: [],
+  facebook: [],
 };

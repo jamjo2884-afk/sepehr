@@ -1,183 +1,293 @@
 /**
- * Convert "گزارش ماهیانه سپهر.xlsx" (long format) to standard import format.
+ * Convert raw "گزارش ماهیانه سپهر.xlsx" (long format) to:
  *
- * Source format (no headers, 8 columns):
- *   brand | platform_persian | username | metric_type | value | date_persian | period | period_label
+ * 1. Wide-format import file (for the standard import pipeline)
+ * 2. Mock data TypeScript file (social-data.generated.ts)
  *
- * Target format (with headers):
- *   platform | account_identifier | period | period_label | followers | reach | views
+ * Source format (long, 10 columns):
+ *   برند | سکو | وضعیت | شناسه | لینک | شاخص | مقدار | تاریخ | ماه | month
+ *
+ * Usage:
+ *   node scripts/convert-report.js [input.xlsx] [output-dir]
  */
-const XLSX = require('xlsx');
-const path = require('path');
+var XLSX = require('xlsx');
+var path = require('path');
+var fs = require('fs');
 
-const INPUT = String.raw`C:\Users\milad\Desktop\پروژه 1\گزارش ها\گزارش ماهیانه سپهر.xlsx`;
-const OUTPUT = String.raw`C:\Users\milad\Desktop\پروژه 1\گزارش ها\گزارش-ماهانه-سپهر-استاندارد.xlsx`;
+// Paths
+var INPUT = process.argv[2] || 'C:\\Users\\milad\\Downloads\\گزارش ماهیانه سپهر.xlsx';
+var OUTPUT_DIR = process.argv[3] || 'C:\\Users\\milad\\Desktop\\';
+var MOCK_DATA_PATH = path.resolve(__dirname, '../src/features/mock-data/social-data.generated.ts');
 
-// ── Metric name mapping ────────────────────────────────────────────────────
-const METRIC_MAP = {
+// Metric name mapping
+var METRIC_MAP = {
   'Follower': 'followers',
   'Reach': 'reach',
   'View': 'views',
+  'Like': 'likes',
+  'Comment': 'comments',
+  'Share': 'shares',
+  'Post': 'posts',
+  'Subscriber': 'subscribers'
 };
 
-// ── Platform mapping (Persian → Latin key) ─────────────────────────────────
-const PLATFORM_MAP = {
-  'تلگرام': 'telegram',
-  'اینستاگرام': 'instagram',
-  'ایکس': 'twitter',
-  'سروش پلاس': 'soroushplus',
-  'روبیکا': 'rubika',
-  'بله': 'bale',
-  'ایتا': 'eita',
-  'یوتیوب': 'youtube',
-  'آپارات': 'aparat',
-  'سایت': 'site',
-  'کلاب هاوس': 'threads',
-  'ویراستی': 'virasty',
-  'گپ': 'gap',
-  'روبینو': 'rubika',     // Rubino → map to rubika or keep separate
-  'آی گپ': 'igap',
+// Platform mapping (Persian to Latin key)
+var PLATFORM_MAP = {
+  '\u062A\u0644\u06AF\u0631\u0627\u0645': 'telegram',
+  '\u0627\u06CC\u0646\u0633\u062A\u0627\u06AF\u0631\u0627\u0645': 'instagram',
+  '\u0627\u06CC\u06A9\u0633': 'twitter',
+  '\u0641\u06CC\u0633\u0628\u0648\u06A9': 'facebook',
+  '\u0633\u0631\u0648\u0634 \u067E\u0644\u0627\u0633': 'soroushplus',
+  '\u0631\u0648\u0628\u06CC\u06A9\u0627': 'rubika',
+  '\u0628\u0644\u0647': 'bale',
+  '\u0627\u06CC\u062A\u0627': 'eita',
+  '\u06CC\u0648\u062A\u06CC\u0648\u0628': 'youtube',
+  '\u0622\u067E\u0627\u0631\u0627\u062A': 'aparat',
+  '\u0633\u0627\u06CC\u062A': 'site',
+  '\u06A9\u0644\u0627\u0628 \u0647\u0627\u0648\u0633': 'clubhouse',
+  '\u0648\u06CC\u0631\u0627\u0633\u062A\u06CC': 'virasty',
+  '\u06AF\u067E': 'gap',
+  '\u0631\u0648\u0628\u06CC\u0646\u0648': 'rubino',
+  '\u0622\u06CC \u06AF\u067E': 'igap',
+  '\u0634\u0627\u062F': 'shad'
 };
 
-// ── Read source ────────────────────────────────────────────────────────────
-const wb = XLSX.readFile(INPUT);
-const ws = wb.Sheets[wb.SheetNames[0]]; // "Data" sheet
-const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+// Status mapping
+var STATUS_MAP = {
+  '\u0641\u0639\u0627\u0644': 'active',
+  '\u063A\u06CC\u0631 \u0641\u0639\u0627\u0644': 'inactive',
+  '\u0631\u0627\u06A9\u062F': 'inactive'
+};
 
-console.log(`Source rows: ${rawData.length}`);
+// Read source
+console.log('Reading: ' + INPUT);
+var wb = XLSX.readFile(INPUT);
+var ws = wb.Sheets[wb.SheetNames[0]];
+var rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-// ── Group by (platform, username, period) ──────────────────────────────────
-// Key: "platform|username|period_label"
-// Value: { brand, platform, username, periodLabel, metrics: { followers, reach, views } }
-const grouped = new Map();
+console.log('Source rows: ' + rawData.length);
 
-let skipped = 0;
-for (const row of rawData) {
-  const brand = String(row[0] ?? '').trim();
-  const platformFa = String(row[1] ?? '').trim();
-  const username = String(row[2] ?? '').trim();
-  const metricType = String(row[3] ?? '').trim();
-  const value = row[4];
-  const periodLabel = String(row[6] ?? row[7] ?? '').trim(); // prefer YYYY-MM
+// Column mapping (matches actual Excel headers)
+// Headers: برند | سکو | وضعیت | شناسه | لینک | شاخص | مقدار | تاریخ | ماه | month
+var COL = {
+  brand: 0,
+  platform: 1,
+  status: 2,
+  username: 3,
+  link: 4,
+  metricType: 5,
+  value: 6,
+  date: 7,
+  month: 8,
+  monthEn: 9
+};
 
-  // Skip empty rows or rows with no platform/metric
-  if (!platformFa || !username || !metricType) {
+// Group by (platform, username, period_label)
+var grouped = new Map();
+var skipped = 0;
+
+for (var i = 1; i < rawData.length; i++) {
+  var row = rawData[i];
+  var brand = String(row[COL.brand] || '').trim();
+  var platformFa = String(row[COL.platform] || '').trim();
+  var username = String(row[COL.username] || '').trim();
+  var metricType = String(row[COL.metricType] || '').trim();
+  var value = row[COL.value];
+  var status = String(row[COL.status] || '').trim();
+  var link = String(row[COL.link] || '').trim();
+  var periodLabel = String(row[COL.monthEn] || row[COL.month] || '').trim();
+
+  if (!platformFa || !username || !periodLabel) {
     skipped++;
     continue;
   }
 
-  const platform = PLATFORM_MAP[platformFa];
+  var platform = PLATFORM_MAP[platformFa];
   if (!platform) {
-    console.warn(`  Unknown platform: "${platformFa}" — skipping row`);
+    console.warn('  Unknown platform: "' + platformFa + '" - skipping row');
     skipped++;
     continue;
   }
 
-  const metricKey = METRIC_MAP[metricType];
+  var metricKey = METRIC_MAP[metricType];
   if (!metricKey) {
-    console.warn(`  Unknown metric: "${metricType}" — skipping row`);
+    console.warn('  Unknown metric: "' + metricType + '" - skipping row');
     skipped++;
     continue;
   }
 
-  // Parse the period label
-  const pl = periodLabel.replace(/\s+/g, '-');
-  const key = `${platform}|${username}|${pl}`;
+  var rawVal = String(value || '').trim();
+  if (!rawVal || rawVal === '-' || rawVal === '\u2014') {
+    skipped++;
+    continue;
+  }
+
+  var pl = periodLabel.replace(/\s+/g, '-');
+  var key = platform + '|' + username + '|' + pl;
 
   if (!grouped.has(key)) {
     grouped.set(key, {
-      brand,
-      platform,
-      username,
+      brand: brand,
+      platform: platform,
+      username: username,
+      status: STATUS_MAP[status] || 'active',
+      link: link || null,
       period: 'monthly',
       periodLabel: pl,
-      metrics: {},
+      metrics: {}
     });
   }
 
-  const entry = grouped.get(key);
-  // Take the latest value if duplicated
-  const numVal = typeof value === 'number' ? value : Number(String(value).replace(/[،,]/g, ''));
+  var entry = grouped.get(key);
+  var numVal = typeof value === 'number' ? value : Number(rawVal.replace(/[،,]/g, '').replace(/[\s\u00A0]/g, ''));
   if (Number.isFinite(numVal) && numVal > 0) {
     entry.metrics[metricKey] = numVal;
   }
 }
 
-console.log(`Grouped into ${grouped.size} unique rows (skipped ${skipped} rows)`);
+console.log('Grouped into ' + grouped.size + ' unique rows (skipped ' + skipped + ' rows)');
 
-// ── Build output matrix ────────────────────────────────────────────────────
-const headers = [
-  'platform',
-  'account_identifier',
-  'period',
-  'period_label',
-  'Followers',
-  'Reach',
-  'Views',
-];
+// 1. Generate wide-format import file
+var headers = ['platform', 'account_identifier', 'period', 'period_label', 'Followers', 'Reach', 'Views'];
+var outputRows = [];
 
-const outputRows = [];
-for (const entry of grouped.values()) {
+for (var entry of grouped.values()) {
   outputRows.push([
     entry.platform,
     entry.username,
     entry.period,
     entry.periodLabel,
-    entry.metrics.followers ?? '',
-    entry.metrics.reach ?? '',
-    entry.metrics.views ?? '',
+    entry.metrics.followers || '',
+    entry.metrics.reach || '',
+    entry.metrics.views || ''
   ]);
 }
 
-// Sort by platform, then username, then period
-outputRows.sort((a, b) => {
-  const cmp = a[0].localeCompare(b[0]);
+outputRows.sort(function(a, b) {
+  var cmp = a[0].localeCompare(b[0]);
   if (cmp !== 0) return cmp;
-  const cmp2 = a[1].localeCompare(b[1]);
+  var cmp2 = a[1].localeCompare(b[1]);
   if (cmp2 !== 0) return cmp2;
   return a[3].localeCompare(b[3]);
 });
 
-console.log(`Output rows: ${outputRows.length}`);
+console.log('Wide-format output rows: ' + outputRows.length);
 
-// ── Write output ───────────────────────────────────────────────────────────
-const wsOutput = XLSX.utils.aoa_to_sheet([headers, ...outputRows]);
-
-// Set column widths
+var wsOutput = XLSX.utils.aoa_to_sheet([headers].concat(outputRows));
 wsOutput['!cols'] = [
-  { wch: 15 },  // platform
-  { wch: 25 },  // account_identifier
-  { wch: 10 },  // period
-  { wch: 12 },  // period_label
-  { wch: 12 },  // Followers
-  { wch: 12 },  // Reach
-  { wch: 12 },  // Views
+  { wch: 15 }, { wch: 25 }, { wch: 10 }, { wch: 12 },
+  { wch: 12 }, { wch: 12 }, { wch: 12 }
 ];
 
-const wbOutput = XLSX.utils.book_new();
+var wbOutput = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(wbOutput, wsOutput, 'Data');
-XLSX.writeFile(wbOutput, OUTPUT);
+var importPath = path.join(OUTPUT_DIR, 'import-sepehr.xlsx');
+XLSX.writeFile(wbOutput, importPath);
+console.log('Import file saved: ' + importPath);
 
-console.log(`\n✅ Saved to: ${OUTPUT}`);
+// 2. Generate mock data TypeScript file
+var brandMap = new Map();
 
-// ── Verify ─────────────────────────────────────────────────────────────────
-const wbVerify = XLSX.readFile(OUTPUT);
-const wsVerify = wbVerify.Sheets[wbVerify.SheetNames[0]];
-const verifyData = XLSX.utils.sheet_to_json(wsVerify, { header: 1, defval: '' });
-console.log(`\nVerification:`);
-console.log(`  Sheet: ${wbVerify.SheetNames[0]}`);
-console.log(`  Total rows (inc. header): ${verifyData.length}`);
-console.log(`  Header: ${JSON.stringify(verifyData[0])}`);
-console.log(`  Row 1:  ${JSON.stringify(verifyData[1])}`);
-console.log(`  Row 2:  ${JSON.stringify(verifyData[2])}`);
+for (var entry of grouped.values()) {
+  var brandName = entry.brand;
+  var plat = entry.platform;
+  var uname = entry.username;
+  var plabel = entry.periodLabel;
+  var metrics = entry.metrics;
 
-// Platform stats
-const platforms = {};
-for (let i = 1; i < verifyData.length; i++) {
-  const p = verifyData[i][0];
-  platforms[p] = (platforms[p] || 0) + 1;
+  if (!brandMap.has(brandName)) brandMap.set(brandName, new Map());
+  var platforms = brandMap.get(brandName);
+  if (!platforms.has(plat)) platforms.set(plat, new Map());
+  var accounts = platforms.get(plat);
+  if (!accounts.has(uname)) accounts.set(uname, []);
+
+  var followers = metrics.followers || 0;
+  if (followers > 0) {
+    accounts.get(uname).push({ month: plabel, value: followers });
+  }
 }
-console.log(`\n  Rows per platform:`);
-Object.entries(platforms).sort((a, b) => b[1] - a[1]).forEach(([p, c]) => {
-  console.log(`    ${p}: ${c}`);
+
+// Build TypeScript output
+var lines = [];
+lines.push('// AUTO-GENERATED from raw Excel. Do not edit by hand.');
+lines.push('export interface SocialMonthlyPoint { month: string; value: number; }');
+lines.push('export interface SocialAccountSeries { handle: string | null; series: SocialMonthlyPoint[]; }');
+lines.push('export interface SocialBrandPlatform { [handleKey: string]: SocialAccountSeries; }');
+lines.push('export interface SocialBrandNode {');
+lines.push('  name: string;');
+lines.push('  platforms: Partial<Record<string, SocialBrandPlatform>>;');
+lines.push('}');
+lines.push('export const socialBrandData: SocialBrandNode[] = [');
+
+var brandIdx = 0;
+for (var brandEntry of brandMap) {
+  var bName = brandEntry[0];
+  var bPlatforms = brandEntry[1];
+  var prefix = brandIdx > 0 ? ',' : '';
+  lines.push(prefix + '  {');
+  lines.push('    "name": ' + JSON.stringify(bName) + ',');
+  lines.push('    "platforms": {');
+
+  var platIdx = 0;
+  for (var platEntry of bPlatforms) {
+    var pName = platEntry[0];
+    var pAccounts = platEntry[1];
+    var platPrefix = platIdx > 0 ? ',' : '';
+    lines.push('      ' + platPrefix + JSON.stringify(pName) + ': {');
+
+    var accIdx = 0;
+    for (var accEntry of pAccounts) {
+      var aName = accEntry[0];
+      var aSeries = accEntry[1];
+      var sorted = aSeries.slice().sort(function(x, y) {
+        return x.month < y.month ? -1 : x.month > y.month ? 1 : 0;
+      });
+      var accPrefix = accIdx > 0 ? ',' : '';
+      lines.push('        ' + accPrefix + JSON.stringify(aName) + ': {');
+      lines.push('          "handle": ' + JSON.stringify(aName) + ',');
+      lines.push('          "series": [');
+      for (var si = 0; si < sorted.length; si++) {
+        var sp = sorted[si];
+        var spPrefix = si > 0 ? ',' : '';
+        lines.push('            ' + spPrefix + '{ "month": ' + JSON.stringify(sp.month) + ', "value": ' + sp.value + ' }');
+      }
+      lines.push('          ]');
+      lines.push('        }');
+      accIdx++;
+    }
+
+    lines.push('      }');
+    platIdx++;
+  }
+
+  lines.push('    }');
+  lines.push('  }');
+  brandIdx++;
+}
+
+lines.push('];');
+lines.push('');
+
+var tsContent = lines.join('\n');
+fs.writeFileSync(MOCK_DATA_PATH, tsContent, 'utf8');
+console.log('Mock data saved: ' + MOCK_DATA_PATH);
+
+// Stats
+var platformCounts = {};
+for (var ri = 0; ri < outputRows.length; ri++) {
+  var p = outputRows[ri][0];
+  platformCounts[p] = (platformCounts[p] || 0) + 1;
+}
+console.log('\nRows per platform:');
+Object.keys(platformCounts).sort(function(a, b) { return platformCounts[b] - platformCounts[a]; }).forEach(function(p) {
+  console.log('  ' + p + ': ' + platformCounts[p]);
 });
+
+var totalAccounts = 0;
+for (var bv of brandMap.values()) {
+  for (var pv of bv.values()) {
+    totalAccounts += pv.size;
+  }
+}
+console.log('\nBrands: ' + brandMap.size);
+console.log('Total accounts: ' + totalAccounts);

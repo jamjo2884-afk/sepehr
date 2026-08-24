@@ -31,6 +31,12 @@ export interface SocialMetricImportRow {
   errors: string[];
   /** User-resolved account ID (set when user picks from ambiguous/unmatched). */
   resolvedAccountId?: string | null;
+  /** Account display name from source file (used for account creation). */
+  brand?: string;
+  /** Account URL from source file. */
+  link?: string | null;
+  /** Account status from source file (فعال/غیر فعال/راکد). */
+  sourceStatus?: string | null;
 }
 
 /** A row with the account matched for preview display. */
