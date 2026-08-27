@@ -23,10 +23,6 @@ export function SettingsLayout() {
     hydrateFromServer();
   }, [hydrateFromServer]);
 
-  // Derive platform counts from the settings store for now; in a future
-  // phase this would come from a server-side data source.
-  const platformCounts = useSettingsStore(() => ({}));
-
   const content = useMemo(() => {
     if (isLoading) {
       return (
@@ -45,7 +41,7 @@ export function SettingsLayout() {
       case 'appearance':
         return <AppearanceSettings />;
       case 'social':
-        return <SocialSettings platformCounts={platformCounts} />;
+        return <SocialSettings />;
       case 'notifications':
         return (
           <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-center">
@@ -57,7 +53,7 @@ export function SettingsLayout() {
       case 'system':
         return <SystemSettings />;
     }
-  }, [activeCategory, platformCounts, isLoading]);
+  }, [activeCategory, isLoading]);
 
   return (
     <motion.div

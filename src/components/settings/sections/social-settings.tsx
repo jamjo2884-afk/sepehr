@@ -1,91 +1,285 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { SettingsSection } from '@/components/settings/settings-section';
-import { SOCIAL_PLATFORM_LABELS, SOCIAL_PLATFORM_BRAND } from '@/types/domain';
-import type { SocialPlatform } from '@/types/domain';
-import { PLATFORM_METRIC_FIELDS } from '@/constants/social-fields';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
+import type { SocialPlatform } from '@/types/domain';
+import {
+  CheckCircle2,
+  AlertCircle,
+  XCircle,
+  Clock,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-interface SocialSettingsProps {
-  /** Platform account counts keyed by platform key. */
-  platformCounts?: Partial<Record<SocialPlatform, number>>;
+interface PlatformData {
+  id: SocialPlatform;
+  label: string;
+  color: string;
+  brandName: string;
+  accountCount: number;
+  connectedCount: number;
+  errorCount: number;
+  disconnectedCount: number;
+  credentialConfigured: boolean;
+  credentialStatus: string;
+  lastSyncAt: string | null;
+  lastSyncStatus: string | null;
+  metricCount: number;
 }
 
-const ALL_PLATFORMS: SocialPlatform[] = [
-  'instagram',
-  'telegram',
-  'youtube',
-  'twitter',
-  'bale',
-  'eita',
-  'rubika',
-  'rubino',
-  'soroushplus',
-  'aparat',
-  'threads',
-  'clubhouse',
-  'shad',
-  'igap',
-  'site',
-  'gap',
-  'virasty',
-  'facebook',
-];
+interface SocialSettingsResponse {
+  ok: boolean;
+  platforms?: PlatformData[];
+  errorCode?: string;
+  errorMessage?: string;
+}
 
-export function SocialSettings({ platformCounts = {} }: SocialSettingsProps) {
-  const sortedPlatforms = useMemo(() => {
-    return [...ALL_PLATFORMS].sort((a, b) => {
-      const ca = platformCounts[a] ?? 0;
-      const cb = platformCounts[b] ?? 0;
-      return cb - ca;
-    });
-  }, [platformCounts]);
+/** Format a relative time string in Persian. */
+function timeAgo(isoDate: string | null): string {
+  if (!isoDate) return 'هنوز همگام‌سازی نشده';
+  const now = Date.now();
+  const then = new Date(isoDate).getTime();
+  if (Number.isNaN(then)) return 'هنوز همگام‌سازی نشده';
+  const diffMs = now - then;
+  if (diffMs < 0) return 'همین الان';
+  const seconds = Math.floor(diffMs / 1000);
+  if (seconds < 60) return `${seconds} ثانیه پیش`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} دقیقه پیش`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ساعت پیش`;
+  const days = Math.floor(hours / 24);
+  return `${days} روز پیش`;
+}
+
+/** Status badge for a platform. */
+function StatusDot({ status }: { status: 'active' | 'error' | 'inactive' }) {
+  const colors = {
+    active: 'bg-emerald-500',
+    error: 'bg-red-500',
+    inactive: 'bg-muted-foreground/40',
+  };
+  return (
+    <span
+      className={cn('inline-block h-2 w-2 rounded-full', colors[status])}
+    />
+  );
+}
+
+/** Loading skeleton for platform rows. */
+function PlatformSkeleton() {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-3 animate-pulse">
+      <div className="h-8 w-8 rounded-md bg-muted" />
+      <div className="flex flex-1 flex-col gap-1.5">
+        <div className="h-3.5 w-20 rounded bg-muted" />
+        <div className="h-2.5 w-32 rounded bg-muted" />
+      </div>
+      <div className="h-4 w-4 rounded-full bg-muted" />
+    </div>
+  );
+}
+
+export function SocialSettings() {
+  const [platforms, setPlatforms] = useState<PlatformData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPlatforms = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/settings/social');
+      const data: SocialSettingsResponse = await res.json();
+      if (data.ok && data.platforms) {
+        setPlatforms(data.platforms);
+      } else {
+        setError(data.errorMessage ?? 'خطا در بارگذاری اطلاعات.');
+      }
+    } catch {
+      setError('خطا در اتصال به سرور.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPlatforms();
+  }, [fetchPlatforms]);
+
+  const activePlatforms = platforms.filter((p) => p.accountCount > 0);
+  const availablePlatforms = platforms.filter((p) => p.accountCount === 0);
 
   return (
     <SettingsSection
       title="شبکه‌های اجتماعی"
-      description="وضعیت پلتفرم‌ها و شاخص‌های قابل ثبت"
+      description="مدیریت وضعیت و تنظیمات شبکه‌های اجتماعی"
     >
-      <div className="flex flex-col gap-2">
-        {sortedPlatforms.map((platform) => {
-          const count = platformCounts[platform] ?? 0;
-          const brand = SOCIAL_PLATFORM_BRAND[platform];
-          const metrics = PLATFORM_METRIC_FIELDS[platform];
+      {/* Header stats */}
+      {!loading && platforms.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-3">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-2">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+            <span className="text-xs text-muted-foreground">
+              {activePlatforms.length} شبکه فعال
+            </span>
+          </div>
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-2">
+            <Wifi className="h-3.5 w-3.5 text-blue-500" />
+            <span className="text-xs text-muted-foreground">
+              {platforms.reduce((s, p) => s + p.connectedCount, 0)} حساب متصل
+            </span>
+          </div>
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-2">
+            <span className="text-xs text-muted-foreground">
+              {platforms.reduce((s, p) => s + p.accountCount, 0)} حساب کل
+            </span>
+          </div>
+        </div>
+      )}
 
-          return (
-            <div
-              key={platform}
-              className="flex items-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-3"
-            >
-              <SocialPlatformIcon
-                platform={platform}
-                className="h-8 w-8 rounded-md"
-                iconClassName="h-4 w-4"
-              />
-              <div className="flex flex-1 flex-col gap-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">
-                    {SOCIAL_PLATFORM_LABELS[platform]}
-                  </span>
-                  {count > 0 && (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                      {count} اکانت
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {metrics.length} شاخص قابل ثبت
-                </span>
-              </div>
-              <div
-                className="h-3 w-3 rounded-full"
-                style={{ backgroundColor: brand.color, opacity: 0.8 }}
-              />
-            </div>
-          );
-        })}
-      </div>
+      {/* Loading */}
+      {loading && (
+        <div className="flex flex-col gap-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <PlatformSkeleton key={i} />
+          ))}
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div className="flex flex-col items-center gap-3 py-8 text-center">
+          <XCircle className="h-8 w-8 text-destructive" />
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <button
+            type="button"
+            onClick={fetchPlatforms}
+            className="flex items-center gap-1.5 rounded-md bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+          >
+            <RefreshCw className="h-3 w-3" />
+            تلاش مجدد
+          </button>
+        </div>
+      )}
+
+      {/* Platform list */}
+      {!loading && !error && (
+        <div className="flex flex-col gap-2">
+          {/* Active platforms */}
+          {activePlatforms.length > 0 && (
+            <>
+              <p className="text-xs font-medium text-muted-foreground px-1 pt-1">
+                شبکه‌های دارای حساب
+              </p>
+              {activePlatforms.map((platform) => (
+                <PlatformRow key={platform.id} platform={platform} />
+              ))}
+            </>
+          )}
+
+          {/* Available but unused platforms */}
+          {availablePlatforms.length > 0 && (
+            <>
+              <p className="text-xs font-medium text-muted-foreground px-1 pt-3">
+                شبکه‌های در دسترس
+              </p>
+              {availablePlatforms.map((platform) => (
+                <PlatformRow key={platform.id} platform={platform} />
+              ))}
+            </>
+          )}
+        </div>
+      )}
     </SettingsSection>
+  );
+}
+
+function PlatformRow({ platform }: { platform: PlatformData }) {
+  // Determine overall platform status
+  const platformStatus: 'active' | 'error' | 'inactive' =
+    platform.errorCount > 0
+      ? 'error'
+      : platform.connectedCount > 0
+        ? 'active'
+        : 'inactive';
+
+  // Determine sync status text
+  let syncText: string;
+  if (platform.lastSyncAt) {
+    syncText = timeAgo(platform.lastSyncAt);
+  } else if (platform.accountCount === 0) {
+    syncText = platform.credentialStatus;
+  } else {
+    syncText = 'هنوز همگام‌سازی نشده';
+  }
+
+  // Sync status icon
+  let SyncIcon = Clock;
+  let syncColor = 'text-muted-foreground';
+  if (platform.lastSyncStatus === 'success') {
+    SyncIcon = CheckCircle2;
+    syncColor = 'text-emerald-500';
+  } else if (platform.lastSyncStatus === 'error') {
+    SyncIcon = AlertCircle;
+    syncColor = 'text-red-500';
+  }
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-3 transition-colors hover:bg-surface/80">
+      {/* Platform icon */}
+      <SocialPlatformIcon
+        platform={platform.id}
+        className="h-9 w-9 shrink-0 rounded-lg"
+        iconClassName="h-4.5 w-4.5"
+      />
+
+      {/* Platform info */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-foreground">
+            {platform.label}
+          </span>
+          <StatusDot status={platformStatus} />
+          {platform.accountCount > 0 && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+              {platform.accountCount} حساب
+            </span>
+          )}
+        </div>
+        <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+          {/* Sync status */}
+          <span className="flex items-center gap-1">
+            <SyncIcon className={cn('h-3 w-3 shrink-0', syncColor)} />
+            {syncText}
+          </span>
+
+          {/* Credential status */}
+          {platform.accountCount > 0 && (
+            <span className="flex items-center gap-1">
+              {platform.credentialConfigured ? (
+                <Wifi className="h-3 w-3 shrink-0 text-emerald-500" />
+              ) : (
+                <WifiOff className="h-3 w-3 shrink-0 text-amber-500" />
+              )}
+              {platform.credentialConfigured ? 'متصل' : 'تنظیم نشده'}
+            </span>
+          )}
+
+          {/* Metric count */}
+          <span>{platform.metricCount} شاخص</span>
+        </div>
+      </div>
+
+      {/* Brand color indicator */}
+      <div
+        className="h-3 w-3 shrink-0 rounded-full"
+        style={{ backgroundColor: platform.color, opacity: 0.8 }}
+      />
+    </div>
   );
 }
