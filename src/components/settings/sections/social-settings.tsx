@@ -12,6 +12,7 @@ import {
   Wifi,
   WifiOff,
   RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -20,6 +21,7 @@ interface PlatformData {
   label: string;
   color: string;
   brandName: string;
+  enabled: boolean;
   accountCount: number;
   connectedCount: number;
   errorCount: number;
@@ -56,7 +58,7 @@ function timeAgo(isoDate: string | null): string {
   return `${days} روز پیش`;
 }
 
-/** Status badge for a platform. */
+/** Status dot for a platform. */
 function StatusDot({ status }: { status: 'active' | 'error' | 'inactive' }) {
   const colors = {
     active: 'bg-emerald-500',
@@ -74,13 +76,47 @@ function StatusDot({ status }: { status: 'active' | 'error' | 'inactive' }) {
 function PlatformSkeleton() {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-3 animate-pulse">
-      <div className="h-8 w-8 rounded-md bg-muted" />
+      <div className="h-9 w-9 rounded-lg bg-muted" />
       <div className="flex flex-1 flex-col gap-1.5">
         <div className="h-3.5 w-20 rounded bg-muted" />
         <div className="h-2.5 w-32 rounded bg-muted" />
       </div>
-      <div className="h-4 w-4 rounded-full bg-muted" />
+      <div className="h-6 w-11 rounded-full bg-muted" />
     </div>
+  );
+}
+
+/** Toggle switch component. */
+function Toggle({
+  checked,
+  onChange,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={onChange}
+      className={cn(
+        'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        checked ? 'bg-primary' : 'bg-muted',
+      )}
+    >
+      <span
+        className={cn(
+          'pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform',
+          checked ? 'translate-x-1 rtl:-translate-x-1' : 'translate-x-6 rtl:-translate-x-6',
+        )}
+      />
+    </button>
   );
 }
 
@@ -88,6 +124,9 @@ export function SocialSettings() {
   const [platforms, setPlatforms] = useState<PlatformData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [togglingMap, setTogglingMap] = useState<
+    Record<string, boolean>
+  >({});
 
   const fetchPlatforms = useCallback(async () => {
     setLoading(true);
@@ -111,6 +150,49 @@ export function SocialSettings() {
     fetchPlatforms();
   }, [fetchPlatforms]);
 
+  /** Toggle a platform's enabled state with optimistic update. */
+  const handleToggle = useCallback(
+    async (platformId: SocialPlatform, currentEnabled: boolean) => {
+      const newEnabled = !currentEnabled;
+
+      // Optimistic update
+      setPlatforms((prev) =>
+        prev.map((p) =>
+          p.id === platformId ? { ...p, enabled: newEnabled } : p,
+        ),
+      );
+      setTogglingMap((prev) => ({ ...prev, [platformId]: true }));
+
+      try {
+        const res = await fetch('/api/settings/social/platform', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: platformId, enabled: newEnabled }),
+        });
+        const data = await res.json();
+
+        if (!data.ok) {
+          // Rollback on failure
+          setPlatforms((prev) =>
+            prev.map((p) =>
+              p.id === platformId ? { ...p, enabled: currentEnabled } : p,
+            ),
+          );
+        }
+      } catch {
+        // Rollback on network error
+        setPlatforms((prev) =>
+          prev.map((p) =>
+            p.id === platformId ? { ...p, enabled: currentEnabled } : p,
+          ),
+        );
+      } finally {
+        setTogglingMap((prev) => ({ ...prev, [platformId]: false }));
+      }
+    },
+    [],
+  );
+
   const activePlatforms = platforms.filter((p) => p.accountCount > 0);
   const availablePlatforms = platforms.filter((p) => p.accountCount === 0);
 
@@ -125,7 +207,7 @@ export function SocialSettings() {
           <div className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-2">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
             <span className="text-xs text-muted-foreground">
-              {activePlatforms.length} شبکه فعال
+              {platforms.filter((p) => p.enabled).length} شبکه فعال
             </span>
           </div>
           <div className="flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-2">
@@ -177,7 +259,12 @@ export function SocialSettings() {
                 شبکه‌های دارای حساب
               </p>
               {activePlatforms.map((platform) => (
-                <PlatformRow key={platform.id} platform={platform} />
+                <PlatformRow
+                  key={platform.id}
+                  platform={platform}
+                  toggling={togglingMap[platform.id] ?? false}
+                  onToggle={handleToggle}
+                />
               ))}
             </>
           )}
@@ -189,7 +276,12 @@ export function SocialSettings() {
                 شبکه‌های در دسترس
               </p>
               {availablePlatforms.map((platform) => (
-                <PlatformRow key={platform.id} platform={platform} />
+                <PlatformRow
+                  key={platform.id}
+                  platform={platform}
+                  toggling={togglingMap[platform.id] ?? false}
+                  onToggle={handleToggle}
+                />
               ))}
             </>
           )}
@@ -199,18 +291,30 @@ export function SocialSettings() {
   );
 }
 
-function PlatformRow({ platform }: { platform: PlatformData }) {
+function PlatformRow({
+  platform,
+  toggling,
+  onToggle,
+}: {
+  platform: PlatformData;
+  toggling: boolean;
+  onToggle: (id: SocialPlatform, currentEnabled: boolean) => void;
+}) {
   // Determine overall platform status
   const platformStatus: 'active' | 'error' | 'inactive' =
-    platform.errorCount > 0
-      ? 'error'
-      : platform.connectedCount > 0
-        ? 'active'
-        : 'inactive';
+    !platform.enabled
+      ? 'inactive'
+      : platform.errorCount > 0
+        ? 'error'
+        : platform.connectedCount > 0
+          ? 'active'
+          : 'inactive';
 
   // Determine sync status text
   let syncText: string;
-  if (platform.lastSyncAt) {
+  if (!platform.enabled) {
+    syncText = 'غیرفعال';
+  } else if (platform.lastSyncAt) {
     syncText = timeAgo(platform.lastSyncAt);
   } else if (platform.accountCount === 0) {
     syncText = platform.credentialStatus;
@@ -230,7 +334,12 @@ function PlatformRow({ platform }: { platform: PlatformData }) {
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-3 transition-colors hover:bg-surface/80">
+    <div
+      className={cn(
+        'flex items-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-3 transition-colors hover:bg-surface/80',
+        !platform.enabled && 'opacity-60',
+      )}
+    >
       {/* Platform icon */}
       <SocialPlatformIcon
         platform={platform.id}
@@ -259,7 +368,7 @@ function PlatformRow({ platform }: { platform: PlatformData }) {
           </span>
 
           {/* Credential status */}
-          {platform.accountCount > 0 && (
+          {platform.accountCount > 0 && platform.enabled && (
             <span className="flex items-center gap-1">
               {platform.credentialConfigured ? (
                 <Wifi className="h-3 w-3 shrink-0 text-emerald-500" />
@@ -275,11 +384,17 @@ function PlatformRow({ platform }: { platform: PlatformData }) {
         </div>
       </div>
 
-      {/* Brand color indicator */}
-      <div
-        className="h-3 w-3 shrink-0 rounded-full"
-        style={{ backgroundColor: platform.color, opacity: 0.8 }}
-      />
+      {/* Toggle */}
+      <div className="flex shrink-0 items-center gap-2">
+        {toggling && (
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+        )}
+        <Toggle
+          checked={platform.enabled}
+          onChange={() => onToggle(platform.id, platform.enabled)}
+          disabled={toggling}
+        />
+      </div>
     </div>
   );
 }

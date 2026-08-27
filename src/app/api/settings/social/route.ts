@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSyncOverview } from '@/services/social-sync.service';
+import { getPlatformSettings } from '@/services/settings/platform-settings.service';
 import {
   SOCIAL_PLATFORM_LABELS,
   SOCIAL_PLATFORM_BRAND,
@@ -28,7 +29,18 @@ import { PLATFORM_METRIC_FIELDS } from '@/constants/social-fields';
  */
 export async function GET(): Promise<NextResponse> {
   try {
-    const overview = await getSyncOverview();
+    const [overview, platformSettings] = await Promise.all([
+      getSyncOverview(),
+      getPlatformSettings(),
+    ]);
+
+    // Build a map of enabled state per platform
+    const enabledMap = new Map<SocialPlatform, boolean>();
+    if (platformSettings.ok) {
+      for (const s of platformSettings.settings) {
+        enabledMap.set(s.platform, s.enabled);
+      }
+    }
 
     // Build a map of last sync info per platform from the latest logs
     const lastSyncByPlatform = new Map<
@@ -76,6 +88,7 @@ export async function GET(): Promise<NextResponse> {
         label: SOCIAL_PLATFORM_LABELS[platform],
         color: brand.color,
         brandName: brand.name,
+        enabled: enabledMap.get(platform) ?? true,
         accountCount,
         connectedCount: syncInfo?.connected ?? 0,
         errorCount: syncInfo?.error ?? 0,
