@@ -76,7 +76,7 @@ export function PlatformBreakdownChart({
         ))}
       </div>
 
-      <ChartContainer config={chartConfig} className="h-[300px] w-full">
+      <ChartContainer config={chartConfig} className="h-[300px] w-full" style={{ direction: 'ltr' }}>
         <BarChart
           data={data}
           layout="vertical"
@@ -86,11 +86,11 @@ export function PlatformBreakdownChart({
           <YAxis
             type="category"
             dataKey="label"
-            width={84}
+            width={110}
             tickLine={false}
             axisLine={false}
             tickMargin={8}
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 11, textAnchor: 'end' }}
           />
           <ChartTooltip
             cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }}
