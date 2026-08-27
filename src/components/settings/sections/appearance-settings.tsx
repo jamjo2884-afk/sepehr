@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSettingsStore } from '@/stores/settings.store';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { SettingsRow } from '@/components/settings/settings-row';
@@ -23,6 +23,11 @@ export function AppearanceSettings() {
   const { appearance, updateAppearance } = useSettingsStore();
   const [local, setLocal] = useState({ ...appearance });
   const [saved, setSaved] = useState(false);
+
+  // Sync local state when store hydrates from Supabase
+  useEffect(() => {
+    setLocal({ ...appearance });
+  }, [appearance.theme, appearance.density]);
 
   const hasChanges =
     local.theme !== appearance.theme || local.density !== appearance.density;

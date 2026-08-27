@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSettingsStore } from '@/stores/settings.store';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { SettingsRow } from '@/components/settings/settings-row';
@@ -26,6 +26,11 @@ export function GeneralSettings() {
   const { general, updateGeneral } = useSettingsStore();
   const [local, setLocal] = useState({ ...general });
   const [saved, setSaved] = useState(false);
+
+  // Sync local state when store hydrates from Supabase
+  useEffect(() => {
+    setLocal({ ...general });
+  }, [general.workspaceName, general.timezone, general.dateFormat]);
 
   const hasChanges =
     local.workspaceName !== general.workspaceName ||

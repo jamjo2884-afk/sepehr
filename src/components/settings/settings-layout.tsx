@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 import type { SettingsCategory } from '@/types/settings';
 import { useSettingsStore } from '@/stores/settings.store';
 import { SettingsSidebar } from '@/components/settings/settings-sidebar';
@@ -14,11 +15,30 @@ export function SettingsLayout() {
   const [activeCategory, setActiveCategory] =
     useState<SettingsCategory>('general');
 
+  const hydrateFromServer = useSettingsStore((s) => s.hydrateFromServer);
+  const isLoading = useSettingsStore((s) => s.isLoading);
+
+  // Hydrate settings from Supabase on mount
+  useEffect(() => {
+    hydrateFromServer();
+  }, [hydrateFromServer]);
+
   // Derive platform counts from the settings store for now; in a future
   // phase this would come from a server-side data source.
   const platformCounts = useSettingsStore(() => ({}));
 
   const content = useMemo(() => {
+    if (isLoading) {
+      return (
+        <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-center">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">
+            در حال بارگذاری تنظیمات...
+          </p>
+        </div>
+      );
+    }
+
     switch (activeCategory) {
       case 'general':
         return <GeneralSettings />;
@@ -37,7 +57,7 @@ export function SettingsLayout() {
       case 'system':
         return <SystemSettings />;
     }
-  }, [activeCategory, platformCounts]);
+  }, [activeCategory, platformCounts, isLoading]);
 
   return (
     <motion.div
@@ -68,7 +88,7 @@ export function SettingsLayout() {
 
         {/* Content */}
         <div className="min-w-0 flex-1">
-          <div className="rounded-xl border border-border bg-surface/60 p-6">
+          <div className="relative rounded-xl border border-border bg-surface/60 p-6">
             {content}
           </div>
         </div>
