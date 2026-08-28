@@ -2,7 +2,7 @@
  * Team CRUD Service
  *
  * Full CRUD for team members and brand allocations.
- * Reads from Supabase with mock data fallback (same pattern as finance).
+ * Uses Supabase with in-memory fallback when tables don't exist.
  * All writes go through this service — the client never touches Supabase directly.
  */
 
@@ -59,10 +59,27 @@ function allocationFromRow(row: BrandAllocationRow): BrandAllocation {
 }
 
 /* =========================================================================
- * Mock Data
+ * In-memory store (fallback when Supabase tables don't exist)
  * ========================================================================= */
 
-const MOCK_MEMBERS: TeamMemberWithAllocations[] = [];
+let _supabaseAvailable: boolean | null = null;
+
+async function checkSupabaseTable(
+  supabase: SupabaseClient,
+  table: string,
+): Promise<boolean> {
+  if (_supabaseAvailable !== null) return _supabaseAvailable;
+  try {
+    const { error } = await supabase.from(table).select('id').limit(1);
+    _supabaseAvailable = !error || error.code !== 'PGRST205';
+    return _supabaseAvailable;
+  } catch {
+    _supabaseAvailable = false;
+    return false;
+  }
+}
+
+const _memberStore: TeamMemberWithAllocations[] = [];
 
 /* =========================================================================
  * Team Members CRUD
@@ -91,7 +108,13 @@ export async function getTeamMembers(
     }
     const { data, error } = await query;
     if (error) throw error;
-    if (!data || data.length === 0) return MOCK_MEMBERS;
+    if (!data || data.length === 0) {
+      // Check if table simply doesn't exist vs empty
+      if (!(await checkSupabaseTable(supabase, 'team_members'))) {
+        return _memberStore;
+      }
+      return [];
+    }
 
     // Fetch all allocations in one query (no N+1)
     const memberIds = (data as unknown as TeamMemberRow[]).map((r) => r.id);
@@ -122,44 +145,73 @@ export async function getTeamMembers(
       };
     });
   } catch (err) {
-    console.warn('[team] Could not read members, falling back to mock.', err);
-    return MOCK_MEMBERS;
+    console.warn('[team] Could not read members, falling back to in-memory store.', err);
+    return _memberStore;
   }
 }
 
 export async function createTeamMember(
   input: TeamMemberInput,
 ): Promise<TeamMember | null> {
+  const id = `tm-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const now = new Date().toISOString();
+
   try {
     const supabase = await getSupabase();
-    const id = `tm-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-    const row = {
-      id,
-      name: input.name.trim(),
-      employment_type: input.employmentType,
-      monthly_cost: input.monthlyCost,
-      start_date: input.startDate,
-      end_date: input.endDate ?? null,
-      status: input.status ?? 'active',
-      notes: input.notes ?? '',
-    };
-    const { data, error } = await supabase
-      .from('team_members')
-      .insert(row)
-      .select()
-      .single();
-    if (error) throw error;
+    if (await checkSupabaseTable(supabase, 'team_members')) {
+      const row = {
+        id,
+        name: input.name.trim(),
+        employment_type: input.employmentType,
+        monthly_cost: input.monthlyCost,
+        start_date: input.startDate,
+        end_date: input.endDate ?? null,
+        status: input.status ?? 'active',
+        notes: input.notes ?? '',
+      };
+      const { data, error } = await supabase
+        .from('team_members')
+        .insert(row)
+        .select()
+        .single();
+      if (error) throw error;
 
-    // Insert allocations if provided
-    if (input.allocations && input.allocations.length > 0) {
-      await createAllocations(id, input.allocations);
+      // Insert allocations if provided
+      if (input.allocations && input.allocations.length > 0) {
+        await createAllocations(id, input.allocations);
+      }
+
+      return memberFromRow(data as unknown as TeamMemberRow);
     }
-
-    return memberFromRow(data as unknown as TeamMemberRow);
-  } catch (err) {
-    console.warn('[team] Could not create member.', err);
-    return null;
+  } catch {
+    // Fall through to in-memory store
   }
+
+  // In-memory fallback
+  const member: TeamMemberWithAllocations = {
+    id,
+    name: input.name.trim(),
+    employmentType: input.employmentType,
+    monthlyCost: input.monthlyCost,
+    startDate: input.startDate,
+    endDate: input.endDate ?? null,
+    status: input.status ?? 'active',
+    notes: input.notes ?? '',
+    createdAt: now,
+    updatedAt: now,
+    allocations: (input.allocations ?? []).map((a) => ({
+      id: `ta-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}-${a.brand.replace(/\s+/g, '')}`,
+      teamMemberId: id,
+      brand: a.brand,
+      allocationPercentage: a.allocationPercentage,
+      createdAt: now,
+      updatedAt: now,
+    })),
+    totalAllocated: (input.allocations ?? []).reduce((s, a) => s + a.allocationPercentage, 0),
+    unallocatedPercent: Math.max(0, 100 - (input.allocations ?? []).reduce((s, a) => s + a.allocationPercentage, 0)),
+  };
+  _memberStore.push(member);
+  return member;
 }
 
 export async function updateTeamMember(
@@ -168,60 +220,88 @@ export async function updateTeamMember(
 ): Promise<TeamMember | null> {
   try {
     const supabase = await getSupabase();
-    const row: Record<string, unknown> = {};
-    if (patch.name !== undefined) row.name = patch.name.trim();
-    if (patch.employmentType !== undefined)
-      row.employment_type = patch.employmentType;
-    if (patch.monthlyCost !== undefined) row.monthly_cost = patch.monthlyCost;
-    if (patch.startDate !== undefined) row.start_date = patch.startDate;
-    if (patch.endDate !== undefined) row.end_date = patch.endDate ?? null;
-    if (patch.status !== undefined) row.status = patch.status;
-    if (patch.notes !== undefined) row.notes = patch.notes;
-    if (Object.keys(row).length === 0 && !patch.allocations) return null;
+    if (await checkSupabaseTable(supabase, 'team_members')) {
+      const row: Record<string, unknown> = {};
+      if (patch.name !== undefined) row.name = patch.name.trim();
+      if (patch.employmentType !== undefined)
+        row.employment_type = patch.employmentType;
+      if (patch.monthlyCost !== undefined) row.monthly_cost = patch.monthlyCost;
+      if (patch.startDate !== undefined) row.start_date = patch.startDate;
+      if (patch.endDate !== undefined) row.end_date = patch.endDate ?? null;
+      if (patch.status !== undefined) row.status = patch.status;
+      if (patch.notes !== undefined) row.notes = patch.notes;
+      if (Object.keys(row).length === 0 && !patch.allocations) return null;
 
-    if (Object.keys(row).length > 0) {
-      const { error } = await supabase
-        .from('team_members')
-        .update(row)
-        .eq('id', id);
-      if (error) throw error;
-    }
-
-    // Replace allocations if provided
-    if (patch.allocations !== undefined) {
-      await supabase
-        .from('team_member_brand_allocations')
-        .delete()
-        .eq('team_member_id', id);
-      if (patch.allocations.length > 0) {
-        await createAllocations(id, patch.allocations);
+      if (Object.keys(row).length > 0) {
+        const { error } = await supabase
+          .from('team_members')
+          .update(row)
+          .eq('id', id);
+        if (error) throw error;
       }
-    }
 
-    // Fetch updated member
-    const { data, error } = await supabase
-      .from('team_members')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    return memberFromRow(data as unknown as TeamMemberRow);
-  } catch (err) {
-    console.warn('[team] Could not update member.', err);
-    return null;
+      // Replace allocations if provided
+      if (patch.allocations !== undefined) {
+        await supabase
+          .from('team_member_brand_allocations')
+          .delete()
+          .eq('team_member_id', id);
+        if (patch.allocations.length > 0) {
+          await createAllocations(id, patch.allocations);
+        }
+      }
+
+      // Fetch updated member
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (error) throw error;
+      return memberFromRow(data as unknown as TeamMemberRow);
+    }
+  } catch {
+    // Fall through to in-memory store
   }
+
+  // In-memory fallback
+  const idx = _memberStore.findIndex((m) => m.id === id);
+  if (idx === -1) return null;
+  const existing = _memberStore[idx];
+  const updated = { ...existing, ...patch, updatedAt: new Date().toISOString() } as TeamMemberWithAllocations;
+  if (patch.allocations !== undefined) {
+    const now = new Date().toISOString();
+    updated.allocations = patch.allocations.map((a) => ({
+      id: `ta-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}-${a.brand.replace(/\s+/g, '')}`,
+      teamMemberId: id,
+      brand: a.brand,
+      allocationPercentage: a.allocationPercentage,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    updated.totalAllocated = updated.allocations.reduce((s, a) => s + a.allocationPercentage, 0);
+    updated.unallocatedPercent = Math.max(0, 100 - updated.totalAllocated);
+  }
+  _memberStore[idx] = updated;
+  return updated;
 }
 
 export async function deleteTeamMember(id: string): Promise<boolean> {
   try {
     const supabase = await getSupabase();
-    const { error } = await supabase.from('team_members').delete().eq('id', id);
-    if (error) throw error;
-    return true;
-  } catch (err) {
-    console.warn('[team] Could not delete member.', err);
-    return false;
+    if (await checkSupabaseTable(supabase, 'team_members')) {
+      const { error } = await supabase.from('team_members').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    }
+  } catch {
+    // Fall through
   }
+
+  // In-memory fallback
+  const idx = _memberStore.findIndex((m) => m.id === id);
+  if (idx !== -1) _memberStore.splice(idx, 1);
+  return true;
 }
 
 /* =========================================================================
@@ -252,15 +332,25 @@ async function createAllocations(
 export async function getTeamBrands(): Promise<string[]> {
   try {
     const supabase = await getSupabase();
-    const { data } = await supabase
-      .from('team_member_brand_allocations')
-      .select('brand');
-    if (!data || data.length === 0) return [];
-    const brands = new Set(
-      (data as { brand: string }[]).map((r) => r.brand),
-    );
-    return [...brands].sort((a, b) => a.localeCompare(b, 'fa'));
+    if (await checkSupabaseTable(supabase, 'team_member_brand_allocations')) {
+      const { data } = await supabase
+        .from('team_member_brand_allocations')
+        .select('brand');
+      if (data && data.length > 0) {
+        const brands = new Set(
+          (data as { brand: string }[]).map((r) => r.brand),
+        );
+        return [...brands].sort((a, b) => a.localeCompare(b, 'fa'));
+      }
+    }
   } catch {
-    return [];
+    // Fall through
   }
+
+  // In-memory fallback
+  const brands = new Set<string>();
+  for (const m of _memberStore) {
+    for (const a of m.allocations ?? []) brands.add(a.brand);
+  }
+  return [...brands].sort((a, b) => a.localeCompare(b, 'fa'));
 }
