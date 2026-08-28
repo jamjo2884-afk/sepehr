@@ -8,92 +8,75 @@ import {
   themeSchema,
   densitySchema,
 } from '@/services/settings/settings.service';
+import { withAuth } from '@/lib/route-auth';
 
 /**
  * GET /api/settings
  *
  * Returns the authenticated user's settings, or defaults for demo mode.
  */
-export async function GET(): Promise<NextResponse> {
+export const GET = withAuth(async () => {
   const result = await getUserSettings();
   return NextResponse.json(result, { status: result.ok ? 200 : 500 });
-}
+});
+
+const patchSchema = z.object({
+  workspaceName: z.string().min(1).max(100).optional(),
+  timezone: timezoneSchema.optional(),
+  dateFormat: dateFormatSchema.optional(),
+  theme: themeSchema.optional(),
+  density: densitySchema.optional(),
+  notifications: z.record(z.unknown()).optional(),
+});
 
 /**
  * PATCH /api/settings
  *
- * Partially update user settings. Only the provided fields are merged.
+ * Partially updates the authenticated user's settings.
+ * Merges flat partial fields into the full AppSettings structure.
  */
-const patchSchema = z.object({
-  general: z
-    .object({
-      workspaceName: z
-        .string()
-        .min(1)
-        .max(100)
-        .trim()
-        .optional(),
-      timezone: timezoneSchema.optional(),
-      dateFormat: dateFormatSchema.optional(),
-    })
-    .optional(),
-  appearance: z
-    .object({
-      theme: themeSchema.optional(),
-      density: densitySchema.optional(),
-    })
-    .optional(),
-  notifications: z
-    .object({
-      systemAlerts: z.boolean().optional(),
-      syncErrors: z.boolean().optional(),
-      importantUpdates: z.boolean().optional(),
-    })
-    .optional(),
-});
-
-export async function PATCH(req: Request): Promise<NextResponse> {
+export const PATCH = withAuth(async (req) => {
   let body: unknown;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json(
-      {
-        ok: false,
-        errorCode: 'bad_request',
-        errorMessage: 'درخواست نامعتبر است.',
-      },
+      { ok: false, error: 'درخواست نامعتبر است.' },
       { status: 400 },
     );
   }
 
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        errorCode: 'validation_failed',
-        errorMessage: 'داده‌های ارسالی نامعتبر هستند.',
-      },
-      { status: 400 },
-    );
+    const message = parsed.error.issues[0]?.message ?? 'داده نامعتبر است.';
+    return NextResponse.json({ ok: false, error: message }, { status: 400 });
   }
 
-  // Load current settings, merge with patch, then upsert
+  // Load current settings to merge with
   const current = await getUserSettings();
   if (!current.ok) {
     return NextResponse.json(current, { status: 500 });
   }
 
+  const { settings } = current;
+  const updates = parsed.data;
+
+  // Build the merged AppSettings object
   const merged = {
-    general: { ...current.settings.general, ...parsed.data.general },
-    appearance: { ...current.settings.appearance, ...parsed.data.appearance },
-    notifications: {
-      ...current.settings.notifications,
-      ...parsed.data.notifications,
+    general: {
+      workspaceName: updates.workspaceName ?? settings.general.workspaceName,
+      timezone: updates.timezone ?? settings.general.timezone,
+      dateFormat: updates.dateFormat ?? settings.general.dateFormat,
     },
+    appearance: {
+      theme: updates.theme ?? settings.appearance.theme,
+      density: updates.density ?? settings.appearance.density,
+    },
+    notifications: updates.notifications
+      ? { ...settings.notifications, ...updates.notifications }
+      : settings.notifications,
   };
 
   const result = await upsertUserSettings(merged);
   return NextResponse.json(result, { status: result.ok ? 200 : 500 });
-}
+});

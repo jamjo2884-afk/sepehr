@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFinanceOverview } from '@/services/finance/finance-analytics.service';
+import { withAuth } from '@/lib/route-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,9 +9,7 @@ export const dynamic = 'force-dynamic';
  *
  * Returns the finance overview KPIs (total budget, spent, remaining, etc.).
  */
-export async function GET(
-  req: Request,
-): Promise<NextResponse> {
+export const GET = withAuth(async (req) => {
   try {
     const { searchParams } = new URL(req.url);
     const brand = searchParams.get('brand') || undefined;
@@ -23,4 +22,4 @@ export async function GET(
       { status: 500 },
     );
   }
-}
+});

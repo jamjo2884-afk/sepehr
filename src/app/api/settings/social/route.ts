@@ -7,27 +7,15 @@ import {
 } from '@/types/domain';
 import type { SocialPlatform } from '@/types/domain';
 import { PLATFORM_METRIC_FIELDS } from '@/constants/social-fields';
+import { withAuth } from '@/lib/route-auth';
 
 /**
  * GET /api/settings/social
  *
  * Returns per-platform status information for the Social Settings page.
  * Reuses the existing sync overview infrastructure — no duplicate logic.
- *
- * Response shape:
- * {
- *   ok: true,
- *   platforms: [
- *     {
- *       id, label, color, brandName,
- *       accountCount, connectedCount, errorCount, disconnectedCount,
- *       credentialConfigured, credentialStatus,
- *       lastSyncAt, lastSyncStatus, metricCount
- *     }
- *   ]
- * }
  */
-export async function GET(): Promise<NextResponse> {
+export const GET = withAuth(async () => {
   try {
     const [overview, platformSettings] = await Promise.all([
       getSyncOverview(),
@@ -57,7 +45,7 @@ export async function GET(): Promise<NextResponse> {
       }
     }
 
-    // All 18 platforms — even those with 0 accounts
+    // All platforms
     const ALL_PLATFORMS: SocialPlatform[] = [
       'instagram', 'telegram', 'youtube', 'twitter', 'bale', 'eita',
       'rubika', 'rubino', 'soroushplus', 'aparat', 'threads', 'clubhouse',
@@ -73,7 +61,6 @@ export async function GET(): Promise<NextResponse> {
       const accountCount = syncInfo?.accounts ?? 0;
       const credentialConfigured = syncInfo?.credentialConfigured ?? false;
 
-      // Determine credential status text
       let credentialStatus: string;
       if (credentialConfigured) {
         credentialStatus = 'متصل';
@@ -102,7 +89,6 @@ export async function GET(): Promise<NextResponse> {
       };
     });
 
-    // Sort: platforms with accounts first, then alphabetically
     platformsData.sort((a, b) => {
       if (a.accountCount > 0 && b.accountCount === 0) return -1;
       if (a.accountCount === 0 && b.accountCount > 0) return 1;
@@ -121,4 +107,4 @@ export async function GET(): Promise<NextResponse> {
       { status: 500 },
     );
   }
-}
+});

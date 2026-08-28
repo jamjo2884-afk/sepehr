@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateTeamMember, deleteTeamMember } from '@/services/finance/team.service';
+import { requireAuth } from '@/lib/auth';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   try {
     const body = await request.json();
     // Partial validation — just check allocations if present
@@ -41,6 +45,9 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   try {
     const ok = await deleteTeamMember(params.id);
     if (!ok) {

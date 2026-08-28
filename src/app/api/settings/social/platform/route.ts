@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { updatePlatformSetting } from '@/services/settings/platform-settings.service';
+import { withAuth } from '@/lib/route-auth';
 
 /**
  * PATCH /api/settings/social/platform
@@ -10,7 +11,7 @@ import { updatePlatformSetting } from '@/services/settings/platform-settings.ser
  *
  * Validation is handled by the service (Zod).
  */
-export async function PATCH(req: Request): Promise<NextResponse> {
+export const PATCH = withAuth(async (req) => {
   let body: unknown;
   try {
     body = await req.json();
@@ -35,4 +36,4 @@ export async function PATCH(req: Request): Promise<NextResponse> {
   return NextResponse.json(result, {
     status: result.ok ? 200 : 400,
   });
-}
+});

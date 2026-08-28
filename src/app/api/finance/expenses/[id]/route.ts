@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { updateExpense, deleteExpense } from '@/services/finance/finance.service';
+import { requireAuth } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,9 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -38,6 +42,9 @@ export async function DELETE(
   _req: Request,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   const success = await deleteExpense(params.id);
   if (!success) {
     return NextResponse.json(

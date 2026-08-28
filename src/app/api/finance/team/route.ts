@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getTeamMembers, createTeamMember } from '@/services/finance/team.service';
 import { validateTeamMember } from '@/services/finance/team-validation';
+import { withAuth } from '@/lib/route-auth';
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request) => {
   try {
     const { searchParams } = new URL(request.url);
     const brand = searchParams.get('brand') ?? undefined;
@@ -15,9 +16,9 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request) => {
   try {
     const body = await request.json();
     const result = validateTeamMember(body);
@@ -42,4 +43,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
