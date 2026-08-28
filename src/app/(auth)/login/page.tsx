@@ -2,27 +2,17 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LoginForm } from './login-form';
 
 /**
- * Login page.
- * Redirects to dashboard in demo mode (no session cookie).
- * Shows login form when Supabase session exists.
+ * Login page — always redirects to dashboard.
+ * Auth is handled at the API level (demo user fallback).
  */
 export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Check if there's a Supabase session cookie
-    const hasSession = document.cookie
-      .split(';')
-      .some((c) => c.trim().startsWith('sb-') && c.includes('-auth-token'));
-
-    if (!hasSession) {
-      // Demo mode or no session — redirect to dashboard
-      router.replace('/command-center');
-    }
+    router.replace('/command-center');
   }, [router]);
 
-  return <LoginForm />;
+  return null;
 }
