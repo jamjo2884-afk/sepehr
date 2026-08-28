@@ -1,0 +1,324 @@
+/**
+ * Brand CRUD Service
+ *
+ * Manages brands within a workspace.
+ * Uses Supabase with in-memory fallback when tables don't exist.
+ * All writes go through this service — the client never touches Supabase directly.
+ */
+
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type {
+  Brand,
+  BrandInput,
+  BrandRow,
+  BrandStatus,
+} from '@/types/brand';
+
+/* =========================================================================
+ * Helpers
+ * ========================================================================= */
+
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\u0600-\u06FF-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+async function getSupabase(): Promise<SupabaseClient> {
+  const { supabase } = await import('@/lib/supabase');
+  return supabase;
+}
+
+let _supabaseAvailable: boolean | null = null;
+
+async function checkSupabaseTable(
+  supabase: SupabaseClient,
+  table: string,
+): Promise<boolean> {
+  if (_supabaseAvailable !== null) return _supabaseAvailable;
+  try {
+    const { error } = await supabase.from(table).select('id').limit(1);
+    _supabaseAvailable = !error || error.code !== 'PGRST205';
+    return _supabaseAvailable;
+  } catch {
+    _supabaseAvailable = false;
+    return false;
+  }
+}
+
+/* =========================================================================
+ * In-memory store (fallback when Supabase tables don't exist)
+ * ========================================================================= */
+
+const _memoryStore: Brand[] = [];
+
+/* =========================================================================
+ * Row Mapper
+ * ========================================================================= */
+
+function brandFromRow(row: BrandRow): Brand {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    name: row.name,
+    slug: row.slug,
+    status: row.status as BrandStatus,
+    logoUrl: row.logo_url,
+    color: row.color,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/* =========================================================================
+ * Get Default Workspace ID
+ * ========================================================================= */
+
+async function getDefaultWorkspaceId(supabase: SupabaseClient): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('workspaces')
+      .select('id')
+      .limit(1)
+      .single();
+    if (error || !data) return null;
+    return data.id;
+  } catch {
+    return null;
+  }
+}
+
+/* =========================================================================
+ * Brands CRUD
+ * ========================================================================= */
+
+export async function getBrands(workspaceId?: string): Promise<Brand[]> {
+  try {
+    const supabase = await getSupabase();
+    if (await checkSupabaseTable(supabase, 'brands')) {
+      let query = supabase
+        .from('brands')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (workspaceId) {
+        query = query.eq('workspace_id', workspaceId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      if (data && data.length > 0) {
+        return (data as unknown as BrandRow[]).map(brandFromRow);
+      }
+    }
+  } catch {
+    // Fall through to in-memory store
+  }
+
+  // In-memory fallback
+  if (workspaceId) {
+    return _memoryStore.filter((b) => b.workspaceId === workspaceId);
+  }
+  return [..._memoryStore];
+}
+
+export async function getBrandById(id: string): Promise<Brand | null> {
+  try {
+    const supabase = await getSupabase();
+    if (await checkSupabaseTable(supabase, 'brands')) {
+      const { data, error } = await supabase
+        .from('brands')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (error) throw error;
+      return brandFromRow(data as unknown as BrandRow);
+    }
+  } catch {
+    // Fall through
+  }
+
+  // In-memory fallback
+  return _memoryStore.find((b) => b.id === id) ?? null;
+}
+
+export async function getBrandByName(
+  name: string,
+  workspaceId?: string,
+): Promise<Brand | null> {
+  try {
+    const supabase = await getSupabase();
+    if (await checkSupabaseTable(supabase, 'brands')) {
+      let query = supabase
+        .from('brands')
+        .select('*')
+        .eq('name', name.trim())
+        .single();
+
+      if (workspaceId) {
+        // Add workspace filter via nested condition
+        const { data, error } = await supabase
+          .from('brands')
+          .select('*')
+          .eq('name', name.trim())
+          .eq('workspace_id', workspaceId)
+          .single();
+        if (error) throw error;
+        return brandFromRow(data as unknown as BrandRow);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return brandFromRow(data as unknown as BrandRow);
+    }
+  } catch {
+    // Fall through
+  }
+
+  // In-memory fallback
+  return _memoryStore.find(
+    (b) =>
+      b.name === name.trim() &&
+      (!workspaceId || b.workspaceId === workspaceId),
+  ) ?? null;
+}
+
+export async function createBrand(
+  input: BrandInput,
+  workspaceId?: string,
+): Promise<Brand | null> {
+  const now = new Date().toISOString();
+
+  try {
+    const supabase = await getSupabase();
+    if (await checkSupabaseTable(supabase, 'brands')) {
+      // Get workspace ID if not provided
+      let wsId: string | undefined = workspaceId;
+      if (!wsId) {
+        const found = await getDefaultWorkspaceId(supabase);
+        if (!found) {
+          console.warn('[brand] No workspace found for brand creation.');
+          return null;
+        }
+        wsId = found;
+      }
+
+      const slug = input.slug || generateSlug(input.name);
+      const row = {
+        workspace_id: wsId,
+        name: input.name.trim(),
+        slug,
+        status: input.status ?? 'active',
+        logo_url: input.logoUrl ?? null,
+        color: input.color ?? null,
+      };
+
+      const { data, error } = await supabase
+        .from('brands')
+        .insert(row)
+        .select()
+        .single();
+      if (error) throw error;
+      return brandFromRow(data as unknown as BrandRow);
+    }
+  } catch {
+    // Fall through to in-memory store
+  }
+
+  // In-memory fallback
+  const brand: Brand = {
+    id: `brand-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    workspaceId: workspaceId ?? 'demo-workspace',
+    name: input.name.trim(),
+    slug: input.slug || generateSlug(input.name),
+    status: input.status ?? 'active',
+    logoUrl: input.logoUrl ?? null,
+    color: input.color ?? null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  _memoryStore.push(brand);
+  return brand;
+}
+
+export async function updateBrand(
+  id: string,
+  patch: Partial<BrandInput>,
+): Promise<Brand | null> {
+  try {
+    const supabase = await getSupabase();
+    if (await checkSupabaseTable(supabase, 'brands')) {
+      const row: Record<string, unknown> = {};
+      if (patch.name !== undefined) row.name = patch.name.trim();
+      if (patch.slug !== undefined) row.slug = patch.slug;
+      if (patch.status !== undefined) row.status = patch.status;
+      if (patch.logoUrl !== undefined) row.logo_url = patch.logoUrl;
+      if (patch.color !== undefined) row.color = patch.color;
+      if (Object.keys(row).length === 0) return null;
+
+      const { data, error } = await supabase
+        .from('brands')
+        .update(row)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return brandFromRow(data as unknown as BrandRow);
+    }
+  } catch {
+    // Fall through to in-memory store
+  }
+
+  // In-memory fallback
+  const idx = _memoryStore.findIndex((b) => b.id === id);
+  if (idx === -1) return null;
+  const updated = {
+    ..._memoryStore[idx],
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  } as Brand;
+  _memoryStore[idx] = updated;
+  return updated;
+}
+
+export async function deleteBrand(id: string): Promise<boolean> {
+  try {
+    const supabase = await getSupabase();
+    if (await checkSupabaseTable(supabase, 'brands')) {
+      const { error } = await supabase.from('brands').delete().eq('id', id);
+      if (error) throw error;
+      return true;
+    }
+  } catch {
+    // Fall through to in-memory store
+  }
+
+  // In-memory fallback
+  const idx = _memoryStore.findIndex((b) => b.id === id);
+  if (idx !== -1) _memoryStore.splice(idx, 1);
+  return true;
+}
+
+/**
+ * Get or create a brand by name.
+ * Useful during data migration when we need to ensure a brand exists.
+ */
+export async function getOrCreateBrand(
+  name: string,
+  workspaceId?: string,
+): Promise<Brand | null> {
+  const existing = await getBrandByName(name, workspaceId);
+  if (existing) return existing;
+  return createBrand({ name }, workspaceId);
+}
+
+/**
+ * Get all brand names as strings (for backward compatibility with existing code).
+ */
+export async function getBrandNames(workspaceId?: string): Promise<string[]> {
+  const brands = await getBrands(workspaceId);
+  return brands.map((b) => b.name);
+}
