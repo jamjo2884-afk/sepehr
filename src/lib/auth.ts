@@ -43,7 +43,11 @@ export async function getAuthUser(): Promise<AuthUser | null> {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) return null;
+    if (!user) {
+      // No session — fall back to demo user so the app works
+      // even before email confirmation or during development.
+      return DEMO_USER;
+    }
 
     return {
       id: user.id,

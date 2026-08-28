@@ -2,18 +2,27 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { LoginForm } from './login-form';
 
 /**
- * Login is currently disabled — authentication is bypassed (demo mode),
- * so this route redirects straight to the dashboard.
- * Re-enable by rendering <LoginForm /> from ./login-form instead.
+ * Login page.
+ * Redirects to dashboard in demo mode (no session cookie).
+ * Shows login form when Supabase session exists.
  */
 export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/command-center');
+    // Check if there's a Supabase session cookie
+    const hasSession = document.cookie
+      .split(';')
+      .some((c) => c.trim().startsWith('sb-') && c.includes('-auth-token'));
+
+    if (!hasSession) {
+      // Demo mode or no session — redirect to dashboard
+      router.replace('/command-center');
+    }
   }, [router]);
 
-  return null;
+  return <LoginForm />;
 }

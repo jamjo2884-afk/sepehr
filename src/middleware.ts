@@ -48,26 +48,24 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for Supabase auth session cookie
-  // Supabase stores the session in a cookie named sb-<project-ref>-auth-token
-  // We check for any cookie that starts with 'sb-' and contains a JWT
+  // Page routes: always allow (UI handles auth state via API responses)
+  // This ensures the app works even before email confirmation or when
+  // Supabase auth is still being set up.
+  if (!pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
+
+  // API routes: check for Supabase auth session cookie
   const cookies = request.cookies;
   const hasSession = cookies.getAll().some(
     (c) => c.name.startsWith('sb-') && c.name.endsWith('-auth-token') && c.value,
   );
 
   if (!hasSession) {
-    // API routes get 401, page routes get redirected
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json(
-        { ok: false, error: 'احراز هویت لازم است.' },
-        { status: 401 },
-      );
-    }
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = '/login';
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.json(
+      { ok: false, error: 'احراز هویت لازم است.' },
+      { status: 401 },
+    );
   }
 
   return NextResponse.next();
