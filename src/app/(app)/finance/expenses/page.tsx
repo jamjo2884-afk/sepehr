@@ -486,7 +486,7 @@ export default function ExpensesPage() {
 
               {allocations.length === 0 && (
                 <p className="py-2 text-center text-xs text-muted-foreground">
-                  بدون تخصیص — هزینه کل به عنوان «نام分配» در نظر گرفته می‌شود.
+                  بدون تخصیص — هزینه کل به عنوان «تخصیص نیافته» در نظر گرفته می‌شود.
                 </p>
               )}
             </div>

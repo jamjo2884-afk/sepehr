@@ -18,6 +18,7 @@ import type {
   FinanceBrandCost,
 } from '@/types/finance';
 import { formatNumber } from '@/utils/persian';
+import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -315,7 +316,7 @@ export default function FinanceAnalyticsPage() {
                   return (
                     <tr key={`${point.brand}-${point.platform}-${i}`} className="border-b border-border/50 last:border-0">
                       <td className="px-4 py-3 text-xs font-medium text-foreground">{point.brand}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{point.platform}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{SOCIAL_PLATFORM_LABELS[point.platform] ?? point.platform}</td>
                       <td className="px-4 py-3 text-xs text-foreground">{formatNumber(point.spend)}</td>
                       <td className="px-4 py-3 text-xs">
                         <span className={cn(
