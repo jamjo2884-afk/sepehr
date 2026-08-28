@@ -34,6 +34,7 @@ function hasSupabaseConfig(): boolean {
  */
 export async function getAuthUser(): Promise<AuthUser | null> {
   if (!hasSupabaseConfig()) {
+    // No Supabase configured — pure demo mode (in-memory only)
     return DEMO_USER;
   }
 
@@ -44,9 +45,10 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      // No session — fall back to demo user so the app works
-      // even before email confirmation or during development.
-      return DEMO_USER;
+      // Supabase is configured but no valid session.
+      // Return null — API routes must not access real data without auth.
+      // The login page will handle redirect.
+      return null;
     }
 
     return {
@@ -54,7 +56,8 @@ export async function getAuthUser(): Promise<AuthUser | null> {
       email: user.email ?? '',
     };
   } catch {
-    return DEMO_USER;
+    // On error, deny access (fail closed)
+    return null;
   }
 }
 

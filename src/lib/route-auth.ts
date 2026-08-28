@@ -1,17 +1,26 @@
 /**
  * API Route Auth Wrapper
  *
- * Wraps Next.js API route handlers with authentication.
- * In demo mode (no Supabase config), allows all requests.
- * When Supabase is configured, requires valid session.
+ * Wraps Next.js API route handlers with authentication and workspace context.
+ * In demo mode (no Supabase config), allows all requests with demo workspace.
+ * When Supabase is configured, requires valid session + workspace membership.
  */
 
 import { NextResponse } from 'next/server';
 import { getAuthUser, type AuthUser } from '@/lib/auth';
+import {
+  getCurrentWorkspace,
+  type WorkspaceContext,
+} from '@/lib/workspace';
+
+export type AuthenticatedRequest = {
+  user: AuthUser;
+  workspace: WorkspaceContext;
+};
 
 type RouteHandler = (
   req: Request,
-  user: AuthUser,
+  auth: AuthenticatedRequest,
 ) => Promise<NextResponse> | NextResponse;
 
 export function withAuth(handler: RouteHandler) {
@@ -23,6 +32,15 @@ export function withAuth(handler: RouteHandler) {
         { status: 401 },
       );
     }
-    return handler(req, user);
+
+    const workspace = await getCurrentWorkspace();
+    if (!workspace) {
+      return NextResponse.json(
+        { ok: false, error: 'فضای کاری یافت نشد.' },
+        { status: 403 },
+      );
+    }
+
+    return handler(req, { user, workspace });
   };
 }
