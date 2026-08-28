@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Award, ExternalLink, Loader2 } from 'lucide-react';
+import { Award, ExternalLink, Loader2, Settings } from 'lucide-react';
 import { getSocialAccounts, getSocialMetrics } from '@/services/social.service';
 import type { SocialAccount, SocialMetric } from '@/types/social';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
@@ -11,6 +11,7 @@ import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { BrandLogo } from '@/components/common/brand-logo';
 import { getBrandColor, isBrandIgnored } from '@/constants/brand-colors';
 import { toPersianDigits } from '@/utils/persian';
+import { BrandManagement } from '@/components/brands/brand-management';
 
 interface BrandCard {
   name: string;
@@ -25,6 +26,7 @@ export default function BrandsPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [metrics, setMetrics] = useState<SocialMetric[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showManagement, setShowManagement] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -130,12 +132,29 @@ export default function BrandsPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
-      <div>
-        <h1 className="text-lg font-bold text-foreground">برندها</h1>
-        <p className="text-sm text-muted-foreground">
-          {toPersianDigits(String(brands.length))} برند — روی هر برند کلیک کنید تا جزئیات آن را ببینید.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-foreground">برندها</h1>
+          <p className="text-sm text-muted-foreground">
+            {toPersianDigits(String(brands.length))} برند — روی هر برند کلیک کنید تا جزئیات آن را ببینید.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowManagement(!showManagement)}
+          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        >
+          <Settings className="h-3.5 w-3.5" />
+          مدیریت برندها
+        </button>
       </div>
+
+      {/* Management section */}
+      {showManagement && (
+        <div className="rounded-xl border border-border bg-surface/60 p-4">
+          <BrandManagement />
+        </div>
+      )}
 
       {/* Brand mosaic grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

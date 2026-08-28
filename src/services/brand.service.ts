@@ -285,21 +285,9 @@ export async function updateBrand(
 }
 
 export async function deleteBrand(id: string): Promise<boolean> {
-  try {
-    const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'brands')) {
-      const { error } = await supabase.from('brands').delete().eq('id', id);
-      if (error) throw error;
-      return true;
-    }
-  } catch {
-    // Fall through to in-memory store
-  }
-
-  // In-memory fallback
-  const idx = _memoryStore.findIndex((b) => b.id === id);
-  if (idx !== -1) _memoryStore.splice(idx, 1);
-  return true;
+  // Soft-delete: set status to inactive instead of removing the row.
+  // This preserves historical references from finance, team, and social tables.
+  return updateBrand(id, { status: 'inactive' }).then((b) => b !== null);
 }
 
 /**
