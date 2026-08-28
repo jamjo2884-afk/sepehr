@@ -1,0 +1,53 @@
+import { NextResponse } from 'next/server';
+import {
+  getFinanceDashboardData,
+  getPlatformEfficiency,
+  getBrandPerformance,
+  getScatterData,
+} from '@/services/finance/finance-analytics.service';
+import { getSocialAccounts, getSocialMetrics } from '@/services/social.service';
+
+export const dynamic = 'force-dynamic';
+
+/**
+ * GET /api/finance/analytics?brand=...
+ *
+ * Returns the full finance analytics dashboard data including
+ * budget vs actual, expense breakdown, brand costs, platform
+ * efficiency, and scatter data.
+ */
+export async function GET(
+  req: Request,
+): Promise<NextResponse> {
+  try {
+    const { searchParams } = new URL(req.url);
+    const brand = searchParams.get('brand') || undefined;
+
+    const [dashboard, accounts, metrics] = await Promise.all([
+      getFinanceDashboardData(brand),
+      getSocialAccounts(),
+      getSocialMetrics(undefined, 'monthly'),
+    ]);
+
+    const [platformEfficiency, brandPerformance, scatterData] =
+      await Promise.all([
+        getPlatformEfficiency(accounts, metrics, brand),
+        getBrandPerformance(accounts, metrics),
+        getScatterData(accounts, metrics),
+      ]);
+
+    return NextResponse.json({
+      ok: true,
+      ...dashboard,
+      platformEfficiency,
+      brandPerformance,
+      scatterData,
+    });
+  } catch (err) {
+    console.warn('[finance] Could not build analytics.', err);
+    return NextResponse.json(
+      { ok: false, error: 'خطا در دریافت تحلیل‌ها.' },
+      { status: 500 },
+    );
+  }
+}

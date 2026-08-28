@@ -12,6 +12,7 @@ import {
   BookOpen,
   Settings,
   Award,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -79,6 +80,13 @@ export const navItems: NavItem[] = [
     href: '/audience',
     icon: Users,
     description: 'بخش‌بندی مخاطبان و شناخت رفتار آن‌ها',
+  },
+  {
+    id: 'finance',
+    label: 'مالی',
+    href: '/finance',
+    icon: Wallet,
+    description: 'مدیریت بودجه، هزینه و بازدهی برندها',
   },
   {
     id: 'analytics',
