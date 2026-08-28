@@ -250,6 +250,7 @@ const FINANCE_TABS = [
   { label: 'بودجه‌ها', href: '/finance/budgets' },
   { label: 'هزینه‌ها', href: '/finance/expenses' },
   { label: 'کمپین‌ها', href: '/finance/campaigns' },
+  { label: 'تیم', href: '/finance/team' },
   { label: 'بازدهی', href: '/finance/analytics' },
 ];
 

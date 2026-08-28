@@ -1,10 +1,9 @@
-import { NextResponse } from 'next/server';
-import {
-  getFinanceDashboardData,
+import { NextResponse } from 'next/server';import { getFinanceDashboardData,
   getPlatformEfficiency,
   getBrandPerformance,
   getScatterData,
 } from '@/services/finance/finance-analytics.service';
+import { getHumanCostByBrand, getBrandTotalCosts } from '@/services/finance/team-analytics.service';
 import { getSocialAccounts, getSocialMetrics } from '@/services/social.service';
 
 export const dynamic = 'force-dynamic';
@@ -36,12 +35,19 @@ export async function GET(
         getScatterData(accounts, metrics),
       ]);
 
+    const [humanCosts, brandTotalCosts] = await Promise.all([
+      getHumanCostByBrand(),
+      getBrandTotalCosts(dashboard.brandCosts, accounts, metrics),
+    ]);
+
     return NextResponse.json({
       ok: true,
       ...dashboard,
       platformEfficiency,
       brandPerformance,
       scatterData,
+      humanCosts,
+      brandTotalCosts,
     });
   } catch (err) {
     console.warn('[finance] Could not build analytics.', err);

@@ -10,6 +10,7 @@ import {
   Inbox,
   Minus,
   TrendingUp,
+  Users,
 } from 'lucide-react';
 import type {
   FinancePlatformEfficiency,
@@ -19,6 +20,7 @@ import type {
 } from '@/types/finance';
 import { formatNumber } from '@/utils/persian';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
+import type { BrandHumanCost, BrandTotalCost } from '@/types/team';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -33,6 +35,8 @@ export default function FinanceAnalyticsPage() {
   const [brandPerformance, setBrandPerformance] = useState<FinanceBrandPerformance[]>([]);
   const [scatterData, setScatterData] = useState<FinanceScatterPoint[]>([]);
   const [brandCosts, setBrandCosts] = useState<FinanceBrandCost[]>([]);
+  const [humanCosts, setHumanCosts] = useState<BrandHumanCost[]>([]);
+  const [brandTotalCosts, setBrandTotalCosts] = useState<BrandTotalCost[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +57,8 @@ export default function FinanceAnalyticsPage() {
           setBrandPerformance(data.brandPerformance ?? []);
           setScatterData(data.scatterData ?? []);
           setBrandCosts(data.brandCosts ?? []);
+          setHumanCosts(data.humanCosts ?? []);
+          setBrandTotalCosts(data.brandTotalCosts ?? []);
           setBrands(data.brands ?? []);
         }
         setLoading(false);
@@ -336,6 +342,104 @@ export default function FinanceAnalyticsPage() {
           </div>
         )}
       </section>
+
+      {/* Human Cost by Brand */}
+      {humanCosts.length > 0 && (
+        <section className="rounded-xl border border-border bg-surface/60 p-4">
+          <div className="mb-4 flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">
+              هزینه نیروی انسانی به تفکیک برند
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">برند</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">هزینه ماهانه</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">تعداد نفر</th>
+                </tr>
+              </thead>
+              <tbody>
+                {humanCosts.map((hc) => (
+                  <tr key={hc.brand} className="border-b border-border/50 last:border-0">
+                    <td className="px-4 py-3 text-xs font-medium text-foreground">{hc.brand}</td>
+                    <td className="px-4 py-3 text-xs text-foreground">{formatNumber(hc.humanCost)}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{hc.memberCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* Brand Total Cost (Operational + Human) */}
+      {brandTotalCosts.length > 0 && (
+        <section className="rounded-xl border border-border bg-surface/60 p-4">
+          <div className="mb-4 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">
+              هزینه کل برند (عملیاتی + نیروی انسانی)
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">برند</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">هزینه عملیاتی</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">هزینه نیروی انسانی</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">هزینه کل</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">رشد</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">هزینه نیرو/رشد</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">هزینه کل/رشد</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">وضعیت</th>
+                </tr>
+              </thead>
+              <tbody>
+                {brandTotalCosts.map((btc) => (
+                  <tr key={btc.brand} className="border-b border-border/50 last:border-0">
+                    <td className="px-4 py-3 text-xs font-medium text-foreground">{btc.brand}</td>
+                    <td className="px-4 py-3 text-xs text-foreground">{formatNumber(btc.operationalCost)}</td>
+                    <td className="px-4 py-3 text-xs text-foreground">{formatNumber(btc.humanCost)}</td>
+                    <td className="px-4 py-3 text-xs font-medium text-foreground">{formatNumber(btc.totalCost)}</td>
+                    <td className="px-4 py-3 text-xs">
+                      <span className={cn(
+                        'flex items-center gap-1',
+                        btc.followerGrowth > 0 ? 'text-success' : btc.followerGrowth < 0 ? 'text-destructive' : 'text-muted-foreground',
+                      )}>
+                        {btc.followerGrowth > 0 ? <ArrowUpRight className="h-3 w-3" /> : btc.followerGrowth < 0 ? <ArrowDownRight className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+                        {formatNumber(btc.followerGrowth)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs font-medium text-foreground">
+                      {btc.humanCostPerNewFollower !== null ? formatNumber(btc.humanCostPerNewFollower) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-xs font-medium text-foreground">
+                      {btc.totalCostPerNewFollower !== null ? formatNumber(btc.totalCostPerNewFollower) : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn(
+                        'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                        btc.growthStatus === 'positive' ? 'bg-success/15 text-success' :
+                        btc.growthStatus === 'negative' ? 'bg-destructive/15 text-destructive' :
+                        btc.growthStatus === 'zero' ? 'bg-warning/15 text-warning' :
+                        'bg-muted text-muted-foreground',
+                      )}>
+                        {btc.growthStatus === 'positive' ? 'رشد مثبت' :
+                         btc.growthStatus === 'negative' ? 'رشد منفی' :
+                         btc.growthStatus === 'zero' ? 'بدون رشد' : 'بدون داده'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Brand Cost Comparison */}
       <section className="rounded-xl border border-border bg-surface/60 p-4">
