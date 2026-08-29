@@ -32,6 +32,62 @@ async function getSupabase(): Promise<SupabaseClient> {
   return supabase;
 }
 
+/**
+ * Resolve a brand name to its UUID id within the current workspace.
+ * Returns null when the brand is not found or Supabase is unavailable.
+ */
+export async function resolveBrandId(
+  brandName: string,
+  workspaceId?: string | null,
+): Promise<string | null> {
+  try {
+    const supabase = await getSupabase();
+    if (!(await checkSupabaseTable(supabase, 'brands'))) return null;
+    let query = supabase
+      .from('brands')
+      .select('id')
+      .eq('name', brandName.trim())
+      .eq('status', 'active')
+      .limit(1);
+    if (workspaceId) query = query.eq('workspace_id', workspaceId);
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) return null;
+    return data[0].id as string;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve multiple brand names to their UUID ids in a single query.
+ * Returns a Map<brandName, brandId> for found brands.
+ */
+export async function resolveBrandIds(
+  brandNames: string[],
+  workspaceId?: string | null,
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  if (brandNames.length === 0) return result;
+  try {
+    const supabase = await getSupabase();
+    if (!(await checkSupabaseTable(supabase, 'brands'))) return result;
+    let query = supabase
+      .from('brands')
+      .select('id, name')
+      .in('name', brandNames.map((n) => n.trim()))
+      .eq('status', 'active');
+    if (workspaceId) query = query.eq('workspace_id', workspaceId);
+    const { data, error } = await query;
+    if (error || !data) return result;
+    for (const row of data) {
+      result.set(row.name as string, row.id as string);
+    }
+    return result;
+  } catch {
+    return result;
+  }
+}
+
 let _supabaseAvailable: boolean | null = null;
 
 async function checkSupabaseTable(

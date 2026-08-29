@@ -79,6 +79,7 @@ function budgetFromRow(row: BudgetRow): FinanceBudget {
   return {
     id: row.id,
     brand: row.brand,
+    brandId: row.brand_id ?? null,
     period: row.period as BudgetPeriod,
     periodLabel: row.period_label,
     amount: Number(row.amount),
@@ -92,6 +93,7 @@ function expenseFromRow(row: ExpenseRow): FinanceExpense {
   return {
     id: row.id,
     brand: row.brand,
+    brandId: row.brand_id ?? null,
     expenseDate: row.expense_date,
     amount: Number(row.amount),
     category: row.category as ExpenseCategory,
@@ -118,6 +120,7 @@ function campaignFromRow(row: CampaignRow): FinanceCampaign {
   return {
     id: row.id,
     brand: row.brand,
+    brandId: row.brand_id ?? null,
     name: row.name,
     startDate: row.start_date,
     endDate: row.end_date,
@@ -133,7 +136,7 @@ function campaignFromRow(row: CampaignRow): FinanceCampaign {
  * Budgets CRUD
  * ========================================================================= */
 
-export async function getBudgets(brand?: string): Promise<FinanceBudget[]> {
+export async function getBudgets(brand?: string, brandId?: string): Promise<FinanceBudget[]> {
   try {
     const supabase = await getSupabase();
     if (await checkSupabaseTable(supabase, 'finance_budgets')) {
@@ -141,7 +144,8 @@ export async function getBudgets(brand?: string): Promise<FinanceBudget[]> {
         .from('finance_budgets')
         .select('*')
         .order('period_label', { ascending: false });
-      if (brand) query = query.eq('brand', brand);
+      if (brandId) query = query.eq('brand_id', brandId);
+      else if (brand) query = query.eq('brand', brand);
       const { data, error } = await query;
       if (error) throw error;
       if (data && data.length > 0) {
@@ -170,6 +174,7 @@ export async function createBudget(
       const row = {
         id,
         brand: input.brand.trim(),
+        brand_id: input.brandId ?? null,
         period: input.period,
         period_label: input.periodLabel,
         amount: input.amount,
@@ -213,6 +218,7 @@ export async function updateBudget(
     if (await checkSupabaseTable(supabase, 'finance_budgets')) {
       const row: Record<string, unknown> = {};
       if (patch.brand !== undefined) row.brand = patch.brand.trim();
+      if (patch.brandId !== undefined) row.brand_id = patch.brandId ?? null;
       if (patch.period !== undefined) row.period = patch.period;
       if (patch.periodLabel !== undefined) row.period_label = patch.periodLabel;
       if (patch.amount !== undefined) row.amount = patch.amount;
@@ -264,7 +270,7 @@ export async function deleteBudget(id: string): Promise<boolean> {
  * Expenses CRUD
  * ========================================================================= */
 
-export async function getExpenses(brand?: string): Promise<FinanceExpense[]> {
+export async function getExpenses(brand?: string, brandId?: string): Promise<FinanceExpense[]> {
   try {
     const supabase = await getSupabase();
     if (await checkSupabaseTable(supabase, 'finance_expenses')) {
@@ -272,7 +278,8 @@ export async function getExpenses(brand?: string): Promise<FinanceExpense[]> {
         .from('finance_expenses')
         .select('*')
         .order('expense_date', { ascending: false });
-      if (brand) query = query.eq('brand', brand);
+      if (brandId) query = query.eq('brand_id', brandId);
+      else if (brand) query = query.eq('brand', brand);
       const { data, error } = await query;
       if (error) throw error;
       if (data && data.length > 0) {
@@ -322,6 +329,7 @@ export async function createExpense(
       const row = {
         id,
         brand: input.brand.trim(),
+        brand_id: input.brandId ?? null,
         expense_date: input.expenseDate,
         amount: input.amount,
         category: input.category,
@@ -388,6 +396,7 @@ export async function updateExpense(
     if (await checkSupabaseTable(supabase, 'finance_expenses')) {
       const row: Record<string, unknown> = {};
       if (patch.brand !== undefined) row.brand = patch.brand.trim();
+      if (patch.brandId !== undefined) row.brand_id = patch.brandId ?? null;
       if (patch.expenseDate !== undefined) row.expense_date = patch.expenseDate;
       if (patch.amount !== undefined) row.amount = patch.amount;
       if (patch.category !== undefined) row.category = patch.category;
@@ -540,7 +549,7 @@ export async function getAllAllocations(
  * Campaigns CRUD
  * ========================================================================= */
 
-export async function getCampaigns(brand?: string): Promise<FinanceCampaign[]> {
+export async function getCampaigns(brand?: string, brandId?: string): Promise<FinanceCampaign[]> {
   try {
     const supabase = await getSupabase();
     if (await checkSupabaseTable(supabase, 'finance_campaigns')) {
@@ -548,7 +557,8 @@ export async function getCampaigns(brand?: string): Promise<FinanceCampaign[]> {
         .from('finance_campaigns')
         .select('*')
         .order('created_at', { ascending: false });
-      if (brand) query = query.eq('brand', brand);
+      if (brandId) query = query.eq('brand_id', brandId);
+      else if (brand) query = query.eq('brand', brand);
       const { data, error } = await query;
       if (error) throw error;
       if (data && data.length > 0) {
@@ -577,6 +587,7 @@ export async function createCampaign(
       const row = {
         id,
         brand: input.brand.trim(),
+        brand_id: input.brandId ?? null,
         name: input.name.trim(),
         start_date: input.startDate,
         end_date: input.endDate ?? null,
@@ -624,6 +635,7 @@ export async function updateCampaign(
     if (await checkSupabaseTable(supabase, 'finance_campaigns')) {
       const row: Record<string, unknown> = {};
       if (patch.brand !== undefined) row.brand = patch.brand.trim();
+      if (patch.brandId !== undefined) row.brand_id = patch.brandId ?? null;
       if (patch.name !== undefined) row.name = patch.name.trim();
       if (patch.startDate !== undefined) row.start_date = patch.startDate;
       if (patch.endDate !== undefined) row.end_date = patch.endDate;

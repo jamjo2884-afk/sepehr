@@ -52,6 +52,7 @@ function allocationFromRow(row: BrandAllocationRow): BrandAllocation {
     id: row.id,
     teamMemberId: row.team_member_id,
     brand: row.brand,
+    brandId: row.brand_id ?? null,
     allocationPercentage: Number(row.allocation_percentage),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -95,11 +96,13 @@ export async function getTeamMembers(
       .select('*')
       .order('name', { ascending: true });
     if (brand) {
-      // Filter by brand through allocations
+      // Filter by brand through allocations (prefer brand_id if available)
+      const { resolveBrandId: resolve } = await import('@/services/brand.service');
+      const resolvedId = await resolve(brand);
       const allocQuery = await supabase
         .from('team_member_brand_allocations')
         .select('team_member_id')
-        .eq('brand', brand);
+        .eq(resolvedId ? 'brand_id' : 'brand', resolvedId ?? brand);
       const memberIds = (allocQuery.data ?? []).map(
         (r: { team_member_id: string }) => r.team_member_id,
       );
@@ -315,9 +318,9 @@ async function createAllocations(
   const supabase = await getSupabase();
   const rows = allocations.map((a) => ({
     id: `ta-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}-${a.brand.replace(/\s+/g, '')}`,
-    team_member_id: memberId,
-    brand: a.brand,
-    allocation_percentage: a.allocationPercentage,
+    team_member_id: memberId,        brand: a.brand,
+        brand_id: a.brandId ?? null,
+        allocation_percentage: a.allocationPercentage,
   }));
   const { error } = await supabase
     .from('team_member_brand_allocations')
@@ -335,7 +338,7 @@ export async function getTeamBrands(): Promise<string[]> {
     if (await checkSupabaseTable(supabase, 'team_member_brand_allocations')) {
       const { data } = await supabase
         .from('team_member_brand_allocations')
-        .select('brand');
+        .select('brand, brand_id');
       if (data && data.length > 0) {
         const brands = new Set(
           (data as { brand: string }[]).map((r) => r.brand),

@@ -606,6 +606,7 @@ export function toSocialAccount(row: AccountRow): SocialAccount {
   return {
     id: row.id,
     brand: row.brand,
+    brandId: (row as unknown as { brand_id?: string | null }).brand_id ?? null,
     platform: row.platform,
     username: row.username,
     displayName: row.display_name,
@@ -656,7 +657,7 @@ export async function getSocialAccounts(): Promise<SocialAccount[]> {
     const { data, error } = await supabase
       .from('social_accounts')
       .select(
-        'id, brand, platform, username, display_name, url, external_id, ' +
+        'id, brand, brand_id, platform, username, display_name, url, external_id, ' +
           'status, connection_status, last_sync_at, last_sync_status, ' +
           'last_successful_sync_at, created_at, updated_at',
       )
@@ -737,8 +738,9 @@ export async function createSocialAccount(
 ): Promise<SocialAccount | null> {
   try {
     const { supabase } = await import('@/lib/supabase');
-    const row = {
+    const row: Record<string, unknown> = {
       brand: input.brand.trim(),
+      brand_id: input.brandId ?? null,
       platform: input.platform,
       username: input.username.trim(),
       display_name: input.displayName?.trim() || null,
@@ -769,8 +771,9 @@ export async function updateSocialAccount(
 ): Promise<SocialAccount | null> {
   try {
     const { supabase } = await import('@/lib/supabase');
-    const row = {
+    const row: Record<string, unknown> = {
       brand: input.brand.trim(),
+      brand_id: input.brandId ?? null,
       platform: input.platform,
       username: input.username.trim(),
       display_name: input.displayName?.trim() || null,
