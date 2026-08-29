@@ -195,6 +195,7 @@ export interface FinanceExpenseBreakdown {
 
 export interface FinanceBrandCost {
   brand: string;
+  brandId?: string | null;
   totalSpend: number;
   expenseCount: number;
 }
@@ -210,6 +211,7 @@ export interface FinancePlatformEfficiency {
 
 export interface FinanceBrandPerformance {
   brand: string;
+  brandId?: string | null;
   totalSpend: number;
   followerGrowth: number;
   costPerNewFollower: number | null;
@@ -219,6 +221,7 @@ export interface FinanceBrandPerformance {
 
 export interface FinanceScatterPoint {
   brand: string;
+  brandId?: string | null;
   platform: SocialPlatform;
   spend: number;
   followerGrowth: number;

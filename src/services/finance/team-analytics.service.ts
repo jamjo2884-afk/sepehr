@@ -23,26 +23,31 @@ import { getTeamMembers } from '@/services/finance/team.service';
 
 export async function getHumanCostByBrand(): Promise<BrandHumanCost[]> {
   const members = await getTeamMembers();
-  const costByBrand = new Map<string, number>();
-  const membersByBrand = new Map<string, number>();
+
+  // Group by brandId when available, fall back to brand string
+  const costByBrand = new Map<string, { brand: string; brandId: string | null; cost: number; count: number }>();
 
   for (const member of members) {
     if (member.status !== 'active') continue;
     for (const alloc of member.allocations) {
       const cost = member.monthlyCost * (alloc.allocationPercentage / 100);
-      costByBrand.set(alloc.brand, (costByBrand.get(alloc.brand) ?? 0) + cost);
-      membersByBrand.set(
-        alloc.brand,
-        (membersByBrand.get(alloc.brand) ?? 0) + 1,
-      );
+      const key = alloc.brandId ?? alloc.brand;
+      const existing = costByBrand.get(key);
+      if (existing) {
+        existing.cost += cost;
+        existing.count += 1;
+      } else {
+        costByBrand.set(key, { brand: alloc.brand, brandId: alloc.brandId ?? null, cost, count: 1 });
+      }
     }
   }
 
-  return [...costByBrand.entries()]
-    .map(([brand, humanCost]) => ({
-      brand,
-      humanCost: Math.round(humanCost),
-      memberCount: membersByBrand.get(brand) ?? 0,
+  return [...costByBrand.values()]
+    .map((data) => ({
+      brand: data.brand,
+      brandId: data.brandId,
+      humanCost: Math.round(data.cost),
+      memberCount: data.count,
     }))
     .sort((a, b) => b.humanCost - a.humanCost);
 }
@@ -81,21 +86,29 @@ export async function getBrandTotalCosts(
   const humanCosts = await getHumanCostByBrand();
   const humanCostByBrand = new Map<string, number>();
   for (const hc of humanCosts) {
-    humanCostByBrand.set(hc.brand, hc.humanCost);
+    const key = hc.brandId ?? hc.brand;
+    humanCostByBrand.set(key, hc.humanCost);
   }
 
-  // Collect all brands
-  const allBrands = new Set<string>();
-  for (const c of operationalCosts) allBrands.add(c.brand);
-  for (const hc of humanCosts) allBrands.add(hc.brand);
+  // Collect all brands (prefer brandId)
+  const allBrands = new Map<string, { brand: string; brandId: string | null }>();
+  for (const c of operationalCosts) {
+    const key = c.brandId ?? c.brand;
+    if (!allBrands.has(key)) allBrands.set(key, { brand: c.brand, brandId: c.brandId ?? null });
+  }
+  for (const hc of humanCosts) {
+    const key = hc.brandId ?? hc.brand;
+    if (!allBrands.has(key)) allBrands.set(key, { brand: hc.brand, brandId: hc.brandId ?? null });
+  }
 
-  // Compute follower growth per brand
+  // Compute follower growth per brand (prefer brandId)
   const sortedMetrics = sortMetricsByPeriod(metrics);
   const accountsByBrand = new Map<string, SocialAccount[]>();
   for (const account of accounts) {
-    const list = accountsByBrand.get(account.brand) ?? [];
+    const key = account.brandId ?? account.brand;
+    const list = accountsByBrand.get(key) ?? [];
     list.push(account);
-    accountsByBrand.set(account.brand, list);
+    accountsByBrand.set(key, list);
   }
 
   const growthByBrand = new Map<string, number>();
@@ -115,12 +128,12 @@ export async function getBrandTotalCosts(
     }
   }
 
-  return [...allBrands].map((brand) => {
+  return [...allBrands.entries()].map(([key, { brand: brandName, brandId }]) => {
     const operationalCost =
-      operationalCosts.find((c) => c.brand === brand)?.totalSpend ?? 0;
-    const humanCost = humanCostByBrand.get(brand) ?? 0;
+      operationalCosts.find((c) => (c.brandId ?? c.brand) === key)?.totalSpend ?? 0;
+    const humanCost = humanCostByBrand.get(key) ?? 0;
     const totalCost = operationalCost + humanCost;
-    const growth = growthByBrand.get(brand) ?? 0;
+    const growth = growthByBrand.get(key) ?? 0;
 
     let growthStatus: 'positive' | 'negative' | 'zero' | 'no_data';
     let operationalCostPerFollower: number | null = null;
@@ -142,7 +155,8 @@ export async function getBrandTotalCosts(
     }
 
     return {
-      brand,
+      brand: brandName,
+      brandId,
       operationalCost,
       humanCost,
       totalCost,

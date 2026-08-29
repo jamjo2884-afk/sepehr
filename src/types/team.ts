@@ -95,12 +95,14 @@ export interface TeamMemberWithAllocations extends TeamMember {
 
 export interface BrandHumanCost {
   brand: string;
+  brandId?: string | null;
   humanCost: number;
   memberCount: number;
 }
 
 export interface BrandTotalCost {
   brand: string;
+  brandId?: string | null;
   operationalCost: number;
   humanCost: number;
   totalCost: number;

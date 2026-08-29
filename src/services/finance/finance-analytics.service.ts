@@ -134,17 +134,20 @@ export async function getExpenseBreakdown(
 export async function getBrandCosts(): Promise<FinanceBrandCost[]> {
   const expenses = await getExpenses();
 
-  const byBrand = new Map<string, { total: number; count: number }>();
+  // Group by brandId when available, fall back to brand string
+  const byBrand = new Map<string, { brand: string; brandId: string | null; total: number; count: number }>();
   for (const e of expenses) {
-    const existing = byBrand.get(e.brand) ?? { total: 0, count: 0 };
+    const key = e.brandId ?? e.brand;
+    const existing = byBrand.get(key) ?? { brand: e.brand, brandId: e.brandId ?? null, total: 0, count: 0 };
     existing.total += e.amount;
     existing.count += 1;
-    byBrand.set(e.brand, existing);
+    byBrand.set(key, existing);
   }
 
-  return [...byBrand.entries()]
-    .map(([brand, data]) => ({
-      brand,
+  return [...byBrand.values()]
+    .map((data) => ({
+      brand: data.brand,
+      brandId: data.brandId,
       totalSpend: data.total,
       expenseCount: data.count,
     }))
@@ -251,24 +254,29 @@ export async function getBrandPerformance(
   const expenses = await getExpenses();
   const budgets = await getBudgets();
 
-  // Spend by brand
-  const spendByBrand = new Map<string, number>();
+  // Spend by brand (prefer brandId)
+  const spendByBrand = new Map<string, { brand: string; brandId: string | null; amount: number }>();
   for (const e of expenses) {
-    spendByBrand.set(e.brand, (spendByBrand.get(e.brand) ?? 0) + e.amount);
+    const key = e.brandId ?? e.brand;
+    const existing = spendByBrand.get(key);
+    if (existing) existing.amount += e.amount;
+    else spendByBrand.set(key, { brand: e.brand, brandId: e.brandId ?? null, amount: e.amount });
   }
 
-  // Budget by brand
+  // Budget by brand (prefer brandId)
   const budgetByBrand = new Map<string, number>();
   for (const b of budgets) {
-    budgetByBrand.set(b.brand, (budgetByBrand.get(b.brand) ?? 0) + b.amount);
+    const key = b.brandId ?? b.brand;
+    budgetByBrand.set(key, (budgetByBrand.get(key) ?? 0) + b.amount);
   }
 
-  // Growth by brand (from social metrics)
+  // Growth by brand (prefer brandId)
   const accountsByBrand = new Map<string, SocialAccount[]>();
   for (const account of accounts) {
-    const list = accountsByBrand.get(account.brand) ?? [];
+    const key = account.brandId ?? account.brand;
+    const list = accountsByBrand.get(key) ?? [];
     list.push(account);
-    accountsByBrand.set(account.brand, list);
+    accountsByBrand.set(key, list);
   }
 
   const sortedMetrics = sortMetricsByPeriod(metrics);
@@ -294,10 +302,13 @@ export async function getBrandPerformance(
     ...growthByBrand.keys(),
   ]);
 
-  return [...allBrands].map((brand) => {
-    const spend = spendByBrand.get(brand) ?? 0;
-    const growth = growthByBrand.get(brand) ?? 0;
-    const budget = budgetByBrand.get(brand) ?? 0;
+  return [...allBrands].map((key) => {
+    const spendData = spendByBrand.get(key);
+    const spend = spendData?.amount ?? 0;
+    const brandName = spendData?.brand ?? key;
+    const brandId = spendData?.brandId ?? null;
+    const growth = growthByBrand.get(key) ?? 0;
+    const budget = budgetByBrand.get(key) ?? 0;
 
     let growthStatus: 'positive' | 'negative' | 'zero' | 'no_data';
     let costPerNewFollower: number | null;
@@ -320,7 +331,8 @@ export async function getBrandPerformance(
       budget > 0 ? (spend / budget) * 100 : null;
 
     return {
-      brand,
+      brand: brandName,
+      brandId,
       totalSpend: spend,
       followerGrowth: growth,
       costPerNewFollower,
