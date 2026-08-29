@@ -448,6 +448,7 @@ function dataQualityNote(components: SocialScoreComponent[]): string | null {
 /** Internal richer row used while ranking (extra fields for peers/trend). */
 interface BrandScoreDraft {
   brand: string;
+  brandId?: string | null;
   score: number | null;
   confidence: SocialScoreConfidence;
   growth: number | null;
@@ -469,7 +470,7 @@ export function rankBrandsByScore(
   const brands = [...new Set(accounts.map((a) => a.brand))];
   const drafts: BrandScoreDraft[] = brands.map((brand) => {
     const ids = new Set(
-      accounts.filter((a) => a.brand === brand).map((a) => a.id),
+      accounts.filter((a) => (a.brandId ?? a.brand) === brand).map((a) => a.id),
     );
     const brandMetrics = metrics.filter((m) => ids.has(m.accountId));
     const periods = distinctPeriods(brandMetrics);
@@ -498,7 +499,7 @@ export function rankBrandsByScore(
 
   for (const draft of drafts) {
     const ids = new Set(
-      accounts.filter((a) => a.brand === draft.brand).map((a) => a.id),
+      accounts.filter((a) => (a.brandId ?? a.brand) === (draft.brandId ?? draft.brand)).map((a) => a.id),
     );
     const brandMetrics = metrics.filter((m) => ids.has(m.accountId));
     const components = assembleComponents(
@@ -526,7 +527,7 @@ export function rankBrandsByScore(
   // minus the latest period of the brand's own series).
   return drafts.map((draft, index) => {
     const ids = new Set(
-      accounts.filter((a) => a.brand === draft.brand).map((a) => a.id),
+      accounts.filter((a) => (a.brandId ?? a.brand) === (draft.brandId ?? draft.brand)).map((a) => a.id),
     );
     const brandMetrics = metrics.filter((m) => ids.has(m.accountId));
     let trend: number | null = null;
@@ -565,7 +566,7 @@ export function calculateSocialScore(
   brand: string,
 ): SocialScore {
   const ranking = rankBrandsByScore(accounts, metrics);
-  const brandAccounts = accounts.filter((a) => a.brand === brand);
+  const brandAccounts = accounts.filter((a) => (a.brandId ?? a.brand) === brand);
   const ids = new Set(brandAccounts.map((a) => a.id));
   const brandMetrics = metrics.filter((m) => ids.has(m.accountId));
   const periods = distinctPeriods(brandMetrics);
@@ -640,7 +641,7 @@ export function calculatePlatformScores(
   metrics: SocialMetric[],
   brand: string,
 ): SocialPlatformScore[] {
-  const brandAccounts = accounts.filter((a) => a.brand === brand);
+  const brandAccounts = accounts.filter((a) => (a.brandId ?? a.brand) === brand);
   const platforms = [...new Set(brandAccounts.map((a) => a.platform))];
 
   return platforms.map((platform) => {

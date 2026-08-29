@@ -93,6 +93,7 @@ export const SUPPORTED_PLATFORMS: SocialPlatform[] = [
 /** A flattened account row: one brand × platform × handle, latest snapshot + series. */
 export interface SocialAccountRow {
   brand: string;
+  brandId?: string | null;
   platform: SocialPlatform;
   handle: string | null;
   /** Latest available follower count. */
@@ -144,6 +145,7 @@ export function flattenAccounts(
         const latest = sorted[sorted.length - 1] ?? null;
         rows.push({
           brand: brand.name,
+          brandId: null,
           platform: platformId,
           handle: series.handle,
           latest,
@@ -204,6 +206,7 @@ export function buildAccountRows(
     const latest = series[series.length - 1] ?? null;
     return {
       brand: account.brand,
+      brandId: account.brandId ?? null,
       platform: account.platform,
       handle: account.username,
       latest,
@@ -260,7 +263,7 @@ export function summarizeAccounts(accounts: SocialAccountRow[]): SocialSummary {
   return {
     totalFollowers,
     totalAccounts: accounts.length,
-    totalBrands: new Set(accounts.map((a) => a.brand)).size,
+    totalBrands: new Set(accounts.map((a) => a.brandId ?? a.brand)).size,
     avgGrowthPct,
     topPlatform,
     monthCount: months.size,
@@ -293,7 +296,7 @@ export function buildSocialOverview(
 ): SocialOverview {
   const rows = buildAccountRows(accounts, metrics);
   const months = collectMonthsFromRows(rows);
-  const brands = [...new Set(rows.map((a) => a.brand))].sort((a, b) =>
+  const brands = [...new Set(rows.map((a) => a.brandId ?? a.brand))].sort((a, b) =>
     a.localeCompare(b, 'fa'),
   );
   const summary = summarizeAccounts(rows);
@@ -507,6 +510,7 @@ export function accountsFromSnapshot(): SocialAccount[] {
       [row.brand, row.platform, row.handle ?? ''].join('|'),
     ),
     brand: row.brand,
+    brandId: null,
     platform: row.platform,
     username: row.handle ?? '',
     displayName: row.handle,
@@ -703,7 +707,7 @@ export async function getBrandSocialAnalytics(
   try {
     const accounts = await getSocialAccounts();
     const metrics = await getSocialMetrics(undefined, 'monthly');
-    if (!accounts.some((a) => a.brand === brand)) return null;
+    if (!accounts.some((a) => (a.brandId ?? a.brand) === brand)) return null;
     const {
       buildBrandOverview,
       buildBrandPlatformPerformance,
@@ -914,7 +918,7 @@ export async function getBrandMetrics(
   brand: string,
   period?: SocialMetricPeriod,
 ): Promise<SocialMetric[]> {
-  const accounts = (await getSocialAccounts()).filter((a) => a.brand === brand);
+  const accounts = (await getSocialAccounts()).filter((a) => (a.brandId ?? a.brand) === brand);
   const ids = accounts.map((a) => a.id);
   if (ids.length === 0) return [];
   return getSocialMetrics(ids, period);
