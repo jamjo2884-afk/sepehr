@@ -60,6 +60,8 @@ export interface BrandAllocation {
   id: ID;
   teamMemberId: ID;
   brand: string;
+  /** Canonical brand reference — may be absent during transition. */
+  brandId?: string | null;
   allocationPercentage: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -67,6 +69,7 @@ export interface BrandAllocation {
 
 export interface BrandAllocationInput {
   brand: string;
+  brandId?: string | null;
   allocationPercentage: number;
 }
 
@@ -129,6 +132,7 @@ export interface BrandAllocationRow {
   id: string;
   team_member_id: string;
   brand: string;
+  brand_id: string | null;
   allocation_percentage: number;
   created_at: string;
   updated_at: string;

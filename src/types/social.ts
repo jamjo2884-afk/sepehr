@@ -37,6 +37,8 @@ export const SOCIAL_ACCOUNT_STATUS_LABELS: Record<SocialAccountStatus, string> =
 export interface SocialAccount {
   id: ID;
   brand: string;
+  /** Canonical brand reference — may be absent during transition. */
+  brandId?: string | null;
   platform: SocialPlatform;
   /** Unique handle / username on the platform. */
   username: string;
@@ -66,6 +68,7 @@ export interface SocialAccount {
  */
 export interface SocialAccountInput {
   brand: string;
+  brandId?: string | null;
   platform: SocialPlatform;
   username: string;
   displayName?: string | null;

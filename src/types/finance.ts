@@ -66,6 +66,8 @@ export type BudgetPeriod = 'monthly' | 'quarterly' | 'yearly';
 export interface FinanceBudget {
   id: ID;
   brand: string;
+  /** Canonical brand reference — may be absent during transition. */
+  brandId?: string | null;
   period: BudgetPeriod;
   periodLabel: string;
   amount: number;
@@ -76,6 +78,7 @@ export interface FinanceBudget {
 
 export interface FinanceBudgetInput {
   brand: string;
+  brandId?: string | null;
   period: BudgetPeriod;
   periodLabel: string;
   amount: number;
@@ -89,6 +92,8 @@ export interface FinanceBudgetInput {
 export interface FinanceExpense {
   id: ID;
   brand: string;
+  /** Canonical brand reference — may be absent during transition. */
+  brandId?: string | null;
   expenseDate: string;
   amount: number;
   category: ExpenseCategory;
@@ -100,6 +105,7 @@ export interface FinanceExpense {
 
 export interface FinanceExpenseInput {
   brand: string;
+  brandId?: string | null;
   expenseDate: string;
   amount: number;
   category: ExpenseCategory;
@@ -136,6 +142,8 @@ export interface ExpenseAllocationInput {
 export interface FinanceCampaign {
   id: ID;
   brand: string;
+  /** Canonical brand reference — may be absent during transition. */
+  brandId?: string | null;
   name: string;
   startDate: string;
   endDate: string | null;
@@ -148,6 +156,7 @@ export interface FinanceCampaign {
 
 export interface FinanceCampaignInput {
   brand: string;
+  brandId?: string | null;
   name: string;
   startDate: string;
   endDate?: string | null;
@@ -222,6 +231,7 @@ export interface FinanceScatterPoint {
 export interface BudgetRow {
   id: string;
   brand: string;
+  brand_id: string | null;
   period: BudgetPeriod;
   period_label: string;
   amount: number;
@@ -233,6 +243,7 @@ export interface BudgetRow {
 export interface ExpenseRow {
   id: string;
   brand: string;
+  brand_id: string | null;
   expense_date: string;
   amount: number;
   category: ExpenseCategory;
@@ -255,6 +266,7 @@ export interface AllocationRow {
 export interface CampaignRow {
   id: string;
   brand: string;
+  brand_id: string | null;
   name: string;
   start_date: string;
   end_date: string | null;
