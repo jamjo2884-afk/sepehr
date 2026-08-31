@@ -486,7 +486,7 @@ export default function SocialAccountsPage() {
               {filtered.map((account) => {
                 const latest = latestByAccount.get(account.id) ?? null;
                 const latestLog =
-                  overview?.latestLogByAccount[account.id] ?? null;
+                  overview?.latestLogByAccount?.[account.id] ?? null;
                 const detailHref = `/social/${encodeURIComponent(
                   [account.brand, account.platform, account.username].join('|'),
                 )}`;

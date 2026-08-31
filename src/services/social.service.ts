@@ -660,7 +660,8 @@ export function toSocialMetric(row: MetricRow): SocialMetric {
 export async function getSocialAccounts(): Promise<SocialAccount[]> {
   try {
     const { supabase } = await import('@/lib/supabase');
-    const { data, error } = await supabase
+    // Try with brand_id first (post-migration schema)
+    let { data, error } = await supabase
       .from('social_accounts')
       .select(
         'id, brand_id, platform, username, display_name, url, external_id, ' +
@@ -670,13 +671,34 @@ export async function getSocialAccounts(): Promise<SocialAccount[]> {
       .order('platform', { ascending: true })
       .order('username', { ascending: true })
       .limit(10000);
+    // If brand_id column doesn't exist yet, retry without it
+    if (error && (error as { code?: string }).code === '42703') {
+      const retry = await supabase
+        .from('social_accounts')
+        .select(
+          'id, brand, platform, username, display_name, url, external_id, ' +
+            'status, connection_status, last_sync_at, last_sync_status, ' +
+            'last_successful_sync_at, created_at, updated_at',
+        )
+        .order('brand', { ascending: true })
+        .order('platform', { ascending: true })
+        .order('username', { ascending: true })
+        .limit(10000);
+      data = retry.data;
+      error = retry.error;
+    }
     if (error) throw error;
     if (!data || data.length === 0) return accountsFromSnapshot();
     const rows = data as unknown as AccountRow[];
-    const { resolveBrandNames } = await import('@/services/brand.service');
-    const brandIds = rows.map((r) => r.brand_id).filter((id): id is string => !!id);
-    const brandNames = await resolveBrandNames(brandIds);
-    return rows.map((r) => toSocialAccount(r, brandNames));
+    // Resolve brand names if we got brand_id, otherwise use brand column
+    if (rows[0] && 'brand_id' in rows[0]) {
+      const { resolveBrandNames } = await import('@/services/brand.service');
+      const brandIds = rows.map((r) => r.brand_id).filter((id): id is string => !!id);
+      const brandNames = await resolveBrandNames(brandIds);
+      return rows.map((r) => toSocialAccount(r, brandNames));
+    }
+    // Legacy schema: brand column exists as text
+    return rows.map((r) => toSocialAccount(r));
   } catch (err) {
     console.warn(
       '[social] Could not read social_accounts from Supabase, ' +
