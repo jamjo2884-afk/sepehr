@@ -986,7 +986,7 @@ function CredentialDot({ configured }: { configured: boolean }) {
 
 /** Top control-center section: platform summary + sync health. */
 function SyncOverviewSection({ overview }: { overview: SyncOverview | null }) {
-  if (!overview) {
+  if (!overview || !overview.platforms) {
     return (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2].map((i) => (
