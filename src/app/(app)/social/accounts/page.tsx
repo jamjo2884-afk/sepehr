@@ -17,10 +17,7 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
-import {
-  getSocialDashboardData,
-  latestMetricsByAccount,
-} from '@/services/social.service';
+import { latestMetricsByAccount } from '@/services/social.service';
 import {
   formatSyncDuration,
   getLatestSyncLogs,
@@ -115,10 +112,15 @@ export default function SocialAccountsPage() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    getSocialDashboardData()
-      .then((data) => {
+    fetch('/api/social/analytics')
+      .then((r) => r.json())
+      .then((data: { ok: boolean; accounts: SocialAccount[]; metrics: SocialMetric[] }) => {
         if (active) {
-          setRaw(data);
+          if (data.ok) {
+            setRaw({ accounts: data.accounts, metrics: data.metrics });
+          } else {
+            setRaw(null);
+          }
           setLoading(false);
         }
       })

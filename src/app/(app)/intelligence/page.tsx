@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { AlertTriangle, BrainCircuit, Lightbulb, Trophy } from 'lucide-react';
-import { getSocialDashboardData } from '@/services/social.service';
+
 import {
   buildBrandGrowthDrivers,
   buildBrandOverview,
@@ -45,10 +45,15 @@ export default function IntelligencePage() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    getSocialDashboardData()
-      .then((data) => {
+    fetch('/api/social/analytics')
+      .then((r) => r.json())
+      .then((data: { ok: boolean; accounts: SocialAccount[]; metrics: SocialMetric[] }) => {
         if (active) {
-          setRaw(data);
+          if (data.ok) {
+            setRaw({ accounts: data.accounts, metrics: data.metrics });
+          } else {
+            setRaw(null);
+          }
           setLoading(false);
         }
       })

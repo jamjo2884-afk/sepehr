@@ -13,10 +13,7 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react';
-import {
-  buildAccountRows,
-  getSocialDashboardData,
-} from '@/services/social.service';
+import { buildAccountRows } from '@/services/social.service';
 import {
   buildFollowersTrend,
   buildPlatformStats,
@@ -67,10 +64,15 @@ export default function AudiencePage() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    getSocialDashboardData()
-      .then((data) => {
+    fetch('/api/social/analytics')
+      .then((r) => r.json())
+      .then((data: { ok: boolean; accounts: SocialAccount[]; metrics: SocialMetric[] }) => {
         if (active) {
-          setRaw(data);
+          if (data.ok) {
+            setRaw({ accounts: data.accounts, metrics: data.metrics });
+          } else {
+            setRaw(null);
+          }
           setLoading(false);
         }
       })

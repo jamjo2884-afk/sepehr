@@ -12,7 +12,6 @@ import {
   PieChart,
   TrendingUp,
 } from 'lucide-react';
-import { getSocialDashboardData } from '@/services/social.service';
 import {
   buildBrandStats,
   buildBrandTrends,
@@ -72,10 +71,15 @@ export default function AnalyticsPage() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    getSocialDashboardData()
-      .then((data) => {
+    fetch('/api/social/analytics')
+      .then((r) => r.json())
+      .then((data: { ok: boolean; accounts: SocialAccount[]; metrics: SocialMetric[] }) => {
         if (active) {
-          setRaw(data);
+          if (data.ok) {
+            setRaw({ accounts: data.accounts, metrics: data.metrics });
+          } else {
+            setRaw(null);
+          }
           setLoading(false);
         }
       })
