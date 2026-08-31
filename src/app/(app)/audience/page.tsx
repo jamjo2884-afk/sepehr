@@ -89,7 +89,7 @@ export default function AudiencePage() {
   const metricsAll = useMemo(() => raw?.metrics ?? [], [raw]);
 
   const brands = useMemo(
-    () => [...new Set(accountsAll.map((a) => a.brand))],
+    () => [...new Set(accountsAll.map((a) => a.brand || a.brandId || ''))].filter(Boolean),
     [accountsAll],
   );
   const presentPlatforms = useMemo(
@@ -167,7 +167,7 @@ export default function AudiencePage() {
     () =>
       accountRows.filter(
         (a) =>
-          (selectedBrands.length === 0 || selectedBrands.includes(a.brand)) &&
+          (selectedBrands.length === 0 || selectedBrands.includes(a.brand || a.brandId || '')) &&
           (selectedPlatforms.length === 0 ||
             selectedPlatforms.includes(a.platform)),
       ),

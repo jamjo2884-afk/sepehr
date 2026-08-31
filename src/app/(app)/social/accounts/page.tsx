@@ -152,7 +152,7 @@ export default function SocialAccountsPage() {
 
   const brands = useMemo(
     () =>
-      [...new Set(accounts.map((a) => a.brand))].sort((a, b) =>
+      [...new Set(accounts.map((a) => a.brand || a.brandId || ''))].sort((a, b) =>
         a.localeCompare(b, 'fa'),
       ),
     [accounts],
@@ -174,7 +174,7 @@ export default function SocialAccountsPage() {
   const filtered = useMemo(() => {
     return accounts.filter(
       (a) =>
-        (brandFilter === 'all' || a.brand === brandFilter) &&
+        (brandFilter === 'all' || a.brand === brandFilter || a.brandId === brandFilter) &&
         (platformFilter === 'all' || a.platform === platformFilter) &&
         (statusFilter === 'all' || a.status === statusFilter),
     );

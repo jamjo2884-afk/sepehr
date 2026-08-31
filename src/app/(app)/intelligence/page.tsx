@@ -67,7 +67,7 @@ export default function IntelligencePage() {
   const metricsAll = useMemo(() => raw?.metrics ?? [], [raw]);
 
   const brands = useMemo(
-    () => [...new Set(accountsAll.map((a) => a.brand))],
+    () => [...new Set(accountsAll.map((a) => a.brand || a.brandId || ''))].filter(Boolean),
     [accountsAll],
   );
 

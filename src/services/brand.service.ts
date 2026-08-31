@@ -100,17 +100,42 @@ export async function resolveBrandNames(
   if (uniqueIds.length === 0) return result;
   try {
     const supabase = await getSupabase();
-    if (!(await checkSupabaseTable(supabase, 'brands'))) return result;
+    if (!(await checkSupabaseTable(supabase, 'brands'))) {
+      // Fallback: fetch all brands and build the map
+      const brands = await getBrands();
+      for (const b of brands) result.set(b.id, b.name);
+      return result;
+    }
     const { data, error } = await supabase
       .from('brands')
       .select('id, name')
       .in('id', uniqueIds);
-    if (error || !data) return result;
+    if (error || !data) {
+      // Fallback: fetch all brands
+      const brands = await getBrands();
+      for (const b of brands) result.set(b.id, b.name);
+      return result;
+    }
     for (const row of data) {
       result.set(row.id as string, row.name as string);
     }
+    // If some IDs are still missing, try full brand list
+    const missing = uniqueIds.filter((id) => !result.has(id));
+    if (missing.length > 0) {
+      const brands = await getBrands();
+      for (const b of brands) {
+        if (missing.includes(b.id)) result.set(b.id, b.name);
+      }
+    }
     return result;
   } catch {
+    // Last resort: fetch all brands
+    try {
+      const brands = await getBrands();
+      for (const b of brands) result.set(b.id, b.name);
+    } catch {
+      // Give up
+    }
     return result;
   }
 }

@@ -44,10 +44,11 @@ export default function BrandsPage() {
   const brands = useMemo<BrandCard[]>(() => {
     const brandMap = new Map<string, SocialAccount[]>();
     for (const account of accounts) {
-      if (isBrandIgnored(account.brand)) continue;
-      const list = brandMap.get(account.brand) ?? [];
+      const brandKey = account.brand || account.brandId || '';
+      if (!brandKey || isBrandIgnored(brandKey)) continue;
+      const list = brandMap.get(brandKey) ?? [];
       list.push(account);
-      brandMap.set(account.brand, list);
+      brandMap.set(brandKey, list);
     }
 
     return [...brandMap.entries()]

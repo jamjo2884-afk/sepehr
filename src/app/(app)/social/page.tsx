@@ -141,14 +141,14 @@ export default function SocialPage() {
   // kept even though they have no accounts yet).
   const visibleBrands = useMemo(() => {
     if (!raw) return [];
-    const base = [...new Set(accountsAll.map((a) => a.brand))].filter(
-      (b) => !removed.includes(b) && !isBrandIgnored(b),
+    const base = [...new Set(accountsAll.map((a) => a.brand || a.brandId || ''))].filter(
+      (b) => b && !removed.includes(b) && !isBrandIgnored(b),
     );
     return [...base, ...added.filter((a) => !base.includes(a) && !isBrandIgnored(a))];
   }, [raw, accountsAll, added, removed]);
 
   const accountsBase = useMemo(
-    () => accountsAll.filter((a) => !removed.includes(a.brand)),
+    () => accountsAll.filter((a) => !removed.includes(a.brand || a.brandId || '')),
     [accountsAll, removed],
   );
 
@@ -276,7 +276,7 @@ export default function SocialPage() {
     return accountRows
       .filter(
         (a) =>
-          (selectedBrands.length === 0 || selectedBrands.includes(a.brand)) &&
+          (selectedBrands.length === 0 || selectedBrands.includes(a.brand || a.brandId || '')) &&
           (selectedPlatforms.length === 0 ||
             selectedPlatforms.includes(a.platform)),
       )
