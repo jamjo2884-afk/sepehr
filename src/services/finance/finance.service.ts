@@ -177,9 +177,15 @@ export async function createBudget(
   try {
     const supabase = await getSupabase();
     if (await checkSupabaseTable(supabase, 'finance_budgets')) {
+      // Resolve brand name to brandId if not provided
+      let brandId = input.brandId ?? null;
+      if (!brandId && input.brand) {
+        const { resolveBrandId } = await import('@/services/brand.service');
+        brandId = await resolveBrandId(input.brand);
+      }
       const row = {
         id,
-        brand_id: input.brandId ?? null,
+        brand_id: brandId,
         period: input.period,
         period_label: input.periodLabel,
         amount: input.amount,
@@ -334,9 +340,15 @@ export async function createExpense(
   try {
     const supabase = await getSupabase();
     if (await checkSupabaseTable(supabase, 'finance_expenses')) {
+      // Resolve brand name to brandId if not provided
+      let brandId = input.brandId ?? null;
+      if (!brandId && input.brand) {
+        const { resolveBrandId } = await import('@/services/brand.service');
+        brandId = await resolveBrandId(input.brand);
+      }
       const row = {
         id,
-        brand_id: input.brandId ?? null,
+        brand_id: brandId,
         expense_date: input.expenseDate,
         amount: input.amount,
         category: input.category,
@@ -594,9 +606,15 @@ export async function createCampaign(
   try {
     const supabase = await getSupabase();
     if (await checkSupabaseTable(supabase, 'finance_campaigns')) {
+      // Resolve brand name to brandId if not provided
+      let brandId = input.brandId ?? null;
+      if (!brandId && input.brand) {
+        const { resolveBrandId } = await import('@/services/brand.service');
+        brandId = await resolveBrandId(input.brand);
+      }
       const row = {
         id,
-        brand_id: input.brandId ?? null,
+        brand_id: brandId,
         name: input.name.trim(),
         start_date: input.startDate,
         end_date: input.endDate ?? null,

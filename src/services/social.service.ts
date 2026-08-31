@@ -747,8 +747,14 @@ export async function createSocialAccount(
 ): Promise<SocialAccount | null> {
   try {
     const { supabase } = await import('@/lib/supabase');
+    // Resolve brand name to brandId if not provided
+    let brandId = input.brandId ?? null;
+    if (!brandId && input.brand) {
+      const { resolveBrandId } = await import('@/services/brand.service');
+      brandId = await resolveBrandId(input.brand);
+    }
     const row: Record<string, unknown> = {
-      brand_id: input.brandId ?? null,
+      brand_id: brandId,
       platform: input.platform,
       username: input.username.trim(),
       display_name: input.displayName?.trim() || null,
@@ -763,8 +769,8 @@ export async function createSocialAccount(
     if (error) throw error;
     const { resolveBrandNames } = await import('@/services/brand.service');
     const createdRow = data as unknown as AccountRow;
-    const brandId = (createdRow as unknown as { brand_id?: string | null }).brand_id;
-    const brandNames = brandId ? await resolveBrandNames([brandId]) : new Map<string, string>();
+    const createdBrandId = (createdRow as unknown as { brand_id?: string | null }).brand_id;
+    const brandNames = createdBrandId ? await resolveBrandNames([createdBrandId]) : new Map<string, string>();
     return toSocialAccount(createdRow, brandNames);
   } catch (err) {
     console.warn('[social] Could not create social account.', err);
@@ -783,8 +789,14 @@ export async function updateSocialAccount(
 ): Promise<SocialAccount | null> {
   try {
     const { supabase } = await import('@/lib/supabase');
+    // Resolve brand name to brandId if not provided
+    let brandId = input.brandId ?? null;
+    if (!brandId && input.brand) {
+      const { resolveBrandId } = await import('@/services/brand.service');
+      brandId = await resolveBrandId(input.brand);
+    }
     const row: Record<string, unknown> = {
-      brand_id: input.brandId ?? null,
+      brand_id: brandId,
       platform: input.platform,
       username: input.username.trim(),
       display_name: input.displayName?.trim() || null,
@@ -799,8 +811,8 @@ export async function updateSocialAccount(
       .single();    if (error) throw error;
     const { resolveBrandNames } = await import('@/services/brand.service');
     const updatedRow = data as unknown as AccountRow;
-    const brandId = (updatedRow as unknown as { brand_id?: string | null }).brand_id;
-    const brandNames = brandId ? await resolveBrandNames([brandId]) : new Map<string, string>();
+    const updatedBrandId = (updatedRow as unknown as { brand_id?: string | null }).brand_id;
+    const brandNames = updatedBrandId ? await resolveBrandNames([updatedBrandId]) : new Map<string, string>();
     return toSocialAccount(updatedRow, brandNames);
   } catch (err) {
 
