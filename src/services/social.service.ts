@@ -566,6 +566,7 @@ export function metricsFromSnapshot(account: SocialAccount): SocialMetric[] {
 interface AccountRow {
   id: string;
   brand: string;
+  brand_id: string | null;
   platform: SocialPlatform;
   username: string;
   display_name: string | null;
@@ -606,11 +607,12 @@ interface MetricRow {
   updated_at: string;
 }
 
-export function toSocialAccount(row: AccountRow): SocialAccount {
+export function toSocialAccount(row: AccountRow, brandNames?: Map<string, string>): SocialAccount {
+  const brandId = row.brand_id ?? null;
   return {
     id: row.id,
-    brand: row.brand,
-    brandId: (row as unknown as { brand_id?: string | null }).brand_id ?? null,
+    brand: (brandId && brandNames?.get(brandId)) ?? row.brand ?? '',
+    brandId,
     platform: row.platform,
     username: row.username,
     displayName: row.display_name,
@@ -661,17 +663,20 @@ export async function getSocialAccounts(): Promise<SocialAccount[]> {
     const { data, error } = await supabase
       .from('social_accounts')
       .select(
-        'id, brand, brand_id, platform, username, display_name, url, external_id, ' +
+        'id, brand_id, platform, username, display_name, url, external_id, ' +
           'status, connection_status, last_sync_at, last_sync_status, ' +
           'last_successful_sync_at, created_at, updated_at',
       )
-      .order('brand', { ascending: true })
       .order('platform', { ascending: true })
       .order('username', { ascending: true })
       .limit(10000);
     if (error) throw error;
     if (!data || data.length === 0) return accountsFromSnapshot();
-    return (data as unknown as AccountRow[]).map(toSocialAccount);
+    const rows = data as unknown as AccountRow[];
+    const { resolveBrandNames } = await import('@/services/brand.service');
+    const brandIds = rows.map((r) => r.brand_id).filter((id): id is string => !!id);
+    const brandNames = await resolveBrandNames(brandIds);
+    return rows.map((r) => toSocialAccount(r, brandNames));
   } catch (err) {
     console.warn(
       '[social] Could not read social_accounts from Supabase, ' +
@@ -743,7 +748,6 @@ export async function createSocialAccount(
   try {
     const { supabase } = await import('@/lib/supabase');
     const row: Record<string, unknown> = {
-      brand: input.brand.trim(),
       brand_id: input.brandId ?? null,
       platform: input.platform,
       username: input.username.trim(),
@@ -757,7 +761,11 @@ export async function createSocialAccount(
       .select()
       .single();
     if (error) throw error;
-    return toSocialAccount(data as unknown as AccountRow);
+    const { resolveBrandNames } = await import('@/services/brand.service');
+    const createdRow = data as unknown as AccountRow;
+    const brandId = (createdRow as unknown as { brand_id?: string | null }).brand_id;
+    const brandNames = brandId ? await resolveBrandNames([brandId]) : new Map<string, string>();
+    return toSocialAccount(createdRow, brandNames);
   } catch (err) {
     console.warn('[social] Could not create social account.', err);
     return null;
@@ -776,7 +784,6 @@ export async function updateSocialAccount(
   try {
     const { supabase } = await import('@/lib/supabase');
     const row: Record<string, unknown> = {
-      brand: input.brand.trim(),
       brand_id: input.brandId ?? null,
       platform: input.platform,
       username: input.username.trim(),
@@ -789,10 +796,15 @@ export async function updateSocialAccount(
       .update(row)
       .eq('id', accountId)
       .select()
-      .single();
-    if (error) throw error;
-    return toSocialAccount(data as unknown as AccountRow);
+      .single();    if (error) throw error;
+    const { resolveBrandNames } = await import('@/services/brand.service');
+    const updatedRow = data as unknown as AccountRow;
+    const brandId = (updatedRow as unknown as { brand_id?: string | null }).brand_id;
+    const brandNames = brandId ? await resolveBrandNames([brandId]) : new Map<string, string>();
+    return toSocialAccount(updatedRow, brandNames);
   } catch (err) {
+
+
     console.warn('[social] Could not update social account.', err);
     return null;
   }
@@ -813,10 +825,15 @@ export async function setSocialAccountStatus(
       .update({ status })
       .eq('id', accountId)
       .select()
-      .single();
-    if (error) throw error;
-    return toSocialAccount(data as unknown as AccountRow);
+      .single();    if (error) throw error;
+    const { resolveBrandNames } = await import('@/services/brand.service');
+    const updatedRow = data as unknown as AccountRow;
+    const brandId = (updatedRow as unknown as { brand_id?: string | null }).brand_id;
+    const brandNames = brandId ? await resolveBrandNames([brandId]) : new Map<string, string>();
+    return toSocialAccount(updatedRow, brandNames);
   } catch (err) {
+
+
     console.warn('[social] Could not update social account status.', err);
     return null;
   }

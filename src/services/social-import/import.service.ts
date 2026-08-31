@@ -91,8 +91,18 @@ async function batchEnsureAccounts(
   if (needed.size === 0) return accountMap;
 
   // Batch insert all missing accounts in ONE query
+  // Resolve brand names to brand_ids
+  const { resolveBrandId } = await import('@/services/brand.service');
+  const brandResolutions = new Map<string, string | null>();
+  for (const acc of needed.values()) {
+    const name = acc.brand.trim();
+    if (!brandResolutions.has(name)) {
+      brandResolutions.set(name, await resolveBrandId(name));
+    }
+  }
+
   const newRows = [...needed.values()].map((acc) => ({
-    brand: acc.brand.trim(),
+    brand_id: brandResolutions.get(acc.brand.trim()) ?? null,
     platform: acc.platform,
     username: acc.username.trim(),
     display_name: null,
@@ -114,7 +124,7 @@ async function batchEnsureAccounts(
         const { data, error: insErr } = await supabase
           .from('social_accounts')
           .insert({
-            brand: acc.brand.trim(),
+            brand_id: brandResolutions.get(acc.brand.trim()) ?? null,
             platform: acc.platform,
             username: acc.username.trim(),
             display_name: null,

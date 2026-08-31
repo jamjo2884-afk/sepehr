@@ -11,8 +11,8 @@ export const dynamic = 'force-dynamic';
 export const GET = withAuth(async (req) => {
   try {
     const { searchParams } = new URL(req.url);
-    const brand = searchParams.get('brand') || undefined;
-    const campaigns = await getCampaigns(brand);
+    const brandId = searchParams.get('brandId') || undefined;
+    const campaigns = await getCampaigns(brandId);
     return NextResponse.json({ ok: true, campaigns });
   } catch (err) {
     console.warn('[finance] Could not list campaigns.', err);

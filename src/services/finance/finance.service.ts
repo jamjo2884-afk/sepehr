@@ -75,11 +75,12 @@ function saveStore<T>(key: string, data: T[]): void {
  * Row Mappers
  * ========================================================================= */
 
-function budgetFromRow(row: BudgetRow): FinanceBudget {
+function budgetFromRow(row: BudgetRow, brandNames?: Map<string, string>): FinanceBudget {
+  const brandId = row.brand_id ?? null;
   return {
     id: row.id,
-    brand: row.brand,
-    brandId: row.brand_id ?? null,
+    brand: (brandId && brandNames?.get(brandId)) ?? '',
+    brandId,
     period: row.period as BudgetPeriod,
     periodLabel: row.period_label,
     amount: Number(row.amount),
@@ -89,11 +90,12 @@ function budgetFromRow(row: BudgetRow): FinanceBudget {
   };
 }
 
-function expenseFromRow(row: ExpenseRow): FinanceExpense {
+function expenseFromRow(row: ExpenseRow, brandNames?: Map<string, string>): FinanceExpense {
+  const brandId = row.brand_id ?? null;
   return {
     id: row.id,
-    brand: row.brand,
-    brandId: row.brand_id ?? null,
+    brand: (brandId && brandNames?.get(brandId)) ?? '',
+    brandId,
     expenseDate: row.expense_date,
     amount: Number(row.amount),
     category: row.category as ExpenseCategory,
@@ -116,11 +118,12 @@ function allocationFromRow(row: AllocationRow): ExpenseAllocation {
   };
 }
 
-function campaignFromRow(row: CampaignRow): FinanceCampaign {
+function campaignFromRow(row: CampaignRow, brandNames?: Map<string, string>): FinanceCampaign {
+  const brandId = row.brand_id ?? null;
   return {
     id: row.id,
-    brand: row.brand,
-    brandId: row.brand_id ?? null,
+    brand: (brandId && brandNames?.get(brandId)) ?? '',
+    brandId,
     name: row.name,
     startDate: row.start_date,
     endDate: row.end_date,
@@ -136,7 +139,7 @@ function campaignFromRow(row: CampaignRow): FinanceCampaign {
  * Budgets CRUD
  * ========================================================================= */
 
-export async function getBudgets(brand?: string, brandId?: string): Promise<FinanceBudget[]> {
+export async function getBudgets(brandId?: string): Promise<FinanceBudget[]> {
   try {
     const supabase = await getSupabase();
     if (await checkSupabaseTable(supabase, 'finance_budgets')) {
@@ -145,11 +148,14 @@ export async function getBudgets(brand?: string, brandId?: string): Promise<Fina
         .select('*')
         .order('period_label', { ascending: false });
       if (brandId) query = query.eq('brand_id', brandId);
-      else if (brand) query = query.eq('brand', brand);
       const { data, error } = await query;
       if (error) throw error;
       if (data && data.length > 0) {
-        return (data as unknown as BudgetRow[]).map(budgetFromRow);
+        const rows = data as unknown as BudgetRow[];
+        const { resolveBrandNames } = await import('@/services/brand.service');
+        const brandIds = rows.map((r) => r.brand_id).filter((id): id is string => !!id);
+        const brandNames = await resolveBrandNames(brandIds);
+        return rows.map((r) => budgetFromRow(r, brandNames));
       }
     }
   } catch {
@@ -158,7 +164,7 @@ export async function getBudgets(brand?: string, brandId?: string): Promise<Fina
 
   // localStorage fallback
   let budgets = loadStore<FinanceBudget>('budgets');
-  if (brand) budgets = budgets.filter((b) => b.brand === brand);
+  if (brandId) budgets = budgets.filter((b) => b.brandId === brandId);
   return budgets.sort((a, b) => b.periodLabel.localeCompare(a.periodLabel));
 }
 
@@ -173,7 +179,6 @@ export async function createBudget(
     if (await checkSupabaseTable(supabase, 'finance_budgets')) {
       const row = {
         id,
-        brand: input.brand.trim(),
         brand_id: input.brandId ?? null,
         period: input.period,
         period_label: input.periodLabel,
@@ -270,7 +275,7 @@ export async function deleteBudget(id: string): Promise<boolean> {
  * Expenses CRUD
  * ========================================================================= */
 
-export async function getExpenses(brand?: string, brandId?: string): Promise<FinanceExpense[]> {
+export async function getExpenses(brandId?: string): Promise<FinanceExpense[]> {
   try {
     const supabase = await getSupabase();
     if (await checkSupabaseTable(supabase, 'finance_expenses')) {
@@ -279,11 +284,14 @@ export async function getExpenses(brand?: string, brandId?: string): Promise<Fin
         .select('*')
         .order('expense_date', { ascending: false });
       if (brandId) query = query.eq('brand_id', brandId);
-      else if (brand) query = query.eq('brand', brand);
       const { data, error } = await query;
       if (error) throw error;
       if (data && data.length > 0) {
-        return (data as unknown as ExpenseRow[]).map(expenseFromRow);
+        const rows = data as unknown as ExpenseRow[];
+        const { resolveBrandNames } = await import('@/services/brand.service');
+        const brandIds = rows.map((r) => r.brand_id).filter((id): id is string => !!id);
+        const brandNames = await resolveBrandNames(brandIds);
+        return rows.map((r) => expenseFromRow(r, brandNames));
       }
     }
   } catch {
@@ -292,7 +300,7 @@ export async function getExpenses(brand?: string, brandId?: string): Promise<Fin
 
   // localStorage fallback
   let expenses = loadStore<FinanceExpense>('expenses');
-  if (brand) expenses = expenses.filter((e) => e.brand === brand);
+  if (brandId) expenses = expenses.filter((e) => e.brandId === brandId);
   return expenses.sort((a, b) => b.expenseDate.localeCompare(a.expenseDate));
 }
 
@@ -328,7 +336,6 @@ export async function createExpense(
     if (await checkSupabaseTable(supabase, 'finance_expenses')) {
       const row = {
         id,
-        brand: input.brand.trim(),
         brand_id: input.brandId ?? null,
         expense_date: input.expenseDate,
         amount: input.amount,
@@ -513,14 +520,14 @@ export async function getAllocationsForExpense(
 }
 
 export async function getAllAllocations(
-  brand?: string,
+  brandId?: string,
 ): Promise<ExpenseAllocation[]> {
   try {
     const supabase = await getSupabase();
     if (await checkSupabaseTable(supabase, 'finance_expense_allocations')) {
       let query = supabase.from('finance_expense_allocations').select('*');
-      if (brand) {
-        const expenses = await getExpenses(brand);
+      if (brandId) {
+        const expenses = await getExpenses(brandId);
         const expenseIds = expenses.map((e) => e.id);
         if (expenseIds.length === 0) return [];
         query = query.in('expense_id', expenseIds);
@@ -537,8 +544,8 @@ export async function getAllAllocations(
 
   // localStorage fallback
   let allocs = loadStore<ExpenseAllocation>('allocations');
-  if (brand) {
-    const expenses = await getExpenses(brand);
+  if (brandId) {
+    const expenses = await getExpenses(brandId);
     const expenseIds = new Set(expenses.map((e) => e.id));
     allocs = allocs.filter((a) => expenseIds.has(a.expenseId));
   }
@@ -549,7 +556,7 @@ export async function getAllAllocations(
  * Campaigns CRUD
  * ========================================================================= */
 
-export async function getCampaigns(brand?: string, brandId?: string): Promise<FinanceCampaign[]> {
+export async function getCampaigns(brandId?: string): Promise<FinanceCampaign[]> {
   try {
     const supabase = await getSupabase();
     if (await checkSupabaseTable(supabase, 'finance_campaigns')) {
@@ -558,11 +565,14 @@ export async function getCampaigns(brand?: string, brandId?: string): Promise<Fi
         .select('*')
         .order('created_at', { ascending: false });
       if (brandId) query = query.eq('brand_id', brandId);
-      else if (brand) query = query.eq('brand', brand);
       const { data, error } = await query;
       if (error) throw error;
       if (data && data.length > 0) {
-        return (data as unknown as CampaignRow[]).map(campaignFromRow);
+        const rows = data as unknown as CampaignRow[];
+        const { resolveBrandNames } = await import('@/services/brand.service');
+        const brandIds = rows.map((r) => r.brand_id).filter((id): id is string => !!id);
+        const brandNames = await resolveBrandNames(brandIds);
+        return rows.map((r) => campaignFromRow(r, brandNames));
       }
     }
   } catch {
@@ -571,7 +581,7 @@ export async function getCampaigns(brand?: string, brandId?: string): Promise<Fi
 
   // localStorage fallback
   let campaigns = loadStore<FinanceCampaign>('campaigns');
-  if (brand) campaigns = campaigns.filter((c) => c.brand === brand);
+  if (brandId) campaigns = campaigns.filter((c) => c.brandId === brandId);
   return campaigns.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
@@ -586,7 +596,6 @@ export async function createCampaign(
     if (await checkSupabaseTable(supabase, 'finance_campaigns')) {
       const row = {
         id,
-        brand: input.brand.trim(),
         brand_id: input.brandId ?? null,
         name: input.name.trim(),
         start_date: input.startDate,
@@ -691,17 +700,15 @@ export async function deleteCampaign(id: string): Promise<boolean> {
 export async function getFinanceBrands(): Promise<string[]> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_budgets')) {
-      const [budgets, expenses, campaigns] = await Promise.all([
-        supabase.from('finance_budgets').select('brand'),
-        supabase.from('finance_expenses').select('brand'),
-        supabase.from('finance_campaigns').select('brand'),
-      ]);
-      const brands = new Set<string>();
-      for (const row of budgets.data ?? []) brands.add((row as { brand: string }).brand);
-      for (const row of expenses.data ?? []) brands.add((row as { brand: string }).brand);
-      for (const row of campaigns.data ?? []) brands.add((row as { brand: string }).brand);
-      return [...brands].sort((a, b) => a.localeCompare(b, 'fa'));
+    if (await checkSupabaseTable(supabase, 'brands')) {
+      const { data } = await supabase
+        .from('brands')
+        .select('name')
+        .eq('status', 'active')
+        .order('name', { ascending: true });
+      if (data && data.length > 0) {
+        return (data as { name: string }[]).map((r) => r.name);
+      }
     }
   } catch {
     // Fall through

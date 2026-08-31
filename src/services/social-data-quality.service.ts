@@ -452,16 +452,20 @@ export async function getSocialDataQuality(
     supabase
       .from('social_accounts')
       .select('*')
-      .order('brand', { ascending: true })
+      .order('created_at', { ascending: true })
       .limit(10000),
     fetchAllMetricRows(supabase, undefined, undefined),
   ]);
   if (accountResult.error) throw accountResult.error;
-  const accounts = (
-    (accountResult.data ?? []) as unknown as Parameters<
+  const rows = (accountResult.data ?? []) as unknown as Parameters<
       typeof toSocialAccount
-    >[0][]
-  ).map(toSocialAccount);
+    >[0][];
+  const { resolveBrandNames } = await import('@/services/brand.service');
+  const brandIds = rows
+    .map((r) => (r as unknown as { brand_id?: string | null }).brand_id)
+    .filter((id): id is string => !!id);
+  const brandNames = await resolveBrandNames(brandIds);
+  const accounts = rows.map((r) => toSocialAccount(r, brandNames));
   const metrics = metricRows.map(toSocialMetric);
   return analyzeSocialDataQuality(accounts, metrics);
 }

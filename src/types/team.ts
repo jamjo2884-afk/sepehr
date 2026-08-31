@@ -133,7 +133,6 @@ export interface TeamMemberRow {
 export interface BrandAllocationRow {
   id: string;
   team_member_id: string;
-  brand: string;
   brand_id: string | null;
   allocation_percentage: number;
   created_at: string;

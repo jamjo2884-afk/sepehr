@@ -233,7 +233,6 @@ export interface FinanceScatterPoint {
 
 export interface BudgetRow {
   id: string;
-  brand: string;
   brand_id: string | null;
   period: BudgetPeriod;
   period_label: string;
@@ -245,7 +244,6 @@ export interface BudgetRow {
 
 export interface ExpenseRow {
   id: string;
-  brand: string;
   brand_id: string | null;
   expense_date: string;
   amount: number;
@@ -268,7 +266,6 @@ export interface AllocationRow {
 
 export interface CampaignRow {
   id: string;
-  brand: string;
   brand_id: string | null;
   name: string;
   start_date: string;

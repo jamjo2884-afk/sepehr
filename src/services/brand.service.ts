@@ -88,6 +88,33 @@ export async function resolveBrandIds(
   }
 }
 
+/**
+ * Resolve multiple brand UUID ids to their display names.
+ * Returns a Map<brandId, brandName> for found brands.
+ */
+export async function resolveBrandNames(
+  brandIds: string[],
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const uniqueIds = [...new Set(brandIds.filter((id) => !!id))];
+  if (uniqueIds.length === 0) return result;
+  try {
+    const supabase = await getSupabase();
+    if (!(await checkSupabaseTable(supabase, 'brands'))) return result;
+    const { data, error } = await supabase
+      .from('brands')
+      .select('id, name')
+      .in('id', uniqueIds);
+    if (error || !data) return result;
+    for (const row of data) {
+      result.set(row.id as string, row.name as string);
+    }
+    return result;
+  } catch {
+    return result;
+  }
+}
+
 let _supabaseAvailable: boolean | null = null;
 
 async function checkSupabaseTable(

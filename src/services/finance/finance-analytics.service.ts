@@ -36,11 +36,11 @@ import {
  * ========================================================================= */
 
 export async function getFinanceOverview(
-  brand?: string,
+  brandId?: string,
 ): Promise<FinanceOverviewKpis> {
   const [budgets, expenses] = await Promise.all([
-    getBudgets(brand),
-    getExpenses(brand),
+    getBudgets(brandId),
+    getExpenses(brandId),
   ]);
 
   const totalBudget = budgets.reduce((sum, b) => sum + b.amount, 0);
@@ -65,11 +65,11 @@ export async function getFinanceOverview(
  * ========================================================================= */
 
 export async function getBudgetVsActual(
-  brand?: string,
+  brandId?: string,
 ): Promise<FinanceBudgetVsActual[]> {
   const [budgets, expenses] = await Promise.all([
-    getBudgets(brand),
-    getExpenses(brand),
+    getBudgets(brandId),
+    getExpenses(brandId),
   ]);
 
   // Group budgets by period_label
@@ -107,9 +107,9 @@ export async function getBudgetVsActual(
  * ========================================================================= */
 
 export async function getExpenseBreakdown(
-  brand?: string,
+  brandId?: string,
 ): Promise<FinanceExpenseBreakdown[]> {
-  const expenses = await getExpenses(brand);
+  const expenses = await getExpenses(brandId);
   const total = expenses.reduce((sum, e) => sum + e.amount, 0);
 
   const byCategory = new Map<ExpenseCategory, number>();
@@ -161,9 +161,9 @@ export async function getBrandCosts(): Promise<FinanceBrandCost[]> {
 export async function getPlatformEfficiency(
   accounts: SocialAccount[],
   metrics: SocialMetric[],
-  brand?: string,
+  brandId?: string,
 ): Promise<FinancePlatformEfficiency[]> {
-  const allocations = await getAllAllocations(brand);
+  const allocations = await getAllAllocations(brandId);
   const { SOCIAL_PLATFORM_LABELS } = await import('@/types/domain');
 
   // Sum allocated spend per platform
@@ -423,13 +423,13 @@ export interface FinanceDashboardData {
 }
 
 export async function getFinanceDashboardData(
-  brand?: string,
+  brandId?: string,
 ): Promise<FinanceDashboardData> {
   const [overview, budgetVsActual, expenseBreakdown, brandCosts, brands] =
     await Promise.all([
-      getFinanceOverview(brand),
-      getBudgetVsActual(brand),
-      getExpenseBreakdown(brand),
+      getFinanceOverview(brandId),
+      getBudgetVsActual(brandId),
+      getExpenseBreakdown(brandId),
       getBrandCosts(),
       getFinanceBrands(),
     ]);
@@ -441,16 +441,15 @@ export async function getFinanceDashboardData(
 async function getFinanceBrands(): Promise<string[]> {
   try {
     const { supabase } = await import('@/lib/supabase');
-    const [budgets, expenses, campaigns] = await Promise.all([
-      supabase.from('finance_budgets').select('brand'),
-      supabase.from('finance_expenses').select('brand'),
-      supabase.from('finance_campaigns').select('brand'),
-    ]);
-    const brands = new Set<string>();
-    for (const row of budgets.data ?? []) brands.add((row as { brand: string }).brand);
-    for (const row of expenses.data ?? []) brands.add((row as { brand: string }).brand);
-    for (const row of campaigns.data ?? []) brands.add((row as { brand: string }).brand);
-    return [...brands].sort((a, b) => a.localeCompare(b, 'fa'));
+    const { data } = await supabase
+      .from('brands')
+      .select('name')
+      .eq('status', 'active')
+      .order('name', { ascending: true });
+    if (data && data.length > 0) {
+      return (data as { name: string }[]).map((r) => r.name);
+    }
+    return [];
   } catch {
     return [];
   }

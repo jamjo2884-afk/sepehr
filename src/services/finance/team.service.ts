@@ -47,12 +47,13 @@ function memberFromRow(row: TeamMemberRow): TeamMember {
   };
 }
 
-function allocationFromRow(row: BrandAllocationRow): BrandAllocation {
+function allocationFromRow(row: BrandAllocationRow, brandNames?: Map<string, string>): BrandAllocation {
+  const brandId = row.brand_id ?? null;
   return {
     id: row.id,
     teamMemberId: row.team_member_id,
-    brand: row.brand,
-    brandId: row.brand_id ?? null,
+    brand: (brandId && brandNames?.get(brandId)) ?? '',
+    brandId,
     allocationPercentage: Number(row.allocation_percentage),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -126,8 +127,13 @@ export async function getTeamMembers(
       .select('*')
       .in('team_member_id', memberIds);
 
+    const allocRows = (allocData ?? []) as unknown as BrandAllocationRow[];
+    const { resolveBrandNames } = await import('@/services/brand.service');
+    const brandIds = allocRows.map((r) => r.brand_id).filter((id): id is string => !!id);
+    const brandNames = await resolveBrandNames(brandIds);
+
     const allocsByMember = new Map<string, BrandAllocationRow[]>();
-    for (const row of (allocData ?? []) as unknown as BrandAllocationRow[]) {
+    for (const row of allocRows) {
       const list = allocsByMember.get(row.team_member_id) ?? [];
       list.push(row);
       allocsByMember.set(row.team_member_id, list);
@@ -135,7 +141,7 @@ export async function getTeamMembers(
 
     return (data as unknown as TeamMemberRow[]).map((row) => {
       const member = memberFromRow(row);
-      const allocs = (allocsByMember.get(row.id) ?? []).map(allocationFromRow);
+      const allocs = (allocsByMember.get(row.id) ?? []).map((r) => allocationFromRow(r, brandNames));
       const totalAllocated = allocs.reduce(
         (sum, a) => sum + a.allocationPercentage,
         0,
@@ -318,8 +324,7 @@ async function createAllocations(
   const supabase = await getSupabase();
   const rows = allocations.map((a) => ({
     id: `ta-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}-${a.brand.replace(/\s+/g, '')}`,
-    team_member_id: memberId,        brand: a.brand,
-        brand_id: a.brandId ?? null,
+    team_member_id: memberId,        brand_id: a.brandId ?? null,
         allocation_percentage: a.allocationPercentage,
   }));
   const { error } = await supabase
@@ -338,12 +343,29 @@ export async function getTeamBrands(): Promise<string[]> {
     if (await checkSupabaseTable(supabase, 'team_member_brand_allocations')) {
       const { data } = await supabase
         .from('team_member_brand_allocations')
-        .select('brand, brand_id');
+        .select('brand_id');
       if (data && data.length > 0) {
-        const brands = new Set(
-          (data as { brand: string }[]).map((r) => r.brand),
-        );
-        return [...brands].sort((a, b) => a.localeCompare(b, 'fa'));
+        const brandIds = [...new Set(
+          (data as { brand_id: string | null }[])
+            .map((r) => r.brand_id)
+            .filter((id): id is string => !!id),
+        )];
+        if (brandIds.length > 0) {
+          const { data: brandsData } = await supabase
+            .from('brands')
+            .select('id, name')
+            .in('id', brandIds)
+            .eq('status', 'active');
+          if (brandsData && brandsData.length > 0) {
+            const nameMap = new Map(
+              (brandsData as { id: string; name: string }[]).map((b) => [b.id, b.name]),
+            );
+            const brands = brandIds
+              .map((id) => nameMap.get(id))
+              .filter((n): n is string => !!n);
+            return [...new Set(brands)].sort((a, b) => a.localeCompare(b, 'fa'));
+          }
+        }
       }
     }
   } catch {

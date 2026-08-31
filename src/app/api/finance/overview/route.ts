@@ -12,8 +12,8 @@ export const dynamic = 'force-dynamic';
 export const GET = withAuth(async (req) => {
   try {
     const { searchParams } = new URL(req.url);
-    const brand = searchParams.get('brand') || undefined;
-    const overview = await getFinanceOverview(brand);
+    const brandId = searchParams.get('brandId') || undefined;
+    const overview = await getFinanceOverview(brandId);
     return NextResponse.json({ ok: true, overview });
   } catch (err) {
     console.warn('[finance] Could not build overview.', err);
