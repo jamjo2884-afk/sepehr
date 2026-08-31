@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, BrainCircuit, Lightbulb, Trophy } from 'lucide-react';
+import { AlertTriangle, BrainCircuit, Lightbulb, PieChart, Trophy } from 'lucide-react';
 
 import {
   buildBrandGrowthDrivers,
@@ -25,6 +25,7 @@ import { PlatformTimeline } from '@/components/social/brand/platform-timeline';
 import { SectionTitle } from '@/components/social/analytics/shared';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatNumber } from '@/utils/persian';
 import {
   Select,
   SelectContent,
@@ -38,6 +39,21 @@ export default function IntelligencePage() {
     accounts: SocialAccount[];
     metrics: SocialMetric[];
   } | null>(null);
+  const [intelligence, setIntelligence] = useState<Array<{
+    brand: string;
+    brandId: string | null;
+    totalSpend: number;
+    totalBudget: number;
+    budgetUtilization: number;
+    totalFollowers: number;
+    followerGrowth: number;
+    growthRate: number;
+    costPerFollower: number;
+    costPerNewFollower: number | null;
+    operationalCost: number;
+    humanCost: number;
+    totalCost: number;
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedBrand, setSelectedBrand] = useState<string>('');
@@ -45,14 +61,19 @@ export default function IntelligencePage() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    fetch('/api/social/analytics')
-      .then((r) => r.json())
-      .then((data: { ok: boolean; accounts: SocialAccount[]; metrics: SocialMetric[] }) => {
+    Promise.all([
+      fetch('/api/social/analytics').then((r) => r.json()),
+      fetch('/api/intelligence').then((r) => r.json()),
+    ])
+      .then(([socialData, intelData]) => {
         if (active) {
-          if (data.ok) {
-            setRaw({ accounts: data.accounts, metrics: data.metrics });
+          if (socialData.ok) {
+            setRaw({ accounts: socialData.accounts, metrics: socialData.metrics });
           } else {
             setRaw(null);
+          }
+          if (intelData.ok) {
+            setIntelligence(intelData.brands ?? []);
           }
           setLoading(false);
         }
@@ -158,6 +179,70 @@ export default function IntelligencePage() {
 
       {/* Overall brand ranking */}
       <ScoreRankingTable rows={brandRanking} accounts={accountsAll} />
+
+      {/* Cross-Domain Intelligence: Finance + Social */}
+      {intelligence.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <SectionTitle
+            icon={PieChart}
+            title="بینش مالی و اجتماعی"
+            extra={
+              <span className="text-[11px] text-muted-foreground">
+                هزینه، رشد و بازدهی هر برند
+              </span>
+            }
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {intelligence.slice(0, 9).map((item) => (
+              <div
+                key={item.brandId ?? item.brand}
+                className="flex flex-col gap-3 rounded-xl border border-border bg-surface/60 p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-foreground">
+                    {item.brand}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {formatNumber(item.totalFollowers)} فالوور
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div>
+                    <span className="text-muted-foreground">هزینه کل:</span>{' '}
+                    <span className="font-medium text-foreground">
+                      {formatNumber(item.totalCost)} تومان
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">رشد:</span>{' '}
+                    <span className="font-medium text-foreground">
+                      {item.followerGrowth > 0 ? '+' : ''}{formatNumber(item.followerGrowth)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">هزینه/فالوور:</span>{' '}
+                    <span className="font-medium text-foreground">
+                      {item.costPerFollower > 0 ? formatNumber(Math.round(item.costPerFollower)) : '—'} تومان
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">بازدهی بودجه:</span>{' '}
+                    <span className="font-medium text-foreground">
+                      {Math.round(item.budgetUtilization)}٪
+                    </span>
+                  </div>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${Math.min(item.budgetUtilization, 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Brand deep-dive */}
       <section className="flex flex-col gap-4">

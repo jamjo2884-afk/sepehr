@@ -48,7 +48,7 @@ export async function getFinanceOverview(
   const remainingBudget = Math.max(0, totalBudget - totalSpent);
   const budgetUsagePercent =
     totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-  const brandCount = new Set(expenses.map((e) => e.brand)).size;
+  const brandCount = new Set(expenses.map((e) => e.brandId ?? e.brand)).size;
 
   return {
     totalBudget,
@@ -359,10 +359,10 @@ export async function getScatterData(
     spendByPlatform.set(a.platform, (spendByPlatform.get(a.platform) ?? 0) + a.amount);
   }
 
-  // Calculate growth per brand+platform
+  // Calculate growth per brand+platform (use brandId as canonical key)
   const accountsByBrandPlatform = new Map<string, SocialAccount[]>();
   for (const account of accounts) {
-    const key = `${account.brand}|${account.platform}`;
+    const key = `${account.brandId ?? account.brand}|${account.platform}`;
     const list = accountsByBrandPlatform.get(key) ?? [];
     list.push(account);
     accountsByBrandPlatform.set(key, list);
@@ -371,7 +371,8 @@ export async function getScatterData(
   const points: FinanceScatterPoint[] = [];
 
   for (const [key, brandPlatformAccounts] of accountsByBrandPlatform) {
-    const [brand, platform] = key.split('|');
+    const [brandKey, platform] = key.split('|');
+    const brand = brandPlatformAccounts[0]?.brand ?? brandKey;
     const accountIds = new Set(brandPlatformAccounts.map((a) => a.id));
     const bpMetrics = sortedMetrics.filter((m) =>
       accountIds.has(m.accountId),
