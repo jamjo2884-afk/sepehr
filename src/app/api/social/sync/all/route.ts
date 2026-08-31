@@ -1,3 +1,4 @@
+import { requireAuth } from "@/lib/route-auth";
 import { NextResponse } from 'next/server';
 import { syncAllConnectedAccounts } from '@/services/social-sync.service';
 
@@ -11,7 +12,7 @@ import { syncAllConnectedAccounts } from '@/services/social-sync.service';
  *
  * Safe output only — no credentials, no raw API errors.
  */
-export async function POST(): Promise<NextResponse> {
+export const POST = requireAuth(async (): Promise<NextResponse> => {
   try {
     const result = await syncAllConnectedAccounts();
     // Strip per-account error messages down to codes + generic Persian text
@@ -36,4 +37,4 @@ export async function POST(): Promise<NextResponse> {
       { status: 500 },
     );
   }
-}
+});

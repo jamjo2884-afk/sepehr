@@ -23,6 +23,28 @@ type RouteHandler = (
   auth: AuthenticatedRequest,
 ) => Promise<NextResponse> | NextResponse;
 
+type AuthOnlyHandler = (
+  req: Request,
+  auth: { user: AuthUser },
+) => Promise<NextResponse | Response> | NextResponse | Response;
+
+/**
+ * Require authentication only (no workspace check).
+ * Use for routes that need auth but don't require workspace context.
+ */
+export function requireAuth(handler: AuthOnlyHandler) {
+  return async (req: Request): Promise<NextResponse | Response> => {
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: 'احراز هویت لازم است.' },
+        { status: 401 },
+      );
+    }
+    return handler(req, { user });
+  };
+}
+
 export function withAuth(handler: RouteHandler) {
   return async (req: Request): Promise<NextResponse> => {
     const user = await getAuthUser();

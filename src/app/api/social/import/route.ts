@@ -1,6 +1,8 @@
+import { requireAuth } from "@/lib/route-auth";
 import { z } from 'zod';
 import { importSocialMetricsRows } from '@/services/social-import/import.service';
 import type { SocialMetricValues } from '@/types/social';
+import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 
 /**
  * POST /api/social/import
@@ -45,7 +47,17 @@ const bodySchema = z.object({
   rows: z.array(rowSchema).max(5000),
 });
 
-export async function POST(req: Request): Promise<Response> {
+export const POST = requireAuth(async (req: Request): Promise<Response> => {
+  // Rate limit: 5 imports per 5 minutes
+  const ip = getClientIp(req);
+  const limit = checkRateLimit(`import:${ip}`, RATE_LIMITS.import);
+  if (!limit.allowed) {
+    return new Response(JSON.stringify({ error: 'درخواست بیش از حد مجاز است.' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -108,4 +120,4 @@ export async function POST(req: Request): Promise<Response> {
       'Connection': 'keep-alive',
     },
   });
-}
+});

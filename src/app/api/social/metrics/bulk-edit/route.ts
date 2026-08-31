@@ -1,4 +1,6 @@
+import { requireAuth } from "@/lib/route-auth";
 import { NextResponse } from 'next/server';
+import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { z } from 'zod';
 import {
   bulkEditSocialMetrics,
@@ -69,7 +71,17 @@ const bodySchema = z.object({
   values: valueSchema,
 });
 
-export async function POST(req: Request): Promise<NextResponse> {
+export const POST = requireAuth(async (req: Request): Promise<NextResponse> => {
+  // Rate limit: 20 bulk edits per minute
+  const ip = getClientIp(req);
+  const limit = checkRateLimit(`bulk-edit:${ip}`, RATE_LIMITS.bulkEdit);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: 'درخواست بیش از حد مجاز است.' },
+      { status: 429 },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -104,4 +116,4 @@ export async function POST(req: Request): Promise<NextResponse> {
       { status: 500 },
     );
   }
-}
+});

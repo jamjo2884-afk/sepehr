@@ -1,3 +1,4 @@
+import { requireAuth } from "@/lib/route-auth";
 import { NextResponse } from 'next/server';
 import { getSocialAccounts, getSocialMetrics } from '@/services/social.service';
 
@@ -13,7 +14,7 @@ export const dynamic = 'force-dynamic';
  * This eliminates the need for client-side Supabase queries
  * and reduces the client bundle size.
  */
-export async function GET(): Promise<NextResponse> {
+export const GET = requireAuth(async (): Promise<NextResponse> => {
   try {
     const [accounts, metrics] = await Promise.all([
       getSocialAccounts(),
@@ -32,4 +33,4 @@ export async function GET(): Promise<NextResponse> {
       { status: 500 },
     );
   }
-}
+});

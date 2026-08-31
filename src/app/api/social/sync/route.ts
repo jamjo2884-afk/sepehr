@@ -1,6 +1,8 @@
+import { requireAuth } from "@/lib/route-auth";
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { syncSocialAccount } from '@/services/social-sync.service';
+import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 
 /**
  * POST /api/social/sync
@@ -16,7 +18,17 @@ const bodySchema = z.object({
   accountId: z.string().uuid(),
 });
 
-export async function POST(req: Request): Promise<NextResponse> {
+export const POST = requireAuth(async (req: Request): Promise<NextResponse> => {
+  // Rate limit: 10 syncs per minute
+  const ip = getClientIp(req);
+  const limit = checkRateLimit(`sync:${ip}`, RATE_LIMITS.sync);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { ok: false, error: 'درخواست بیش از حد مجاز است.' },
+      { status: 429 },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -59,4 +71,4 @@ export async function POST(req: Request): Promise<NextResponse> {
         : result.errorMessage,
   };
   return NextResponse.json(safe, { status: result.ok ? 200 : 400 });
-}
+});
