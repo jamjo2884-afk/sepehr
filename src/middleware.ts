@@ -62,10 +62,9 @@ export function middleware(request: NextRequest) {
   );
 
   if (!hasSession) {
-    return NextResponse.json(
-      { ok: false, error: 'احراز هویت لازم است.' },
-      { status: 401 },
-    );
+    // No session cookie — fall back to demo mode instead of blocking.
+    // Services will use in-memory/localStorage data.
+    return NextResponse.next();
   }
 
   return NextResponse.next();

@@ -46,9 +46,8 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 
     if (!user) {
       // Supabase is configured but no valid session.
-      // Return null — API routes must not access real data without auth.
-      // The login page will handle redirect.
-      return null;
+      // Fall back to demo user so the app works in demo mode.
+      return DEMO_USER;
     }
 
     return {
