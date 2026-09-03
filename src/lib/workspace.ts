@@ -42,7 +42,8 @@ export async function getCurrentWorkspace(): Promise<WorkspaceContext | null> {
 
   // Real mode: look up workspace membership
   try {
-    const { supabase } = await import('@/lib/supabase');
+    const { createSupabaseServerClient } = await import('@/lib/supabase-server');
+    const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from('workspace_members')
       .select('workspace_id, role')

@@ -1,3 +1,4 @@
+import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -9,15 +10,26 @@ import type { NextRequest } from 'next/server';
  *
  * Auth mode (Supabase configured and DEMO_MODE unset):
  *  - Public/auth paths and static assets are always allowed.
- *  - Page routes without a Supabase session cookie redirect to /login.
- *  - API routes without a session cookie return 401.
+ *  - A server client validates the session with supabase.auth.getUser() and
+ *    refreshes it when needed (writing refreshed cookies back to the
+ *    response). A valid user is required past the public paths.
+ *  - Page routes without a valid session redirect to /login?next=…
+ *  - API routes without a valid session return 401.
  *
  * Route handlers remain the source of truth: services call getAuthUser()
  * and never silently substitute a demo user outside demo mode.
  */
-const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];
+const PUBLIC_PATHS = [
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+];
 
 const AUTH_API_PATHS = ['/api/auth'];
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 function isPublicPath(pathname: string): boolean {
   return (
@@ -34,9 +46,9 @@ function isPublicPath(pathname: string): boolean {
 
 function hasSupabaseConfig(): boolean {
   return (
-    !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
-    process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://placeholder.supabase.co'
+    !!supabaseUrl &&
+    !!supabaseAnonKey &&
+    supabaseUrl !== 'https://placeholder.supabase.co'
   );
 }
 
@@ -48,13 +60,7 @@ function isDemoMode(): boolean {
   return !hasSupabaseConfig() || process.env.DEMO_MODE === 'true';
 }
 
-function hasSessionCookie(request: NextRequest): boolean {
-  return request.cookies.getAll().some(
-    (c) => c.name.startsWith('sb-') && c.name.endsWith('-auth-token') && c.value,
-  );
-}
-
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public paths and static assets are always allowed.
@@ -67,26 +73,53 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Auth mode — a Supabase session cookie is required below.
-  const hasSession = hasSessionCookie(request);
+  // Auth mode — validate the real Supabase session.
+  let response = NextResponse.next({ request });
 
-  // Page routes: redirect to /login when there is no session.
+  const supabase = createServerClient(
+    supabaseUrl!,
+    supabaseAnonKey!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value),
+          );
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options),
+          );
+        },
+      },
+    },
+  );
+
+  // IMPORTANT: nothing should run between createServerClient and getUser() —
+  // otherwise the client may refresh the session and set cookies mid-request.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Page routes: redirect to /login when there is no valid session.
   if (!pathname.startsWith('/api/')) {
-    if (!hasSession) {
+    if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
       url.searchParams.set('next', pathname);
       return NextResponse.redirect(url);
     }
-    return NextResponse.next();
+    return response;
   }
 
-  // API routes: reject requests without a session.
-  if (!hasSession) {
+  // API routes: reject requests without a valid session.
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {

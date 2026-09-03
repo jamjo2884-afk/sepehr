@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/popover';
 import { useUIStore } from '@/stores/ui.store';
 import { useAuthStore } from '@/stores/auth.store';
+import { isDemoModeClient } from '@/lib/demo';
 import { useIsMobile } from '@/hooks/use-media-query';
 import { signOut } from '@/services/auth.service';
 import { ROLE_LABELS } from '@/types/auth';
@@ -188,7 +189,9 @@ export function Header() {
     setLoggingOut(true);
     try {
       await signOut();
-      router.replace('/command-center');
+      // Real auth mode returns to /login (the provider resets the store on
+      // SIGNED_OUT); demo mode keeps the demo dashboard.
+      router.replace(isDemoModeClient() ? '/command-center' : '/login');
     } catch {
       setLoggingOut(false);
     }

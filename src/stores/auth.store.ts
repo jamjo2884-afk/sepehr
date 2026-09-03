@@ -29,20 +29,15 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  // ورود آزمایشی بدون لاگین
-  status: 'authenticated',
+  // Neutral initial state. AuthProvider hydrates it: demo mode applies the
+  // demo session, real auth mode applies the Supabase session (or resets).
+  status: 'loading',
 
   user: null,
   session: null,
   profile: null,
-  workspace: {
-    id: 'demo',
-    name: 'Media Deck',
-    slug: 'media-deck',
-    logoUrl: null,
-    createdAt: new Date().toISOString(),
-  },
-  role: 'owner',
+  workspace: null,
+  role: null,
 
   setSession: (session) =>
     set({

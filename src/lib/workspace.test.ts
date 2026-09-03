@@ -7,24 +7,22 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
  * The workspace resolver maps auth.uid() → workspace membership.
  */
 
-// Mock supabase module
+// Mock supabase server client (workspace.ts resolves memberships through
+// createSupabaseServerClient so RLS sees the authenticated user).
 const mockSelect = vi.fn();
 const mockEq = vi.fn();
 const mockLimit = vi.fn();
 const mockSingle = vi.fn();
 
-vi.mock('@/lib/supabase', () => ({
-  supabase: {
-    auth: {
-      getUser: vi.fn(),
-    },
+vi.mock('@/lib/supabase-server', () => ({
+  createSupabaseServerClient: vi.fn(async () => ({
     from: vi.fn(() => ({
       select: mockSelect.mockReturnThis(),
       eq: mockEq.mockReturnThis(),
       limit: mockLimit.mockReturnThis(),
       single: mockSingle,
     })),
-  },
+  })),
 }));
 
 // Mock auth module

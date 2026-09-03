@@ -20,6 +20,10 @@ export const supabase: SupabaseClient = createClient(
   supabaseAnonKey ?? 'placeholder-anon-key',
   {
     auth: {
+      // Isolated key: the auth UI uses the cookie-backed supabase-browser
+      // client (sb-<ref>-auth-token). Sharing this client's storage key with
+      // it would make auth-js treat them as conflicting instances.
+      storageKey: 'md-anon-legacy',
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,

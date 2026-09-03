@@ -1,18 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { LoginForm } from './login-form';
 
 /**
- * Login page — always redirects to dashboard.
- * Auth is handled at the API level (demo user fallback).
+ * Login page — renders the real Supabase login form.
+ * Middleware redirects unauthenticated visitors here with ?next=<path>,
+ * which the form honors after a successful sign-in.
  */
 export default function LoginPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/command-center');
-  }, [router]);
-
-  return null;
+  return <LoginForm />;
 }

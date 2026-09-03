@@ -1,4 +1,6 @@
-import { supabase } from '@/lib/supabase';
+// Cookie-backed browser client — sessions persist to the sb-*-auth-token
+// cookie so middleware and server-side getAuthUser() can see them.
+import { supabaseBrowser as supabase } from '@/lib/supabase-browser';
 import type {
   ProfileRow,
   Workspace,
@@ -89,6 +91,12 @@ export async function signIn({ email, password }: SignInInput) {
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
+}
+
+/** Resolve the current browser session (recovery links exchange their code on load). */
+export async function getAuthSession() {
+  const { data } = await supabase.auth.getSession();
+  return data.session;
 }
 
 export async function resetPasswordForEmail(email: string) {

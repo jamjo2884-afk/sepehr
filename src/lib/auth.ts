@@ -52,7 +52,10 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   }
 
   try {
-    const { supabase } = await import('@/lib/supabase');
+    // Server client reads the sb-*-auth-token cookie from the request so
+    // the authenticated Supabase user is resolved server-side (RLS-aware).
+    const { createSupabaseServerClient } = await import('@/lib/supabase-server');
+    const supabase = await createSupabaseServerClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();

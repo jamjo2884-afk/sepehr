@@ -36,11 +36,21 @@ export default function RegisterPage() {
   const onSubmit = async (values: RegisterValues) => {
     setSubmitError(null);
     try {
-      await signUp({
+      const result = await signUp({
         email: values.email,
         password: values.password,
         fullName: values.fullName,
       });
+      // Email confirmation disabled → a session is returned; sign in directly.
+      if (result.session) {
+        const next = new URLSearchParams(window.location.search).get('next');
+        router.replace(
+          next && next.startsWith('/') && !next.startsWith('//')
+            ? next
+            : '/command-center',
+        );
+        return;
+      }
       setDone(true);
     } catch (err) {
       const message =

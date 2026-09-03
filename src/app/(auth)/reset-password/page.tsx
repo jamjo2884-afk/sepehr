@@ -9,7 +9,7 @@ import {
   resetPasswordSchema,
   type ResetPasswordValues,
 } from '@/lib/auth-schemas';
-import { updatePassword } from '@/services/auth.service';
+import { getAuthSession, updatePassword } from '@/services/auth.service';
 import { AuthShell } from '@/components/common/auth-shell';
 import { FormField } from '@/components/forms/form-field';
 import { PasswordInput } from '@/components/forms/password-input';
@@ -33,6 +33,14 @@ export default function ResetPasswordPage() {
   const onSubmit = async (values: ResetPasswordValues) => {
     setSubmitError(null);
     try {
+      // The recovery link must have produced a session (detectSessionInUrl)
+      // before updateUser({ password }) can work.
+      const session = await getAuthSession();
+      if (!session) {
+        throw new Error(
+          'لینک بازنشانی نامعتبر یا منقضی شده است. لطفاً دوباره درخواست دهید.',
+        );
+      }
       await updatePassword(values.password);
       setDone(true);
     } catch (err) {

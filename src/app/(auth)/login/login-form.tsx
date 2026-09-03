@@ -15,10 +15,21 @@ import { Input } from '@/components/ui/input';
 import { toPersianDigits } from '@/utils/persian';
 
 /**
- * Login form. Kept intact for re-enabling authentication later;
- * currently the /login route redirects straight to the dashboard
- * (see page.tsx in this directory).
+ * Login form — real Supabase sign-in.
+ *
+ * After a successful login the user is redirected to the middleware's
+ * `?next=` target when present (same-origin only), otherwise to the
+ * command center. In demo mode the backend is not reachable and the form
+ * surfaces a graceful Persian error.
  */
+
+/** Returns the redirect target only when it is a safe same-origin path. */
+function safeNextPath(param: string | null): string | null {
+  if (!param) return null;
+  if (!param.startsWith('/') || param.startsWith('//')) return null;
+  return param;
+}
+
 export function LoginForm() {
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -36,7 +47,10 @@ export function LoginForm() {
     setSubmitError(null);
     try {
       await signIn(values);
-      router.replace('/command-center');
+      const next = safeNextPath(
+        new URLSearchParams(window.location.search).get('next'),
+      );
+      router.replace(next ?? '/command-center');
     } catch (err) {
       const message =
         err instanceof Error
