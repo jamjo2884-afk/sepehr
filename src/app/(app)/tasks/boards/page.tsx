@@ -22,17 +22,41 @@ function BoardsPageInner() {
   const [newBoardTitle, setNewBoardTitle] = useState("");
   const [archivedBoards, setArchivedBoards] = useState<Board[]>([]);
   const [showArchived, setShowArchived] = useState(false);
+  const [error, setError] = useState(false);
+  const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState("");
 
   const fetchData = useCallback(async () => {
     try {
       const r = await fetch("/api/flowboard/auth/session");
-      if (!r.ok) return;
+      if (!r.ok) {
+        setError(true);
+        setLoading(false);
+        return;
+      }
       const d = await r.json();
       setUser(d.user);
       setWorkspaces(d.workspaces);
-      if (d.workspaces.length > 0 && !currentWorkspace) setCurrentWorkspace(d.workspaces[0]);
-    } catch {}
+      setError(false);
+      if (d.workspaces.length === 0) {
+        // No workspace yet — stop loading and show the empty/creation state.
+        setLoading(false);
+      } else if (!currentWorkspace) {
+        setCurrentWorkspace(d.workspaces[0]);
+      }
+    } catch {
+      setError(true);
+      setLoading(false);
+    }
   }, [currentWorkspace]);
+
+  const reload = useCallback(() => {
+    setError(false);
+    setLoading(true);
+    fetchData();
+  }, [fetchData]);
 
   const fetchBoards = useCallback(async () => {
     if (!currentWorkspace) return;
@@ -53,6 +77,32 @@ function BoardsPageInner() {
       if (r.ok) setArchivedBoards(await r.json());
     } catch {}
   }, [currentWorkspace]);
+
+  const handleCreateWorkspace = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newWorkspaceName.trim() || creatingWorkspace) return;
+    setCreatingWorkspace(true);
+    setWorkspaceError("");
+    try {
+      const r = await fetch("/api/flowboard/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newWorkspaceName.trim() }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setWorkspaceError(d?.error || t("boards.createWorkspaceFailed"));
+        return;
+      }
+      setNewWorkspaceName("");
+      setShowCreateWorkspace(false);
+      await fetchData();
+    } catch {
+      setWorkspaceError(t("boards.createWorkspaceFailed"));
+    } finally {
+      setCreatingWorkspace(false);
+    }
+  };
 
   const handleCreateBoard = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,6 +161,24 @@ function BoardsPageInner() {
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />
           ))}
+        </div>
+      ) : error ? (
+        <div className="text-center py-16">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h3 className="text-lg font-semibold text-foreground mb-2">{t("boards.loadFailed")}</h3>
+          <p className="text-muted-foreground mb-6">{t("boards.loadFailedDesc")}</p>
+          <button onClick={reload} className="px-6 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors">
+            {t("common.retry")}
+          </button>
+        </div>
+      ) : workspaces.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="text-6xl mb-4">🗂️</div>
+          <h3 className="text-lg font-semibold text-foreground mb-2">{t("boards.noWorkspace")}</h3>
+          <p className="text-muted-foreground mb-6">{t("boards.createWorkspaceDesc")}</p>
+          <button onClick={() => setShowCreateWorkspace(true)} className="px-6 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors">
+            {t("boards.createWorkspace")}
+          </button>
         </div>
       ) : (
         <>
@@ -200,6 +268,23 @@ function BoardsPageInner() {
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => { setShowCreateBoard(false); setNewBoardTitle(""); }} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">{t("common.cancel")}</button>
                 <button type="submit" disabled={!newBoardTitle.trim()} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">{t("common.create")}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Workspace Dialog */}
+      {showCreateWorkspace && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card rounded-xl border border-border p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">{t("boards.newWorkspace")}</h3>
+            <form onSubmit={handleCreateWorkspace}>
+              <input type="text" value={newWorkspaceName} onChange={(e) => setNewWorkspaceName(e.target.value)} placeholder={t("boards.newWorkspace")} autoFocus className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent mb-4" />
+              {workspaceError && <p className="text-sm text-destructive mb-4">{workspaceError}</p>}
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => { setShowCreateWorkspace(false); setNewWorkspaceName(""); setWorkspaceError(""); }} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">{t("common.cancel")}</button>
+                <button type="submit" disabled={!newWorkspaceName.trim() || creatingWorkspace} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">{creatingWorkspace ? t("common.saving") : t("common.create")}</button>
               </div>
             </form>
           </div>

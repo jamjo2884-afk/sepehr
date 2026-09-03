@@ -33,6 +33,7 @@ const en = {
   "common.today": "Today",
   "common.all": "All",
   "common.none": "None",
+  "common.retry": "Retry",
 
   // Navigation
   "nav.boards": "Boards",
@@ -70,6 +71,13 @@ const en = {
   "boards.createFirst": "Create your first board",
   "boards.createFirstDesc": "Create your first board to get started with project management.",
   "boards.noArchived": "No archived boards",
+  "boards.loadFailed": "Couldn't load boards",
+  "boards.loadFailedDesc": "We couldn't reach the FlowBoard service. Check your connection and try again.",
+  "boards.noWorkspace": "No workspace yet",
+  "boards.createWorkspace": "Create workspace",
+  "boards.newWorkspace": "New Workspace",
+  "boards.createWorkspaceDesc": "Create a workspace to start organizing boards and tasks.",
+  "boards.createWorkspaceFailed": "Could not create workspace",
 
   // Lists
   "lists.addList": "Add another list",

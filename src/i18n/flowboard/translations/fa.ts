@@ -33,6 +33,7 @@ const fa: Record<string, string> = {
   "common.today": "امروز",
   "common.all": "همه",
   "common.none": "هیچ‌کدام",
+  "common.retry": "تلاش مجدد",
 
   // Navigation
   "nav.boards": "تخته‌ها",
@@ -70,6 +71,13 @@ const fa: Record<string, string> = {
   "boards.createFirst": "اولین تخته خود را بسازید",
   "boards.createFirstDesc": "اولین تخته خود را برای شروع مدیریت پروژه بسازید.",
   "boards.noArchived": "تخته بایگانی شده‌ای وجود ندارد",
+  "boards.loadFailed": "بارگذاری تخته‌ها انجام نشد",
+  "boards.loadFailedDesc": "ارتباط با سرویس FlowBoard برقرار نشد. اتصال خود را بررسی و دوباره تلاش کنید.",
+  "boards.noWorkspace": "هنوز فضای کاری ندارید",
+  "boards.createWorkspace": "ایجاد فضای کاری",
+  "boards.newWorkspace": "فضای کاری جدید",
+  "boards.createWorkspaceDesc": "برای شروع مدیریت تخته‌ها و کارها یک فضای کاری بسازید.",
+  "boards.createWorkspaceFailed": "ایجاد فضای کاری ممکن نشد",
 
   // Lists
   "lists.addList": "افزودن لیست دیگر",
