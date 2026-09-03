@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft,
   Bell,
   FileText,
   HeartPulse,
@@ -28,16 +27,12 @@ import {
 } from 'recharts';
 import { useAuthStore } from '@/stores/auth.store';
 import { navItems } from '@/config/navigation.config';
-import { TASK_STATUS_LABELS, type Task } from '@/types/todo';
+// Old task types removed - FlowBoard is now the task system
 import type { Notification } from '@/types/index';
 import type { ActivityItem } from '@/features/mock-data';
-import { getTasks } from '@/services/todo.service';
-import {
-  getActivity,
-  getNotifications,
-} from '@/services/data.service';
+
 import { formatJalaliDate, formatRelativeTime } from '@/utils/persian';
-import { cn } from '@/lib/utils';const QUICK_ACCESS_IDS = [
+const QUICK_ACCESS_IDS = [
   'tasks', 'assets', 'campaigns', 'distribution', 'social', 'analytics',
 ];
 
@@ -134,31 +129,28 @@ export default function CommandCenterPage() {
     [today],
   );
 
-  const [tasks, setTasks] = useState<Task[]>([]);
+  // Tasks now managed by FlowBoard
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
     let active = true;
-    Promise.all([getTasks(), getActivity(), getNotifications()])
-      .then(([t, a, n]) => {
+    // Tasks now managed by FlowBoard - no old task fetching needed
+    // Activity and notifications stay as service calls for now
+    // (no dedicated API route needed for these small datasets)
+    import('@/services/data.service').then(({ getActivity, getNotifications }) =>
+      Promise.all([getActivity(), getNotifications()]).then(([a, n]) => {
         if (!active) return;
-        setTasks(t);
         setActivity(a);
         setNotifications(n);
       })
-      .catch(() => {
-        // services already fall back; nothing else to do
-      });
+    ).catch(() => {});
     return () => {
       active = false;
     };
   }, []);
 
-  const recentTasks = tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled').slice(0, 4);
-  const activeTasks = tasks
-    .filter((t) => t.status === 'in_progress' || t.status === 'todo')
-    .slice(0, 3);
+  // Tasks now managed by FlowBoard
   const recentActivity = activity.slice(0, 5);
   const unreadNotifications = notifications.filter((n) => !n.read);
 
@@ -376,91 +368,14 @@ export default function CommandCenterPage() {
 
       <section>
         <SectionTitle icon={ListTodo} title="ادامه کار" href="/tasks" />
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {activeTasks.map((task) => (
-            <Link
-              key={task.id}
-              href="/tasks"
-              className="group flex flex-col gap-2 rounded-xl border border-border bg-surface/60 p-4 transition-colors duration-200 hover:border-primary/40"
-            >
-              <div className="flex items-center justify-between">
-                <span
-                  className={cn(
-                    'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
-                    task.status === 'in_progress' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
-                  )}
-                >
-                  {TASK_STATUS_LABELS[task.status]}
-                </span>
-                <ArrowLeft className="h-4 w-4 text-muted-foreground transition-transform group-hover:-translate-x-1" />
-              </div>
-              <p className="text-sm font-semibold text-foreground">
-                {task.title}
-              </p>
-              {task.dueDate && (
-                <p className="text-xs text-muted-foreground">
-                  مهلت: {task.dueDate}
-                </p>
-              )}
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <SectionTitle
-          icon={ListTodo}
-          title="کارهای اخیر"
-          href="/tasks"
-        />
-        <div className="overflow-hidden rounded-xl border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-xs text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 text-right font-medium">عنوان کار</th>
-                <th className="hidden px-4 py-3 text-right font-medium sm:table-cell">
-                  وضعیت
-                </th>
-                <th className="hidden px-4 py-3 text-right font-medium md:table-cell">
-                  اولویت
-                </th>
-                <th className="px-4 py-3 text-right font-medium">
-                  به‌روزرسانی
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {recentTasks.map((task) => (
-                <tr
-                  key={task.id}
-                  className="transition-colors duration-150 hover:bg-primary/5"
-                >
-                  <td className="px-4 py-3 font-medium text-foreground">
-                    {task.title}
-                  </td>
-                  <td className="hidden px-4 py-3 sm:table-cell">
-                    <span
-                      className={cn(
-                        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
-                        task.status === 'in_progress' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
-                      )}
-                    >
-                      {TASK_STATUS_LABELS[task.status]}
-                    </span>
-                  </td>
-                  <td className="hidden px-4 py-3 md:table-cell">
-                    <span className="text-muted-foreground">
-                      {TASK_STATUS_LABELS[task.status]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {formatRelativeTime(new Date(task.updatedAt))}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Link
+          href="/tasks/boards"
+          className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface/40 p-8 transition-colors duration-200 hover:border-primary/40"
+        >
+          <ListTodo className="h-8 w-8 text-muted-foreground" />
+          <p className="text-sm font-medium text-foreground">مشاهده تخته‌های کاری</p>
+          <p className="text-xs text-muted-foreground">مدیریت وظایف با FlowBoard</p>
+        </Link>
       </section>
 
       <section>

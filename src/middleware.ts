@@ -4,12 +4,16 @@ import type { NextRequest } from 'next/server';
 /**
  * Route protection middleware.
  *
- * When Supabase is configured (env vars present), unauthenticated users
- * are redirected to /login. When Supabase is NOT configured (demo mode),
- * all routes are allowed through so the app remains functional.
+ * Demo mode (Supabase not configured, or DEMO_MODE=true) allows all traffic
+ * through so the app stays fully functional without backend auth.
  *
- * Public routes that never need auth:
- *   /login, /register, /forgot-password, /reset-password, /_next/*, /api/health
+ * Auth mode (Supabase configured and DEMO_MODE unset):
+ *  - Public/auth paths and static assets are always allowed.
+ *  - Page routes without a Supabase session cookie redirect to /login.
+ *  - API routes without a session cookie return 401.
+ *
+ * Route handlers remain the source of truth: services call getAuthUser()
+ * and never silently substitute a demo user outside demo mode.
  */
 const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];
 
@@ -18,6 +22,7 @@ const AUTH_API_PATHS = ['/api/auth'];
 function isPublicPath(pathname: string): boolean {
   return (
     PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
+    pathname === '/api/health' ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
     pathname.endsWith('.ico') ||
@@ -35,36 +40,50 @@ function hasSupabaseConfig(): boolean {
   );
 }
 
+/**
+ * Demo mode is active when Supabase is not configured or when DEMO_MODE=true
+ * is set — mirrors isDemoMode() in src/lib/auth.ts.
+ */
+function isDemoMode(): boolean {
+  return !hasSupabaseConfig() || process.env.DEMO_MODE === 'true';
+}
+
+function hasSessionCookie(request: NextRequest): boolean {
+  return request.cookies.getAll().some(
+    (c) => c.name.startsWith('sb-') && c.name.endsWith('-auth-token') && c.value,
+  );
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Always allow public paths and static assets
+  // Public paths and static assets are always allowed.
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
-  // If Supabase is not configured, allow everything (demo mode)
-  if (!hasSupabaseConfig()) {
+  // Demo mode: allow everything so the app works without backend auth.
+  if (isDemoMode()) {
     return NextResponse.next();
   }
 
-  // Page routes: always allow (UI handles auth state via API responses)
-  // This ensures the app works even before email confirmation or when
-  // Supabase auth is still being set up.
+  // Auth mode — a Supabase session cookie is required below.
+  const hasSession = hasSessionCookie(request);
+
+  // Page routes: redirect to /login when there is no session.
   if (!pathname.startsWith('/api/')) {
+    if (!hasSession) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.searchParams.set('next', pathname);
+      return NextResponse.redirect(url);
+    }
     return NextResponse.next();
   }
 
-  // API routes: check for Supabase auth session cookie
-  const cookies = request.cookies;
-  const hasSession = cookies.getAll().some(
-    (c) => c.name.startsWith('sb-') && c.name.endsWith('-auth-token') && c.value,
-  );
-
+  // API routes: reject requests without a session.
   if (!hasSession) {
-    // No session cookie — fall back to demo mode instead of blocking.
-    // Services will use in-memory/localStorage data.
-    return NextResponse.next();
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   return NextResponse.next();

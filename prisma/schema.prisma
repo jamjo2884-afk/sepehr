@@ -1,0 +1,435 @@
+// FlowBoard - Task Management for Media Deck
+// Prisma Schema with SQLite for development
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("FLOWBOARD_DATABASE_URL")
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+
+model FlowUser {
+  id           String   @id
+  email        String   @unique
+  name         String
+  passwordHash String   @map("password_hash")
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  ownedWorkspaces    FlowWorkspace[]           @relation("WorkspaceOwner")
+  workspaceMembers   FlowWorkspaceMember[]
+  ownedBoards        FlowBoard[]               @relation("BoardOwner")
+  boardMembers       FlowBoardMember[]
+  assignedCards      FlowCardMember[]
+  createdCards       FlowCard[]                @relation("CardCreator")
+  checklistItems     FlowChecklistItem[]       @relation("ItemAssignee")
+  commentsAuthored   FlowComment[]             @relation("CommentAuthor")
+  attachments        FlowAttachment[]
+  activities         FlowActivity[]
+  cardWatchers       FlowCardWatcher[]
+  automationRules    FlowAutomationRule[]
+  boardTemplates     FlowBoardTemplate[] @relation("TemplateOwner")
+  cardTemplates      FlowCardTemplate[]  @relation("CardTemplateOwner")
+
+  @@map("flow_users")
+}
+
+// ============================================================
+// WORKSPACES
+// ============================================================
+
+model FlowWorkspace {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  ownerId     String   @map("owner_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  owner   FlowUser              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members FlowWorkspaceMember[]
+  boards  FlowBoard[]
+  labels  FlowLabel[]
+  cardTemplates FlowCardTemplate[]
+
+  @@index([ownerId])
+  @@index([slug])
+  @@map("flow_workspaces")
+}
+
+model FlowWorkspaceMember {
+  id          String            @id @default(uuid())
+  workspaceId String            @map("workspace_id")
+  userId      String            @map("user_id")
+  role        String            @default("MEMBER")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  workspace FlowWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      FlowUser      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@map("flow_workspace_members")
+}
+
+// ============================================================
+// BOARDS
+// ============================================================
+
+model FlowBoard {
+  id               String   @id @default(uuid())
+  title            String
+  description      String?
+  workspaceId      String   @map("workspace_id")
+  ownerId          String   @map("owner_id")
+  position         Int      @default(0)
+  backgroundColor  String?  @map("background_color")
+  backgroundImage  String?  @map("background_image")
+  isArchived       Boolean  @default(false) @map("is_archived")
+  isFavorited      Boolean  @default(false) @map("is_favorited")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  workspace     FlowWorkspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner         FlowUser               @relation("BoardOwner", fields: [ownerId], references: [id])
+  members       FlowBoardMember[]
+  lists         FlowList[]
+  cards         FlowCard[]
+  labels        FlowBoardLabel[]
+  automationRules FlowAutomationRule[]
+
+  @@index([workspaceId])
+  @@index([ownerId])
+  @@index([position])
+  @@map("flow_boards")
+}
+
+model FlowBoardMember {
+  id        String   @id @default(uuid())
+  boardId   String   @map("board_id")
+  userId    String   @map("user_id")
+  role      String   @default("MEMBER")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  board FlowBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user  FlowUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, userId])
+  @@index([boardId])
+  @@index([userId])
+  @@map("flow_board_members")
+}
+
+// ============================================================
+// LISTS
+// ============================================================
+
+model FlowList {
+  id         String   @id @default(uuid())
+  title      String
+  boardId    String   @map("board_id")
+  position   Int      @default(0)
+  isArchived Boolean  @default(false) @map("is_archived")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  board FlowBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards FlowCard[]
+
+  @@index([boardId])
+  @@index([position])
+  @@map("flow_lists")
+}
+
+// ============================================================
+// CARDS
+// ============================================================
+
+model FlowCard {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  listId      String    @map("list_id")
+  boardId     String    @map("board_id")
+  position    Int       @default(0)
+  priority    String    @default("NONE")
+  dueDate     DateTime? @map("due_date")
+  startDate   DateTime? @map("start_date")
+  coverColor  String?   @map("cover_color")
+  coverImage  String?   @map("cover_image")
+  isArchived  Boolean   @default(false) @map("is_archived")
+  isCompleted Boolean   @default(false) @map("is_completed")
+  createdBy   String    @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  list           FlowList             @relation(fields: [listId], references: [id], onDelete: Cascade)
+  board          FlowBoard            @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  creator        FlowUser             @relation("CardCreator", fields: [createdBy], references: [id])
+  members        FlowCardMember[]
+  labels         FlowCardLabel[]
+  checklists     FlowChecklist[]
+  comments       FlowComment[]
+  attachments    FlowAttachment[]
+  activities     FlowActivity[]
+  watchers       FlowCardWatcher[]
+
+  @@index([listId])
+  @@index([boardId])
+  @@index([position])
+  @@index([dueDate])
+  @@index([createdBy])
+  @@index([isArchived])
+  @@map("flow_cards")
+}
+
+model FlowCardMember {
+  id     String @id @default(uuid())
+  cardId String @map("card_id")
+  userId String @map("user_id")
+
+  card FlowCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user FlowUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, userId])
+  @@index([cardId])
+  @@index([userId])
+  @@map("flow_card_members")
+}
+
+model FlowCardWatcher {
+  id     String @id @default(uuid())
+  cardId String @map("card_id")
+  userId String @map("user_id")
+
+  card FlowCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user FlowUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, userId])
+  @@index([cardId])
+  @@index([userId])
+  @@map("flow_card_watchers")
+}
+
+// ============================================================
+// LABELS
+// ============================================================
+
+model FlowLabel {
+  id          String   @id @default(uuid())
+  name        String
+  color       String
+  workspaceId String?  @map("workspace_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace FlowWorkspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  boards    FlowBoardLabel[]
+  cards     FlowCardLabel[]
+
+  @@index([workspaceId])
+  @@map("flow_labels")
+}
+
+model FlowBoardLabel {
+  id      String @id @default(uuid())
+  boardId String @map("board_id")
+  labelId String @map("label_id")
+
+  board FlowBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  label FlowLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, labelId])
+  @@index([boardId])
+  @@map("flow_board_labels")
+}
+
+model FlowCardLabel {
+  id      String @id @default(uuid())
+  cardId  String @map("card_id")
+  labelId String @map("label_id")
+
+  card  FlowCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  label FlowLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, labelId])
+  @@index([cardId])
+  @@map("flow_card_labels")
+}
+
+// ============================================================
+// CHECKLISTS
+// ============================================================
+
+model FlowChecklist {
+  id        String   @id @default(uuid())
+  title     String
+  cardId    String   @map("card_id")
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  card  FlowCard            @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  items FlowChecklistItem[]
+
+  @@index([cardId])
+  @@map("flow_checklists")
+}
+
+model FlowChecklistItem {
+  id          String    @id @default(uuid())
+  checklistId String    @map("checklist_id")
+  content     String
+  isCompleted Boolean   @default(false) @map("is_completed")
+  position    Int       @default(0)
+  assigneeId  String?   @map("assignee_id")
+  dueDate     DateTime? @map("due_date")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  checklist FlowChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  assignee  FlowUser?     @relation("ItemAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([checklistId])
+  @@map("flow_checklist_items")
+}
+
+// ============================================================
+// COMMENTS
+// ============================================================
+
+model FlowComment {
+  id        String   @id @default(uuid())
+  cardId    String   @map("card_id")
+  authorId  String   @map("author_id")
+  content   String
+  isEdited  Boolean  @default(false) @map("is_edited")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  card   FlowCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  author FlowUser @relation("CommentAuthor", fields: [authorId], references: [id])
+
+  @@index([cardId])
+  @@index([authorId])
+  @@map("flow_comments")
+}
+
+// ============================================================
+// ATTACHMENTS
+// ============================================================
+
+model FlowAttachment {
+  id         String   @id @default(uuid())
+  cardId     String   @map("card_id")
+  uploaderId String   @map("uploader_id")
+  fileName   String   @map("file_name")
+  fileSize   Int      @map("file_size")
+  fileType   String   @map("file_type")
+  fileUrl    String   @map("file_url")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  card     FlowCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  uploader FlowUser @relation(fields: [uploaderId], references: [id])
+
+  @@index([cardId])
+  @@map("flow_attachments")
+}
+
+// ============================================================
+// ACTIVITY LOG
+// ============================================================
+
+model FlowActivity {
+  id        String   @id @default(uuid())
+  cardId    String   @map("card_id")
+  userId    String   @map("user_id")
+  type      String
+  content   String
+  metadata  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  card FlowCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user FlowUser @relation(fields: [userId], references: [id])
+
+  @@index([cardId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("flow_activities")
+}
+
+// ============================================================
+// AUTOMATIONS (minimal)
+// ============================================================
+
+model FlowAutomationRule {
+  id         String   @id @default(uuid())
+  boardId    String   @map("board_id")
+  name       String
+  trigger    String
+  conditions String?
+  actions    String?
+  isActive   Boolean  @default(true) @map("is_active")
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  board   FlowBoard @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  creator FlowUser  @relation(fields: [createdBy], references: [id])
+
+  @@index([boardId])
+  @@map("flow_automation_rules")
+}
+
+// ============================================================
+// TEMPLATES
+// ============================================================
+
+model FlowBoardTemplate {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  ownerId      String   @map("owner_id")
+  templateData String   @map("template_data")
+  isPublic     Boolean  @default(false) @map("is_public")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  owner FlowUser @relation("TemplateOwner", fields: [ownerId], references: [id])
+
+  @@index([ownerId])
+  @@map("flow_board_templates")
+}
+
+model FlowCardTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  ownerId     String   @map("owner_id")
+  workspaceId String?  @map("workspace_id")
+  title       String
+  cardDesc    String?  @map("card_description")
+  priority    String   @default("NONE")
+  coverColor  String?  @map("cover_color")
+  labels      String   @default("[]")
+  checklists  String   @default("[]")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  owner     FlowUser       @relation("CardTemplateOwner", fields: [ownerId], references: [id])
+  workspace FlowWorkspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId])
+  @@index([workspaceId])
+  @@map("flow_card_templates")
+}

@@ -27,14 +27,27 @@ function hasSupabaseConfig(): boolean {
 }
 
 /**
+ * Check if the app is in Demo Mode.
+ * Demo Mode is active when Supabase is NOT configured
+ * or when DEMO_MODE=true is set.
+ */
+export function isDemoMode(): boolean {
+  return !hasSupabaseConfig() || process.env.DEMO_MODE === 'true';
+}
+
+/**
  * Get the authenticated user.
  *
- * - No Supabase config → demo user (demo mode).
- * - Supabase configured but no session → null.
+ * Two valid modes:
+ * - Demo Mode: No Supabase config → demo user (in-memory only).
+ * - Auth Mode: Supabase configured → real session required.
+ *
+ * In Auth Mode, missing/invalid session returns null (unauthorized).
+ * Never silently substitute DEMO_USER when Supabase is configured.
  */
 export async function getAuthUser(): Promise<AuthUser | null> {
-  if (!hasSupabaseConfig()) {
-    // No Supabase configured — pure demo mode (in-memory only)
+  if (isDemoMode()) {
+    // No Supabase configured or demo mode — synthetic user (in-memory only)
     return DEMO_USER;
   }
 
@@ -45,9 +58,9 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      // Supabase is configured but no valid session.
-      // Fall back to demo user so the app works in demo mode.
-      return DEMO_USER;
+      // Supabase is configured but no valid session → unauthorized.
+      // Do NOT fall back to DEMO_USER.
+      return null;
     }
 
     return {
