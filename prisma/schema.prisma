@@ -1,5 +1,5 @@
 // FlowBoard - Task Management for Media Deck
-// Prisma Schema with SQLite for development
+// Prisma Schema with PostgreSQL (same Supabase database as Media Deck)
 
 generator client {
   provider = "prisma-client"
@@ -7,8 +7,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("FLOWBOARD_DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================================
