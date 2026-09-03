@@ -34,7 +34,7 @@ export function handleApiError(error: unknown) {
     if (error.message.includes("No access")) return apiForbidden();
     if (error.message.includes("Only the workspace owner")) return apiForbidden();
 
-    return apiError(error.message);
+    return apiInternalError(error.message);
   }
 
   return apiInternalError();

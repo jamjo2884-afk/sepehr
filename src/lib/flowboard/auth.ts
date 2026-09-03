@@ -62,8 +62,12 @@ export async function getCurrentUser(): Promise<FlowBoardUser | null> {
       avatarUrl: user.avatarUrl,
     };
   } catch (err) {
-    console.warn("[flowboard/auth] Error getting current user:", err);
-    return null;
+    // A missing Media Deck user is the only "unauthorized" case (handled above
+    // via the `if (!mdUser) return null;` guard). Every other failure — an
+    // unreachable database, a provisioning error — must surface as a server
+    // error instead of being masked as 401.
+    console.warn("[flowboard/auth] Error resolving current user:", err);
+    throw err;
   }
 }
 
