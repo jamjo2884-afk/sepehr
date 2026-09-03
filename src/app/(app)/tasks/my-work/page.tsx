@@ -110,11 +110,6 @@ export default function MyWorkPage() {
   const pColor = (p: string) => p === "URGENT" ? "bg-red-100 text-red-700" : p === "HIGH" ? "bg-orange-100 text-orange-700" : p === "MEDIUM" ? "bg-yellow-100 text-yellow-700" : p === "LOW" ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground";
   const pLabel = (p: string) => t(`priority.${p.toLowerCase()}` as any);
 
-  const handleLogout = async () => {
-    await fetch("/api/flowboard/auth/logout", { method: "POST" });
-    /* No redirect needed in Media Deck */;
-  };
-
   const handleWorkspaceChange = (id: string) => {
     const ws = workspaces.find((w) => w.id === id);
     if (ws) setCurrentWorkspace(ws);
@@ -200,7 +195,7 @@ export default function MyWorkPage() {
                 const ov = isOverdue(card);
                 const dt = isDueToday(card);
                 return (
-                  <button key={card.id} onClick={() => router.push(`/boards/${card.board.id}?card=${card.id}`)} className="w-full bg-card rounded-xl border border-border p-4 text-left hover:shadow-md transition-all">
+                  <button key={card.id} onClick={() => router.push(`/tasks/boards/${card.board.id}?card=${card.id}`)} className="w-full bg-card rounded-xl border border-border p-4 text-left hover:shadow-md transition-all">
                     <div className="flex items-start gap-4">
                       {card.coverColor && <div className="w-1.5 h-full min-h-[40px] rounded-full flex-shrink-0" style={{ backgroundColor: card.coverColor }} />}
                       <div className="flex-1 min-w-0">

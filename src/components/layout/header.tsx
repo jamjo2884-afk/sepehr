@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Bell,
@@ -59,6 +59,41 @@ const SAMPLE_NOTIFICATIONS = [
   },
 ];
 
+interface SearchBoard {
+  id: string;
+  title: string;
+  backgroundColor?: string | null;
+  backgroundImage?: string | null;
+}
+
+interface SearchCard {
+  id: string;
+  title: string;
+  description?: string | null;
+  board: { id: string; title: string };
+  list: { title: string };
+}
+
+interface SearchMember {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string | null;
+}
+
+interface SearchLabel {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface SearchResults {
+  boards: SearchBoard[];
+  cards: SearchCard[];
+  members: SearchMember[];
+  labels: SearchLabel[];
+}
+
 export function Header() {
   const router = useRouter();
   const { toggleSidebar } = useUIStore();
@@ -72,6 +107,79 @@ export function Header() {
   const [notifications, setNotifications] = useState(SAMPLE_NOTIFICATIONS);
   const [loggingOut, setLoggingOut] = useState(false);
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Global search (FlowBoard) — debounced fetch into the header search box.
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchBoxRef = useRef<HTMLDivElement | null>(null);
+
+  const runSearch = useCallback(async (q: string) => {
+    setSearching(true);
+    setSearchFailed(false);
+    try {
+      const res = await fetch(
+        `/api/flowboard/search?q=${encodeURIComponent(q)}`,
+      );
+      if (!res.ok) {
+        setSearchFailed(true);
+        setSearchResults(null);
+        return;
+      }
+      setSearchResults(await res.json());
+    } catch {
+      setSearchFailed(true);
+      setSearchResults(null);
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    const q = value.trim();
+    if (!q) {
+      setSearchOpen(false);
+      setSearchResults(null);
+      setSearching(false);
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      return;
+    }
+    setSearchOpen(true);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      void runSearch(q);
+    }, 250);
+  };
+
+  // Close the results when clicking outside the search box.
+  useEffect(() => {
+    if (!searchOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [searchOpen]);
+
+  useEffect(
+    () => () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    },
+    [],
+  );
+
+  const resultCount = searchResults
+    ? searchResults.boards.length +
+      searchResults.cards.length +
+      searchResults.members.length +
+      searchResults.labels.length
+    : 0;
 
   const markAllRead = () =>
     setNotifications((items) => items.map((n) => ({ ...n, read: true })));
@@ -112,13 +220,141 @@ export function Header() {
         </span>
       </div>
 
-      <div className="relative mx-0 min-w-0 flex-1 sm:mx-auto sm:max-w-md">
+      <div ref={searchBoxRef} className="relative mx-0 min-w-0 flex-1 sm:mx-auto sm:max-w-md">
         <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
+          value={searchQuery}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          onFocus={(e) => {
+            if (e.target.value.trim()) setSearchOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setSearchOpen(false);
+          }}
           placeholder={SEARCH_PLACEHOLDER}
           className="h-10 rounded-lg bg-secondary pr-9 text-sm"
         />
+        {searchOpen ? (
+          <div
+            dir="rtl"
+            className="absolute right-0 top-full z-50 mt-2 max-h-96 w-full overflow-y-auto rounded-xl border border-border bg-popover shadow-lg"
+          >
+            {searching ? (
+              <div className="space-y-2 p-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-4 animate-pulse rounded bg-muted" />
+                ))}
+              </div>
+            ) : searchFailed ? (
+              <p className="px-4 py-6 text-center text-sm text-destructive">
+                جستجو ناموفق بود.
+              </p>
+            ) : searchResults && resultCount === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                نتیجه‌ای یافت نشد.
+              </p>
+            ) : searchResults ? (
+              <div className="divide-y divide-border/60">
+                {searchResults.boards.length > 0 ? (
+                  <section className="px-1 py-2">
+                    <h3 className="px-3 pb-1 text-xs font-medium text-muted-foreground">
+                      تخته‌ها ({searchResults.boards.length})
+                    </h3>
+                    {searchResults.boards.map((b) => (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() => {
+                          router.push(`/tasks/boards/${b.id}`);
+                          setSearchOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-right text-sm hover:bg-secondary"
+                      >
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: b.backgroundColor || '#0079bf' }}
+                        />
+                        <span className="truncate">{b.title}</span>
+                      </button>
+                    ))}
+                  </section>
+                ) : null}
+                {searchResults.cards.length > 0 ? (
+                  <section className="px-1 py-2">
+                    <h3 className="px-3 pb-1 text-xs font-medium text-muted-foreground">
+                      کارت‌ها ({searchResults.cards.length})
+                    </h3>
+                    {searchResults.cards.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          router.push(`/tasks/boards/${c.board.id}?card=${c.id}`);
+                          setSearchOpen(false);
+                        }}
+                        className="flex w-full flex-col gap-0.5 rounded-lg px-3 py-1.5 text-right text-sm hover:bg-secondary"
+                      >
+                        <span className="truncate font-medium">{c.title}</span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {c.board.title} › {c.list.title}
+                        </span>
+                      </button>
+                    ))}
+                  </section>
+                ) : null}
+                {searchResults.members.length > 0 ? (
+                  <section className="px-1 py-2">
+                    <h3 className="px-3 pb-1 text-xs font-medium text-muted-foreground">
+                      اعضا ({searchResults.members.length})
+                    </h3>
+                    {searchResults.members.map((m) => (
+                      <div
+                        key={m.id}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm"
+                      >
+                        <Avatar className="h-6 w-6">
+                          {m.avatarUrl ? (
+                            <AvatarImage src={m.avatarUrl} alt={m.name} />
+                          ) : null}
+                          <AvatarFallback className="bg-primary/15 text-[10px] font-bold text-primary">
+                            {m.name.charAt(0) || 'ع'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate">{m.name}</span>
+                        <span
+                          className="truncate text-xs text-muted-foreground"
+                          dir="ltr"
+                        >
+                          {m.email}
+                        </span>
+                      </div>
+                    ))}
+                  </section>
+                ) : null}
+                {searchResults.labels.length > 0 ? (
+                  <section className="px-1 py-2">
+                    <h3 className="px-3 pb-1 text-xs font-medium text-muted-foreground">
+                      برچسب‌ها ({searchResults.labels.length})
+                    </h3>
+                    {searchResults.labels.map((l) => (
+                      <div
+                        key={l.id}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm"
+                      >
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: l.color }}
+                        />
+                        <span className="truncate">{l.name}</span>
+                      </div>
+                    ))}
+                  </section>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">

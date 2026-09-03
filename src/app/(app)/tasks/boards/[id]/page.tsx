@@ -177,6 +177,14 @@ export default function BoardPage() {
     fetchBoard();
   }, [fetchBoard]);
 
+  // Open a card directly when arriving via ?card=<id> (e.g. from global
+  // search results or My Work). The modal fetches the card by its own id.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cardId = params.get("card");
+    if (cardId) setSelectedCardId(cardId);
+  }, []);
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {

@@ -29,8 +29,9 @@ export function useTranslation() {
 const STORAGE_KEY = "flowboard_locale";
 
 export function FlowLanguageProvider({ children }: { children: ReactNode }) {
-  // Always start with English to ensure server and client render identically
-  const [locale, setLocaleState] = useState<Locale>("en");
+  // Media Deck is Persian-first (root layout is lang=fa dir=rtl), so default
+  // to "fa". A persisted user preference still wins after hydration.
+  const [locale, setLocaleState] = useState<Locale>("fa");
   const [hydrated, setHydrated] = useState(false);
 
   // Read persisted locale only after hydration (client-only)
