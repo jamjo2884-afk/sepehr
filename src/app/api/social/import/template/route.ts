@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/route-auth';
 import {
   buildCsvTemplate,
   buildXlsxTemplate,
 } from '@/services/social-import/template';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/social/import/template?format=xlsx|csv
@@ -11,7 +14,7 @@ import {
  * header row + clearly-marked DEMO rows + a column guide sheet (Excel).
  * Demo rows are never importable data — they only show the format.
  */
-export async function GET(req: Request): Promise<NextResponse> {
+export const GET = requireAuth(async (req: Request): Promise<NextResponse> => {
   const url = new URL(req.url);
   const format = url.searchParams.get('format') ?? 'xlsx';
   try {
@@ -46,4 +49,4 @@ export async function GET(req: Request): Promise<NextResponse> {
       { status: 500 },
     );
   }
-}
+});

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import { z } from 'zod';
 import {
   resolveRowMatchExisting,
@@ -13,10 +14,15 @@ const resolveSchema = z.object({
  * POST /api/social/import/review/sessions/[id]/rows/[rowId]/resolve
  * Resolve a row by matching it to an existing account.
  */
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string; rowId: string }> },
 ): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   const { rowId } = await params;
   let body: unknown;
   try {

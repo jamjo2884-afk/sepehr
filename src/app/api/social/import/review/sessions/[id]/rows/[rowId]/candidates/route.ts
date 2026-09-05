@@ -1,14 +1,20 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import { getCandidates } from '@/services/import-review/import-review.service';
 
 /**
  * GET /api/social/import/review/sessions/[id]/rows/[rowId]/candidates
  * Get candidate accounts for an ambiguous row.
  */
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string; rowId: string }> },
 ): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   const { rowId } = await params;
   try {
     const candidates = await getCandidates(rowId);

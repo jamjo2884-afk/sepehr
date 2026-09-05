@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import {
   IMPORT_MAX_FILE_BYTES,
   parseImportFile,
@@ -17,7 +18,12 @@ import {
  * Upload a file → parse → create session → insert rows → validate.
  * Returns the session ID for the Review Center.
  */
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   let form: FormData;
   try {
     form = await req.formData();

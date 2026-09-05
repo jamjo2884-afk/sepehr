@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/route-auth';
 import { getSocialDataQuality } from '@/services/social-data-quality.service';
 import {
   getSocialDataQualityReviews,
@@ -20,7 +21,7 @@ import {
  */
 export const dynamic = 'force-dynamic';
 
-export async function GET(): Promise<NextResponse> {
+export const GET = requireAuth(async (): Promise<NextResponse> => {
   try {
     const [report, reviews] = await Promise.all([
       getSocialDataQuality(),
@@ -37,4 +38,4 @@ export async function GET(): Promise<NextResponse> {
       { status: 500 },
     );
   }
-}
+});

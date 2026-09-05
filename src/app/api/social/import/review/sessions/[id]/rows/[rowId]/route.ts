@@ -1,14 +1,20 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import { getImportRow, editAndRevalidateRow } from '@/services/import-review/import-review.service';
 
 /**
  * GET /api/social/import/review/sessions/[id]/rows/[rowId]
  * Get a single row.
  */
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string; rowId: string }> },
 ): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   const { rowId } = await params;
   try {
     const row = await getImportRow(rowId);
@@ -30,6 +36,9 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string; rowId: string }> },
 ): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   const { rowId } = await params;
   let body: unknown;
   try {

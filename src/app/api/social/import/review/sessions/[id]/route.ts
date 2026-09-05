@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import {
   getImportSession,
   updateImportSession,
@@ -10,10 +11,15 @@ import {
  * GET /api/social/import/review/sessions/[id]
  * Get a single session with its rows + summary.
  */
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   const { id } = await params;
   try {
     const session = await getImportSession(id);
@@ -36,6 +42,9 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   const { id } = await params;
   let body: unknown;
   try {
@@ -61,6 +70,9 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   const { id } = await params;
   try {
     await deleteImportSession(id);

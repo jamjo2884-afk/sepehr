@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/route-auth';
 import { getSyncOverview } from '@/services/social-sync.service';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/social/sync/overview
@@ -9,7 +12,7 @@ import { getSyncOverview } from '@/services/social-sync.service';
  * sync health, the latest sync logs, and the latest log per account.
  * Never includes credentials or raw API secrets.
  */
-export async function GET(): Promise<NextResponse> {
+export const GET = requireAuth(async (): Promise<NextResponse> => {
   try {
     const overview = await getSyncOverview();
     return NextResponse.json(overview);
@@ -20,4 +23,4 @@ export async function GET(): Promise<NextResponse> {
       { status: 500 },
     );
   }
-}
+});

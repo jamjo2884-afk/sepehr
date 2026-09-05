@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import { detectAnomaliesForSession, detectAnomaliesForRowById } from '@/services/import-review/anomaly-detection';
 import { updateImportRow } from '@/services/import-review/import-review.service';
 
@@ -7,10 +8,14 @@ import { updateImportRow } from '@/services/import-review/import-review.service'
  *
  * Returns the anomaly summary for a session.
  */
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   _req: Request,
   { params }: { params: { id: string } },
 ) {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
   try {
     const summary = await detectAnomaliesForSession(params.id);
     return NextResponse.json({ summary });
@@ -31,6 +36,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string } },
 ) {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
   void params; // available for future use (session-scoped validation)
   try {
     const body = await req.json();

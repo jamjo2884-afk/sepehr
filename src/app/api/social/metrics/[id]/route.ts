@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import { z } from 'zod';
 import { deleteSocialMetric } from '@/services/social.service';
 
@@ -30,6 +31,8 @@ export async function DELETE(
   req: Request,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
   const parsed = paramsSchema.safeParse(params);
   if (!parsed.success) {
     return NextResponse.json(

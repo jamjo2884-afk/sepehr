@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 import { z } from 'zod';
 import {
   listImportSessions,
@@ -9,7 +10,12 @@ import {
  * GET /api/social/import/review/sessions
  * List all import sessions.
  */
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   try {
     const url = new URL(req.url);
     const limit = Math.min(Number(url.searchParams.get('limit') ?? '50'), 200);
@@ -33,6 +39,9 @@ const createSchema = z.object({
  * Create a new import session.
  */
 export async function POST(req: Request): Promise<NextResponse> {
+  const auth = await requireAuth();
+  if ('error' in auth) return auth.error;
+
   let body: unknown;
   try {
     body = await req.json();
