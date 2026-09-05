@@ -13,9 +13,6 @@ import {
 import Link from 'next/link';
 import {
   decodeAccountKey,
-  getBrandSocialAnalytics,
-  getSocialAccounts,
-  getSocialMetrics,
   socialAccountUrl,
 } from '@/services/social.service';
 import type { BrandSocialAnalytics } from '@/services/social.service';
@@ -89,15 +86,16 @@ export default function BrandPerformancePage() {
     }
     setBrand(parsed.brand);
 
-    Promise.all([
-      getBrandSocialAnalytics(parsed.brand),
-      getSocialAccounts(),
-      getSocialMetrics(undefined, 'monthly'),
-    ])
-      .then(([analytics, accounts, metrics]) => {
-        setAnalytics(analytics);
-        setAccounts(accounts);
-        setAllMetrics(metrics);
+    fetch(`/api/social/brand/${encodeURIComponent(parsed.brand)}`)
+      .then((r) => r.json())
+      .then((data: { ok: boolean; analytics: BrandSocialAnalytics | null; accounts: SocialAccount[]; metrics: SocialMetric[] }) => {
+        if (data.ok) {
+          setAnalytics(data.analytics);
+          setAccounts(data.accounts);
+          setAllMetrics(data.metrics);
+        } else {
+          setError(true);
+        }
         setLoading(false);
       })
       .catch(() => {

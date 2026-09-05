@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Award, ExternalLink, Loader2, Settings } from 'lucide-react';
-import { getSocialAccounts, getSocialMetrics } from '@/services/social.service';
+
 import type { SocialAccount, SocialMetric } from '@/types/social';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
@@ -29,16 +29,21 @@ export default function BrandsPage() {
   const [showManagement, setShowManagement] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      getSocialAccounts(),
-      getSocialMetrics(undefined, 'monthly'),
-    ])
-      .then(([acc, met]) => {
-        setAccounts(acc);
-        setMetrics(met);
+    let active = true;
+    fetch('/api/social/analytics')
+      .then((r) => r.json())
+      .then((data: { ok: boolean; accounts: SocialAccount[]; metrics: SocialMetric[] }) => {
+        if (!active) return;
+        if (data.ok) {
+          setAccounts(data.accounts);
+          setMetrics(data.metrics);
+        }
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
   }, []);
 
   const brands = useMemo<BrandCard[]>(() => {

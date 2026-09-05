@@ -13,7 +13,7 @@ import {
   Search,
   type LucideIcon,
 } from 'lucide-react';
-import { getMediaAssets } from '@/services/data.service';
+
 import {
   MEDIA_ASSET_TYPE_LABELS,
   type MediaAsset,
@@ -60,10 +60,11 @@ export default function AssetsPage() {
 
   useEffect(() => {
     let active = true;
-    getMediaAssets()
-      .then((a) => {
+    fetch('/api/assets')
+      .then((r) => r.json())
+      .then((data: { ok: boolean; assets: MediaAsset[] }) => {
         if (!active) return;
-        setAssets(a);
+        if (data.ok) setAssets(data.assets);
         setLoading(false);
       })
       .catch(() => {

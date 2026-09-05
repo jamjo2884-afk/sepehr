@@ -13,10 +13,7 @@ import {
   Tag,
   type LucideIcon,
 } from 'lucide-react';
-import {
-  getAssetById,
-  getProjectById,
-} from '@/services/data.service';
+
 import {
   MEDIA_ASSET_TYPE_LABELS,
   type MediaAsset,
@@ -71,11 +68,14 @@ export default function AssetDetailPage() {
 
   useEffect(() => {
     let active = true;
-    getAssetById(id)
-      .then(async (a) => {
-        if (!active || !a) return;
-        setAsset(a);
-        setProject(await getProjectById(a.projectId));
+    fetch(`/api/assets/${encodeURIComponent(id)}`)
+      .then((r) => r.json())
+      .then((data: { ok: boolean; asset: MediaAsset | null; project: Project | null }) => {
+        if (!active) return;
+        if (data.ok && data.asset) {
+          setAsset(data.asset);
+          setProject(data.project);
+        }
         setLoading(false);
       })
       .catch(() => {
