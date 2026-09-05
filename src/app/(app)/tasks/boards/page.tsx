@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -12,8 +12,9 @@ interface User { id: string; name: string; email: string; avatarUrl?: string; }
 
 function BoardsPageInner() {
   const router = useRouter();
-  const { t, locale } = useLanguage();
-  const [user, setUser] = useState<User | null>(null);
+  const { t } = useLanguage();
+
+  const [, setUser] = useState<User | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
   const [boards, setBoards] = useState<Board[]>([]);

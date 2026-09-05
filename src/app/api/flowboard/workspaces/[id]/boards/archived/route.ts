@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/flowboard/db";
 import { getCurrentUser, requireWorkspaceMember } from "@/lib/flowboard/auth";

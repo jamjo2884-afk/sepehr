@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -73,7 +73,7 @@ export function CardDetailModal({
   onCardUpdated,
 }: CardDetailModalProps) {
   const { toast } = useFlowToast();
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const [card, setCard] = useState<CardDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -415,7 +415,7 @@ export function CardDetailModal({
   const formatTime = (dateStr: string) =>
     new Date(dateStr).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-  const isOverdue = (dateStr: string) => new Date(dateStr) < new Date();
+
 
   if (loading) {
     return (

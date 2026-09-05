@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -38,7 +38,7 @@ export default function TablePage() {
   const [filterText, setFilterText] = useState("");
   const [filterPriority, setFilterPriority] = useState<string[]>([]);
   const [filterBoard, setFilterBoard] = useState<string>("all");
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [, setSelectedCardId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {

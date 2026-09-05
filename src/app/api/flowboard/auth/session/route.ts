@@ -1,11 +1,8 @@
-// @ts-nocheck
+
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/flowboard/db";
 import { getCurrentUser } from "@/lib/flowboard/auth";
 import { apiSuccess, handleApiError } from "@/lib/flowboard/api-utils";
-
-const DEMO_USER_ID = "demo-user-000";
-const DEMO_WORKSPACE_ID = "demo-workspace-000";
 
 export async function GET(_request: NextRequest) {
   try {

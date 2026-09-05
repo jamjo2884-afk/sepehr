@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useFlowToast } from "@/components/flowboard/toast";
 import { useLanguage } from "@/i18n/flowboard/context";
 import {
-  getJalaliMonthInfo,
   jalaliToGregorian,
   gregorianToJalali,
   getDaysInJalaliMonth,
@@ -36,10 +35,10 @@ interface Card {
 
 interface WorkspaceData { cards: Card[]; }
 
-const PERSIAN_MONTHS = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"];
 
 export default function CalendarPage() {
   const router = useRouter();
+  const [, setSelectedCardId] = useState<string | null>(null);
   const { toast } = useFlowToast();
   const { t, locale } = useLanguage();
   const [cards, setCards] = useState<Card[]>([]);
@@ -50,7 +49,6 @@ export default function CalendarPage() {
   const [gregorianDate, setGregorianDate] = useState(new Date());
   const [jalaliYear, setJalaliYear] = useState(0);
   const [jalaliMonth, setJalaliMonth] = useState(0);
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {

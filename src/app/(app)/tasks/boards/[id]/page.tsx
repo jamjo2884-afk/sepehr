@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -90,9 +90,8 @@ export default function BoardPage() {
   const { toast } = useFlowToast();
   const { t, locale } = useLanguage();
 
-  const [board, setBoard] = useState<BoardData | null>(null);
-  const [lists, setLists] = useState<List[]>([]);
-  const [user, setUser] = useState<User | null>(null);
+  const [board, setBoard] = useState<BoardData | null>(null);  const [lists, setLists] = useState<List[]>([]);
+  const [, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [showFilter, setShowFilter] = useState(false);
   const [filterLabels, setFilterLabels] = useState<string[]>([]);
@@ -536,28 +535,6 @@ export default function BoardPage() {
     }
   };
 
-  const handleSaveAsTemplate = async (cardId: string) => {
-    const card = lists.flatMap((l) => l.cards).find((c) => c.id === cardId);
-    if (!card) return;
-    try {
-      const res = await fetch("/api/card-templates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: `Template: ${card.title}`,
-          title: card.title,
-          workspaceId: board?.workspace.id,
-          priority: card.priority,
-          coverColor: card.coverColor,
-        }),
-      });
-      if (res.ok) {
-        toast("Template created", "success");
-      }
-    } catch {
-      toast("Failed to create template", "error");
-    }
-  };
 
   // ============================================================
   // FILTERING

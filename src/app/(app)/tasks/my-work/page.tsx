@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -24,8 +24,8 @@ type SortType = "dueDate" | "priority" | "updated";
 export default function MyWorkPage() {
   const router = useRouter();
   const { t, locale } = useLanguage();
-  const [user, setUser] = useState<User | null>(null);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [, setUser] = useState<User | null>(null);
+  const [, setWorkspaces] = useState<Workspace[]>([]);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
   const [cards, setCards] = useState<CardItem[]>([]);
   const [summary, setSummary] = useState<Summary>({ total: 0, overdue: 0, dueToday: 0, upcoming: 0, completed: 0 });
@@ -110,10 +110,6 @@ export default function MyWorkPage() {
   const pColor = (p: string) => p === "URGENT" ? "bg-red-100 text-red-700" : p === "HIGH" ? "bg-orange-100 text-orange-700" : p === "MEDIUM" ? "bg-yellow-100 text-yellow-700" : p === "LOW" ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground";
   const pLabel = (p: string) => t(`priority.${p.toLowerCase()}` as any);
 
-  const handleWorkspaceChange = (id: string) => {
-    const ws = workspaces.find((w) => w.id === id);
-    if (ws) setCurrentWorkspace(ws);
-  };
 
   const filterTabs: { value: FilterType; label: string }[] = [
     { value: "all", label: t("common.all") },

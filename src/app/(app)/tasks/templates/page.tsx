@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -21,7 +21,7 @@ export default function TemplatesPage() {
   const { toast } = useFlowToast();
   const { t, locale } = useLanguage();
   const [templates, setTemplates] = useState<CardTemplateItem[]>([]);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [, setWorkspaces] = useState<Workspace[]>([]);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -115,8 +115,6 @@ export default function TemplatesPage() {
   const pColor = (p: string) => p === "URGENT" ? "bg-red-100 text-red-700" : p === "HIGH" ? "bg-orange-100 text-orange-700" : p === "MEDIUM" ? "bg-yellow-100 text-yellow-700" : p === "LOW" ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground";
   const pLabel = (p: string) => t(`priority.${p.toLowerCase()}` as any);
 
-  const handleLogout = async () => { await fetch("/api/flowboard/auth/logout", { method: "POST" }); /* No redirect needed in Media Deck */; };
-  const handleWorkspaceChange = (id: string) => { const ws = workspaces.find((w) => w.id === id); if (ws) setCurrentWorkspace(ws); };
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
