@@ -6,7 +6,7 @@
  * All writes go through this service — the client never touches Supabase directly.
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { getSupabase, isTableAvailable } from '@/lib/db';
 import type {
   Brand,
   BrandInput,
@@ -27,10 +27,7 @@ function generateSlug(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
-async function getSupabase(): Promise<SupabaseClient> {
-  const { supabase } = await import('@/lib/supabase');
-  return supabase;
-}
+
 
 /**
  * Resolve a brand name to its UUID id within the current workspace.
@@ -42,7 +39,7 @@ export async function resolveBrandId(
 ): Promise<string | null> {
   try {
     const supabase = await getSupabase();
-    if (!(await checkSupabaseTable(supabase, 'brands'))) return null;
+    if (!(await isTableAvailable('brands'))) return null;
     let query = supabase
       .from('brands')
       .select('id')
@@ -70,7 +67,7 @@ export async function resolveBrandIds(
   if (brandNames.length === 0) return result;
   try {
     const supabase = await getSupabase();
-    if (!(await checkSupabaseTable(supabase, 'brands'))) return result;
+    if (!(await isTableAvailable('brands'))) return result;
     let query = supabase
       .from('brands')
       .select('id, name')
@@ -100,7 +97,7 @@ export async function resolveBrandNames(
   if (uniqueIds.length === 0) return result;
   try {
     const supabase = await getSupabase();
-    if (!(await checkSupabaseTable(supabase, 'brands'))) {
+    if (!(await isTableAvailable('brands'))) {
       // Fallback: fetch all brands and build the map
       const brands = await getBrands();
       for (const b of brands) result.set(b.id, b.name);
@@ -140,22 +137,7 @@ export async function resolveBrandNames(
   }
 }
 
-let _supabaseAvailable: boolean | null = null;
 
-async function checkSupabaseTable(
-  supabase: SupabaseClient,
-  table: string,
-): Promise<boolean> {
-  if (_supabaseAvailable !== null) return _supabaseAvailable;
-  try {
-    const { error } = await supabase.from(table).select('id').limit(1);
-    _supabaseAvailable = !error || error.code !== 'PGRST205';
-    return _supabaseAvailable;
-  } catch {
-    _supabaseAvailable = false;
-    return false;
-  }
-}
 
 /* =========================================================================
  * In-memory store (fallback when Supabase tables don't exist)
@@ -185,7 +167,7 @@ function brandFromRow(row: BrandRow): Brand {
  * Get Default Workspace ID
  * ========================================================================= */
 
-async function getDefaultWorkspaceId(supabase: SupabaseClient): Promise<string | null> {
+async function getDefaultWorkspaceId(supabase: Awaited<ReturnType<typeof getSupabase>>): Promise<string | null> {
   try {
     const { data, error } = await supabase
       .from('workspaces')
@@ -206,7 +188,7 @@ async function getDefaultWorkspaceId(supabase: SupabaseClient): Promise<string |
 export async function getBrands(workspaceId?: string): Promise<Brand[]> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'brands')) {
+    if (await isTableAvailable('brands')) {
       let query = supabase
         .from('brands')
         .select('*')
@@ -236,7 +218,7 @@ export async function getBrands(workspaceId?: string): Promise<Brand[]> {
 export async function getBrandById(id: string): Promise<Brand | null> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'brands')) {
+    if (await isTableAvailable('brands')) {
       const { data, error } = await supabase
         .from('brands')
         .select('*')
@@ -259,7 +241,7 @@ export async function getBrandByName(
 ): Promise<Brand | null> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'brands')) {
+    if (await isTableAvailable('brands')) {
       let query = supabase
         .from('brands')
         .select('*')
@@ -302,7 +284,7 @@ export async function createBrand(
 
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'brands')) {
+    if (await isTableAvailable('brands')) {
       // Get workspace ID if not provided
       let wsId: string | undefined = workspaceId;
       if (!wsId) {
@@ -358,7 +340,7 @@ export async function updateBrand(
 ): Promise<Brand | null> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'brands')) {
+    if (await isTableAvailable('brands')) {
       const row: Record<string, unknown> = {};
       if (patch.name !== undefined) row.name = patch.name.trim();
       if (patch.slug !== undefined) row.slug = patch.slug;

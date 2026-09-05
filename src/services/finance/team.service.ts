@@ -6,7 +6,7 @@
  * All writes go through this service — the client never touches Supabase directly.
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { getSupabase, isTableAvailable } from '@/lib/db';
 import type {
   TeamMember,
   TeamMemberInput,
@@ -23,10 +23,7 @@ import type {
  * Helpers
  * ========================================================================= */
 
-async function getSupabase(): Promise<SupabaseClient> {
-  const { supabase } = await import('@/lib/supabase');
-  return supabase;
-}
+
 
 /* =========================================================================
  * Row Mappers
@@ -64,22 +61,7 @@ function allocationFromRow(row: BrandAllocationRow, brandNames?: Map<string, str
  * In-memory store (fallback when Supabase tables don't exist)
  * ========================================================================= */
 
-let _supabaseAvailable: boolean | null = null;
 
-async function checkSupabaseTable(
-  supabase: SupabaseClient,
-  table: string,
-): Promise<boolean> {
-  if (_supabaseAvailable !== null) return _supabaseAvailable;
-  try {
-    const { error } = await supabase.from(table).select('id').limit(1);
-    _supabaseAvailable = !error || error.code !== 'PGRST205';
-    return _supabaseAvailable;
-  } catch {
-    _supabaseAvailable = false;
-    return false;
-  }
-}
 
 const _memberStore: TeamMemberWithAllocations[] = [];
 
@@ -114,7 +96,7 @@ export async function getTeamMembers(
     if (error) throw error;
     if (!data || data.length === 0) {
       // Check if table simply doesn't exist vs empty
-      if (!(await checkSupabaseTable(supabase, 'team_members'))) {
+      if (!(await isTableAvailable('team_members'))) {
         return _memberStore;
       }
       return [];
@@ -167,7 +149,7 @@ export async function createTeamMember(
 
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'team_members')) {
+    if (await isTableAvailable('team_members')) {
       const row = {
         id,
         name: input.name.trim(),
@@ -229,7 +211,7 @@ export async function updateTeamMember(
 ): Promise<TeamMember | null> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'team_members')) {
+    if (await isTableAvailable('team_members')) {
       const row: Record<string, unknown> = {};
       if (patch.name !== undefined) row.name = patch.name.trim();
       if (patch.employmentType !== undefined)
@@ -298,7 +280,7 @@ export async function updateTeamMember(
 export async function deleteTeamMember(id: string): Promise<boolean> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'team_members')) {
+    if (await isTableAvailable('team_members')) {
       const { error } = await supabase.from('team_members').delete().eq('id', id);
       if (error) throw error;
       return true;
@@ -340,7 +322,7 @@ async function createAllocations(
 export async function getTeamBrands(): Promise<string[]> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'team_member_brand_allocations')) {
+    if (await isTableAvailable('team_member_brand_allocations')) {
       const { data } = await supabase
         .from('team_member_brand_allocations')
         .select('brand_id');

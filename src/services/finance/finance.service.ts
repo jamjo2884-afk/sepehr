@@ -6,7 +6,7 @@
  * All writes go through this service — the client never touches Supabase directly.
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { getSupabase, isTableAvailable } from '@/lib/db';
 import type { SocialPlatform } from '@/types/domain';
 import type {
   FinanceBudget,
@@ -34,27 +34,7 @@ function iso(v: unknown): string {
   return typeof v === 'string' ? v : new Date().toISOString();
 }
 
-let _supabaseAvailable: boolean | null = null;
 
-async function getSupabase(): Promise<SupabaseClient> {
-  const { supabase } = await import('@/lib/supabase');
-  return supabase;
-}
-
-async function checkSupabaseTable(
-  supabase: SupabaseClient,
-  table: string,
-): Promise<boolean> {
-  if (_supabaseAvailable !== null) return _supabaseAvailable;
-  try {
-    const { error } = await supabase.from(table).select('id').limit(1);
-    _supabaseAvailable = !error || error.code !== 'PGRST205';
-    return _supabaseAvailable;
-  } catch {
-    _supabaseAvailable = false;
-    return false;
-  }
-}
 
 /* =========================================================================
  * In-memory store (fallback when Supabase tables don't exist).
@@ -142,7 +122,7 @@ function campaignFromRow(row: CampaignRow, brandNames?: Map<string, string>): Fi
 export async function getBudgets(brandId?: string): Promise<FinanceBudget[]> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_budgets')) {
+    if (await isTableAvailable('finance_budgets')) {
       let query = supabase
         .from('finance_budgets')
         .select('*')
@@ -176,7 +156,7 @@ export async function createBudget(
 
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_budgets')) {
+    if (await isTableAvailable('finance_budgets')) {
       // Resolve brand name to brandId if not provided
       let brandId = input.brandId ?? null;
       if (!brandId && input.brand) {
@@ -226,7 +206,7 @@ export async function updateBudget(
 ): Promise<FinanceBudget | null> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_budgets')) {
+    if (await isTableAvailable('finance_budgets')) {
       const row: Record<string, unknown> = {};
       if (patch.brand !== undefined) row.brand = patch.brand.trim();
       if (patch.brandId !== undefined) row.brand_id = patch.brandId ?? null;
@@ -261,7 +241,7 @@ export async function updateBudget(
 export async function deleteBudget(id: string): Promise<boolean> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_budgets')) {
+    if (await isTableAvailable('finance_budgets')) {
       const { error } = await supabase.from('finance_budgets').delete().eq('id', id);
       if (error) throw error;
       return true;
@@ -284,7 +264,7 @@ export async function deleteBudget(id: string): Promise<boolean> {
 export async function getExpenses(brandId?: string): Promise<FinanceExpense[]> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_expenses')) {
+    if (await isTableAvailable('finance_expenses')) {
       let query = supabase
         .from('finance_expenses')
         .select('*')
@@ -313,7 +293,7 @@ export async function getExpenses(brandId?: string): Promise<FinanceExpense[]> {
 export async function getExpenseById(id: string): Promise<FinanceExpense | null> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_expenses')) {
+    if (await isTableAvailable('finance_expenses')) {
       const { data, error } = await supabase
         .from('finance_expenses')
         .select('*')
@@ -339,7 +319,7 @@ export async function createExpense(
 
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_expenses')) {
+    if (await isTableAvailable('finance_expenses')) {
       // Resolve brand name to brandId if not provided
       let brandId = input.brandId ?? null;
       if (!brandId && input.brand) {
@@ -412,7 +392,7 @@ export async function updateExpense(
 ): Promise<FinanceExpense | null> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_expenses')) {
+    if (await isTableAvailable('finance_expenses')) {
       const row: Record<string, unknown> = {};
       if (patch.brand !== undefined) row.brand = patch.brand.trim();
       if (patch.brandId !== undefined) row.brand_id = patch.brandId ?? null;
@@ -463,7 +443,7 @@ export async function updateExpense(
 export async function deleteExpense(id: string): Promise<boolean> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_expenses')) {
+    if (await isTableAvailable('finance_expenses')) {
       const { error } = await supabase.from('finance_expenses').delete().eq('id', id);
       if (error) throw error;
       return true;
@@ -509,7 +489,7 @@ export async function getAllocationsForExpense(
 ): Promise<ExpenseAllocation[]> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_expense_allocations')) {
+    if (await isTableAvailable('finance_expense_allocations')) {
       const { data, error } = await supabase
         .from('finance_expense_allocations')
         .select('*')
@@ -536,7 +516,7 @@ export async function getAllAllocations(
 ): Promise<ExpenseAllocation[]> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_expense_allocations')) {
+    if (await isTableAvailable('finance_expense_allocations')) {
       let query = supabase.from('finance_expense_allocations').select('*');
       if (brandId) {
         const expenses = await getExpenses(brandId);
@@ -571,7 +551,7 @@ export async function getAllAllocations(
 export async function getCampaigns(brandId?: string): Promise<FinanceCampaign[]> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_campaigns')) {
+    if (await isTableAvailable('finance_campaigns')) {
       let query = supabase
         .from('finance_campaigns')
         .select('*')
@@ -605,7 +585,7 @@ export async function createCampaign(
 
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_campaigns')) {
+    if (await isTableAvailable('finance_campaigns')) {
       // Resolve brand name to brandId if not provided
       let brandId = input.brandId ?? null;
       if (!brandId && input.brand) {
@@ -659,7 +639,7 @@ export async function updateCampaign(
 ): Promise<FinanceCampaign | null> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_campaigns')) {
+    if (await isTableAvailable('finance_campaigns')) {
       const row: Record<string, unknown> = {};
       if (patch.brand !== undefined) row.brand = patch.brand.trim();
       if (patch.brandId !== undefined) row.brand_id = patch.brandId ?? null;
@@ -696,7 +676,7 @@ export async function updateCampaign(
 export async function deleteCampaign(id: string): Promise<boolean> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'finance_campaigns')) {
+    if (await isTableAvailable('finance_campaigns')) {
       const { error } = await supabase.from('finance_campaigns').delete().eq('id', id);
       if (error) throw error;
       return true;
@@ -718,7 +698,7 @@ export async function deleteCampaign(id: string): Promise<boolean> {
 export async function getFinanceBrands(): Promise<string[]> {
   try {
     const supabase = await getSupabase();
-    if (await checkSupabaseTable(supabase, 'brands')) {
+    if (await isTableAvailable('brands')) {
       const { data } = await supabase
         .from('brands')
         .select('name')
