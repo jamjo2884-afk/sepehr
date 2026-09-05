@@ -8,13 +8,13 @@ import {
   BarChart3,
   CalendarRange,
   GitCompareArrows,
+  Heart,
   Inbox,
   PieChart,
   TrendingUp,
-} from 'lucide-react';
-import {
-  buildBrandStats,
+} from 'lucide-react';import { buildBrandStats,
   buildBrandTrends,
+  buildEngagementTrends,
   buildFollowersTrend,
   buildPlatformStats,
   buildPlatformTrends,
@@ -42,6 +42,7 @@ import { MonthlyGrowthChart } from '@/components/social/analytics/monthly-growth
 import { PlatformBreakdownChart } from '@/components/social/analytics/platform-breakdown-chart';
 import { BrandAudienceTrendChart } from '@/components/social/analytics/brand-audience-trend-chart';
 import { PlatformAudienceTrendChart } from '@/components/social/analytics/platform-audience-trend-chart';
+import { EngagementTrendChart } from '@/components/social/analytics/engagement-trend-chart';
 import { BrandComparisonTable } from '@/components/social/analytics/brand-comparison-table';
 import { PeriodComparison } from '@/components/social/analytics/period-comparison';
 import { SectionTitle } from '@/components/social/analytics/shared';
@@ -202,6 +203,11 @@ export default function AnalyticsPage() {
   const brandStats = useMemo(
     () => buildBrandStats(brandTableAccounts, metricsAll, range, prevRange),
     [brandTableAccounts, metricsAll, range, prevRange],
+  );
+
+  const engagementTrends = useMemo(
+    () => buildEngagementTrends(filteredAccounts, metricsAll, range),
+    [filteredAccounts, metricsAll, range],
   );
 
   const hasRangeData = useMemo(
@@ -411,6 +417,22 @@ export default function AnalyticsPage() {
             />
             <div className="rounded-xl border border-border bg-surface/60 p-4">
               <PlatformAudienceTrendChart trends={platformTrends} />
+            </div>
+          </section>
+
+          {/* Engagement trend */}
+          <section>
+            <SectionTitle
+              icon={Heart}
+              title="روند تعامل برندها"
+              extra={
+                <span className="text-[11px] text-muted-foreground">
+                  مقایسه روند تعامل (لایک، کامنت، اشتراک) برندها در بازه زمانی انتخابی
+                </span>
+              }
+            />
+            <div className="rounded-xl border border-border bg-surface/60 p-4">
+              <EngagementTrendChart trends={engagementTrends} />
             </div>
           </section>
 

@@ -254,6 +254,22 @@ export interface SocialBrandTrend {
   points: SocialTrendPoint[];
 }
 
+/** One point of an aggregate engagement trend (one month). */
+export interface SocialEngagementTrendPoint {
+  /** Sortable 'YYYY-MM' Jalali label. */
+  month: string;
+  /** Human label, e.g. 'مرداد ۱۴۰۴'. */
+  monthLabel: string;
+  /** Total engagement (likes + comments + shares) for the month. */
+  engagement: number;
+}
+
+/** Engagement trend of one brand (for multi-brand comparison). */
+export interface SocialEngagementTrend {
+  brand: string;
+  points: SocialEngagementTrendPoint[];
+}
+
 /** Month-over-month follower growth point. */
 export interface SocialMonthlyGrowthPoint {
   month: string;

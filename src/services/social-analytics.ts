@@ -19,6 +19,7 @@ import type {
   SocialBrandStat,
   SocialBrandTrend,
   SocialDataFreshness,
+  SocialEngagementTrend,
   SocialEntityStat,
   SocialGrowthDriver,
   SocialKpiComparison,
@@ -394,6 +395,50 @@ export function buildPlatformTrends(
       }));
     return { platform, points };
   });
+}
+
+/* =========================================================================
+ * Engagement trends (per brand)
+ * ========================================================================= */
+
+/**
+ * Engagement trend (likes + comments + shares) per brand.
+ * One point per month present in the data — months with no data are
+ * excluded.
+ */
+export function buildEngagementTrends(
+  accounts: SocialAccount[],
+  metrics: SocialMetric[],
+  range: SocialMonthRange,
+): SocialEngagementTrend[] {
+  const brands = [...new Set(accounts.map((a) => a.brandId ?? a.brand))];
+  const idsByBrand = new Map<string, Set<string>>();
+  for (const a of accounts) {
+    const key = a.brandId ?? a.brand;
+    const set = idsByBrand.get(key) ?? new Set<string>();
+    set.add(a.id);
+    idsByBrand.set(key, set);
+  }
+  const inRange = metricsInMonthRange(metrics, range);
+  return brands.map((brandId) => {
+    const ids = idsByBrand.get(brandId) ?? new Set<string>();
+    const byMonth = new Map<string, number>();
+    for (const m of inRange) {
+      if (!ids.has(m.accountId)) continue;
+      const eng = totalEngagement(m);
+      if (eng > 0) {
+        byMonth.set(m.periodLabel, (byMonth.get(m.periodLabel) ?? 0) + eng);
+      }
+    }
+    const points = [...byMonth.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+      .map(([month, engagement]) => ({
+        month,
+        monthLabel: jalaliMonthName(month),
+        engagement,
+      }));
+    return { brand: brandId, points };
+  }).filter((t) => t.points.length > 0);
 }
 
 /* =========================================================================

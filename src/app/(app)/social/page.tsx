@@ -9,6 +9,7 @@ import {
   CalendarRange,
   Database,
   GitCompareArrows,
+  Heart,
   Inbox,
   PieChart,
   Plus,
@@ -23,6 +24,7 @@ import type { SocialAccountRow } from '@/services/social.service';
 import {
   buildBrandStats,
   buildBrandTrends,
+  buildEngagementTrends,
   buildFollowersTrend,
   buildPlatformStats,
   computeKpiComparison,
@@ -51,6 +53,7 @@ import { MonthlyGrowthChart } from '@/components/social/analytics/monthly-growth
 import { PlatformBreakdownChart } from '@/components/social/analytics/platform-breakdown-chart';
 import { BrandComparisonTable } from '@/components/social/analytics/brand-comparison-table';
 import { PlatformComparisonTable } from '@/components/social/analytics/platform-comparison-table';
+import { EngagementTrendChart } from '@/components/social/analytics/engagement-trend-chart';
 import { PeriodComparison } from '@/components/social/analytics/period-comparison';
 import { SectionTitle } from '@/components/social/analytics/shared';
 import { ScoreRankingTable } from '@/components/social/score-ranking-table';
@@ -251,6 +254,11 @@ export default function SocialPage() {
   const brandStats = useMemo(
     () => buildBrandStats(brandTableAccounts, metricsAll, range, prevRange),
     [brandTableAccounts, metricsAll, range, prevRange],
+  );
+
+  const engagementTrends = useMemo(
+    () => buildEngagementTrends(filteredAccounts, metricsAll, range),
+    [filteredAccounts, metricsAll, range],
   );
 
   const platformStats = useMemo(
@@ -644,6 +652,22 @@ export default function SocialPage() {
             <SectionTitle icon={PieChart} title="عملکرد شبکه‌ها" />
             <div className="rounded-xl border border-border bg-surface/60 p-4">
               <PlatformBreakdownChart stats={platformStats} />
+            </div>
+          </section>
+
+          {/* Engagement trend */}
+          <section>
+            <SectionTitle
+              icon={Heart}
+              title="روند تعامل برندها"
+              extra={
+                <span className="text-[11px] text-muted-foreground">
+                  مقایسه روند تعامل (لایک، کامنت، اشتراک) برندها در بازه زمانی انتخابی
+                </span>
+              }
+            />
+            <div className="rounded-xl border border-border bg-surface/60 p-4">
+              <EngagementTrendChart trends={engagementTrends} />
             </div>
           </section>
 
