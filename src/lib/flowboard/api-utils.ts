@@ -34,7 +34,10 @@ export function handleApiError(error: unknown) {
     if (error.message.includes("No access")) return apiForbidden();
     if (error.message.includes("Only the workspace owner")) return apiForbidden();
 
-    return apiInternalError(error.message);
+    // Production safety: never leak Prisma/database internals, file paths, or
+    // implementation details to the client. Details are already server-logged
+    // above (without secrets).
+    return apiInternalError();
   }
 
   return apiInternalError();
