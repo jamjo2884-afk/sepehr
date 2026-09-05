@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/flowboard/db";
 import { getCurrentUser } from "@/lib/flowboard/auth";
@@ -14,9 +14,27 @@ export async function GET(request: NextRequest) {
     const boardId = searchParams.get("boardId");
     const filter = searchParams.get("filter") || "all"; // all, overdue, today, upcoming, completed
 
-    // Get user's workspace IDs if no specific workspace
+    // Get user's workspace IDs if no specific workspace.
+    // Security: a client-supplied workspaceId is only honored when the user
+    // is actually a member of that workspace (IDOR protection).
     let workspaceIds: string[] = [];
     if (workspaceId) {
+      const membership = await prisma.flowWorkspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId,
+            userId: user.id,
+          },
+        },
+        select: { workspaceId: true },
+      });
+      if (!membership) {
+        // Not a member — return empty result, never another workspace's data.
+        return apiSuccess({
+          cards: [],
+          summary: { total: 0, overdue: 0, dueToday: 0, upcoming: 0, completed: 0 },
+        });
+      }
       workspaceIds = [workspaceId];
     } else {
       const memberships = await prisma.flowWorkspaceMember.findMany({
