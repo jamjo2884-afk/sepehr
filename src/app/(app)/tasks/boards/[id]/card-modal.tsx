@@ -15,6 +15,9 @@ interface CardDetail {
   coverColor?: string;
   isCompleted: boolean;
   isArchived: boolean;
+  // Phase 23: Media Deck links (brand / content) — nullable scalars.
+  brandId?: string | null;
+  contentId?: string | null;
   list: { id: string; title: string };
   board: { id: string; title: string; workspaceId: string };
   creator: { id: string; name: string; email: string; avatarUrl?: string };
@@ -94,6 +97,23 @@ export function CardDetailModal({
   const [templateName, setTemplateName] = useState("");
   const [templateDesc, setTemplateDesc] = useState("");
   const [savingTemplate, setSavingTemplate] = useState(false);
+  // Phase 23: brand / content link options (Media Deck modules)
+  const [brands, setBrands] = useState<{ id: string; name: string }[]>([]);
+  const [contentItems, setContentItems] = useState<{ id: string; title: string }[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/brands").then((r) => (r.ok ? r.json() : { brands: [] })),
+      fetch("/api/content").then((r) => (r.ok ? r.json() : { contents: [] })),
+    ])
+      .then(([b, c]) => {
+        setBrands(b.brands ?? []);
+        setContentItems(c.contents ?? []);
+      })
+      .catch(() => {
+        // Non-critical: links simply stay empty when Media Deck APIs fail.
+      });
+  }, []);
 
   const fetchCard = useCallback(async () => {
     try {
@@ -967,6 +987,38 @@ export function CardDetailModal({
                 disabled={saving}
                 className="w-full px-2 py-1.5 text-sm rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
               />
+            </div>
+
+            {/* Brand link (Phase 23) */}
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">برند</label>
+              <select
+                value={card.brandId ?? ""}
+                onChange={(e) => updateCard({ brandId: e.target.value || null })}
+                disabled={saving}
+                className="w-full px-2 py-1.5 text-sm rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+              >
+                <option value="">بدون برند</option>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Content link (Phase 23) */}
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">محتوا</label>
+              <select
+                value={card.contentId ?? ""}
+                onChange={(e) => updateCard({ contentId: e.target.value || null })}
+                disabled={saving}
+                className="w-full px-2 py-1.5 text-sm rounded-lg border border-border bg-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+              >
+                <option value="">بدون محتوا</option>
+                {contentItems.map((c) => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
+                ))}
+              </select>
             </div>
 
             {/* Cover color */}

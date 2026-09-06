@@ -83,6 +83,10 @@ export const updateCardSchema = z.object({
   coverImage: z.string().max(500).nullable().optional(),
   isArchived: z.boolean().optional(),
   isCompleted: z.boolean().optional(),
+  // Phase 23: Media Deck links (brands / contents are Supabase-managed,
+  // plain nullable scalars — SET NULL on delete).
+  brandId: z.string().nullable().optional(),
+  contentId: z.string().nullable().optional(),
 });
 
 export const moveCardSchema = z.object({

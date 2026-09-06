@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   ListTodo,
+  ClipboardList,
   Package,
   Rocket,
   Share2,
@@ -10,6 +11,7 @@ import {
   BrainCircuit,
   Bot,
   BookOpen,
+  Bell,
   Settings,
   Award,
   Wallet,
@@ -38,6 +40,13 @@ export const navItems: NavItem[] = [
     href: '/tasks',
     icon: ListTodo,
     description: 'مدیریت وظایف، پروژه‌ها و عملیات',
+  },
+  {
+    id: 'content',
+    label: 'محتوا',
+    href: '/content',
+    icon: ClipboardList,
+    description: 'چرخه تولید محتوا: پیش‌نویس تا انتشار',
   },
   {
     id: 'assets',
@@ -115,6 +124,13 @@ export const navItems: NavItem[] = [
     href: '/knowledge',
     icon: BookOpen,
     description: 'مقالات، راهنماها و دانش سازمانی',
+  },
+  {
+    id: 'notifications',
+    label: 'اعلان‌ها',
+    href: '/notifications',
+    icon: Bell,
+    description: 'اعلان‌ها و هشدارهای سیستم',
   },
   {
     id: 'settings',
