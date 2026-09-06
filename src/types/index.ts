@@ -28,6 +28,10 @@ export interface Notification {
   description: string;
   read: boolean;
   createdAt: Timestamp;
+  /** Phase 23: workspace scoping, type and deep-link (non-breaking additions). */
+  workspaceId?: ID | null;
+  type?: string;
+  link?: string | null;
 }
 
 export interface ApiError {

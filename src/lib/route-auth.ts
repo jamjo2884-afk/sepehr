@@ -66,3 +66,23 @@ export function withAuth(handler: RouteHandler) {
     return handler(req, { user, workspace });
   };
 }
+
+/**
+ * Require a specific workspace role (Phase 23 — permission foundation).
+ *
+ * Workspace membership is ALWAYS checked first by `withAuth`; this wrapper
+ * only narrows the allowed roles on top of it. Enforced server-side — the
+ * UI is never trusted. Applies only where a route genuinely needs it.
+ */
+export function requireRole(...roles: string[]) {
+  return (handler: RouteHandler) =>
+    withAuth(async (req, auth) => {
+      if (!roles.includes(auth.workspace.role)) {
+        return NextResponse.json(
+          { ok: false, error: 'دسترسی شما برای این عملیات کافی نیست.' },
+          { status: 403 },
+        );
+      }
+      return handler(req, auth);
+    });
+}

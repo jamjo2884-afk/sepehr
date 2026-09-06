@@ -171,6 +171,13 @@ model FlowCard {
   coverImage  String?   @map("cover_image")
   isArchived  Boolean   @default(false) @map("is_archived")
   isCompleted Boolean   @default(false) @map("is_completed")
+  // Phase 23: links to Media Deck entities (same Postgres database).
+  // Plain scalars on purpose — brands/contents are managed by Supabase
+  // migrations, not Prisma, so no @relation is declared here.
+  // Both FKs are ON DELETE SET NULL: deleting a brand or content never
+  // deletes a task/card.
+  brandId     String?   @map("brand_id")
+  contentId   String?   @map("content_id")
   createdBy   String    @map("created_by")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
