@@ -40,6 +40,30 @@ export async function POST(
       },
     });
 
+    // Phase 23E — internal notification for the assignee (best-effort,
+    // never breaks the assignment flow). Only for real (non-demo) users.
+    try {
+      if (userId !== "demo-user-000") {
+        const { createNotification } = await import(
+          "@/services/notification.service"
+        );
+        const { getCurrentWorkspace } = await import("@/lib/workspace");
+        const ws = await getCurrentWorkspace();
+        if (ws) {
+          void createNotification({
+            workspaceId: ws.workspaceId,
+            userId,
+            title: "وظیفه جدید به شما اختصاص یافت",
+            description: `«${card.title}» به شما اختصاص یافت.`,
+            type: "info",
+            link: `/tasks/boards/${card.boardId}?card=${id}`,
+          });
+        }
+      }
+    } catch {
+      // Notification failures are silently ignored (best-effort).
+    }
+
     return apiSuccess({ message: "Member added" });
   } catch (error) {
     return handleApiError(error);

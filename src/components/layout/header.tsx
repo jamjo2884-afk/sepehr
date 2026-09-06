@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Bell,
   Check,
@@ -37,6 +38,7 @@ import { isDemoModeClient } from '@/lib/demo';
 import { useIsMobile } from '@/hooks/use-media-query';
 import { signOut } from '@/services/auth.service';
 import { ROLE_LABELS } from '@/types/auth';
+import type { Notification } from '@/types/index';
 import {
   NOTIFICATIONS_LABEL,
   PROFILE_LABEL,
@@ -44,21 +46,6 @@ import {
   WORKSPACE_LABEL,
 } from '@/constants/ui.constants';
 import { toPersianDigits } from '@/utils/persian';
-
-const SAMPLE_NOTIFICATIONS = [
-  {
-    id: '1',
-    title: 'سیستم به‌روزرسانی شد',
-    description: 'نسخه ۰.۱ منتشر شد',
-    read: false,
-  },
-  {
-    id: '2',
-    title: 'خوش آمدید',
-    description: 'به Media Deck خوش آمدید',
-    read: false,
-  },
-];
 
 interface SearchBoard {
   id: string;
@@ -105,9 +92,28 @@ export function Header() {
   const isDark = themeMounted && resolvedTheme === 'dark';
   const profile = useAuthStore((s) => s.profile);
   const workspace = useAuthStore((s) => s.workspace);
-  const [notifications, setNotifications] = useState(SAMPLE_NOTIFICATIONS);
+  // Real notifications from the notifications API (Phase 23) — no mock data.
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loggingOut, setLoggingOut] = useState(false);
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notifications', { cache: 'no-store' });
+      if (!res.ok) return;
+      const body = (await res.json()) as {
+        ok: boolean;
+        notifications: Notification[];
+      };
+      if (body.ok) setNotifications(body.notifications ?? []);
+    } catch {
+      // Silent — header degrades to the empty state.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadNotifications();
+  }, [loadNotifications]);
 
   // Global search (FlowBoard) — debounced fetch into the header search box.
   const [searchQuery, setSearchQuery] = useState('');
@@ -182,8 +188,14 @@ export function Header() {
       searchResults.labels.length
     : 0;
 
-  const markAllRead = () =>
-    setNotifications((items) => items.map((n) => ({ ...n, read: true })));
+  const markAllRead = async () => {
+    await fetch('/api/notifications/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true }),
+    });
+    void loadNotifications();
+  };
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -411,28 +423,60 @@ export function Header() {
                   اعلانی وجود ندارد.
                 </li>
               ) : (
-                notifications.map((n) => (
+                notifications.slice(0, 8).map((n) => (
                   <li
                     key={n.id}
-                    className="flex gap-3 border-b border-border/60 px-4 py-3 last:border-0"
+                    className="border-b border-border/60 last:border-0"
                   >
-                    <span
-                      className={
-                        n.read
-                          ? 'mt-1.5 h-2 w-2 shrink-0 rounded-full bg-muted'
-                          : 'mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary'
-                      }
-                    />
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-sm font-medium">{n.title}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {n.description}
-                      </span>
-                    </div>
+                    <Link
+                      href={n.link ?? '/notifications'}
+                      onClick={() => {
+                        if (!n.read) {
+                          void fetch('/api/notifications/read', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: n.id }),
+                          });
+                        }
+                      }}
+                      className="flex gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
+                    >
+                      <span
+                        className={
+                          n.read
+                            ? 'mt-1.5 h-2 w-2 shrink-0 rounded-full bg-muted'
+                            : 'mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary'
+                        }
+                      />
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <span
+                          className={`text-sm ${
+                            n.read
+                              ? 'text-muted-foreground'
+                              : 'font-medium text-foreground'
+                          }`}
+                        >
+                          {n.title}
+                        </span>
+                        {n.description && (
+                          <span className="line-clamp-2 text-xs text-muted-foreground">
+                            {n.description}
+                          </span>
+                        )}
+                      </div>
+                    </Link>
                   </li>
                 ))
               )}
             </ul>
+            <div className="border-t border-border py-2 text-center">
+              <Link
+                href="/notifications"
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                مشاهده همه اعلان‌ها
+              </Link>
+            </div>
           </PopoverContent>
         </Popover>
 
