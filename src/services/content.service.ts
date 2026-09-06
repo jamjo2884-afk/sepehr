@@ -58,6 +58,11 @@ function memoryAdd(
   return row;
 }
 
+/** Clear the in-memory fallback store (test isolation only). */
+export function resetContentMemoryForTests(): void {
+  _memory.length = 0;
+}
+
 function memoryPatch(id: string, patch: Partial<Content>): Content | null {
   const idx = _memory.findIndex((c) => c.id === id);
   if (idx === -1) return null;

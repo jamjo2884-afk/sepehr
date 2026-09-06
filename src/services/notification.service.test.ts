@@ -14,6 +14,7 @@ import {
   getUnreadCount,
   markNotificationRead,
   markAllNotificationsRead,
+  resetNotificationMemoryForTests,
 } from '@/services/notification.service';
 
 const WS = 'ws-1';
@@ -23,6 +24,9 @@ const USER_B = 'user-b';
 describe('Notification Service (in-memory)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Module-scope in-memory store persists across tests in this file —
+    // clear it so counts never accumulate between cases.
+    resetNotificationMemoryForTests();
   });
 
   it('1. createNotification returns an id and lists newest first', async () => {

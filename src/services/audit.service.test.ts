@@ -15,6 +15,7 @@ import {
   sanitizeAuditMetadata,
   recordAudit,
   getAuditLogs,
+  resetAuditMemoryForTests,
 } from '@/services/audit.service';
 
 const WS = 'ws-1';
@@ -60,7 +61,9 @@ describe('sanitizeAuditMetadata (redaction)', () => {
   });
 
   it('3. truncates long non-secret values', () => {
-    const long = 'x'.repeat(1000);
+    // Must NOT match the token/JWT charset (letters+digits only would be
+    // treated as an opaque token and redacted) — use spaces to break it.
+    const long = `${'word '.repeat(200)}`;
     const out = sanitizeAuditMetadata({ summary: long });
     expect(String(out.summary).length).toBeLessThan(600);
     expect(String(out.summary).endsWith('…')).toBe(true);
@@ -84,6 +87,7 @@ describe('sanitizeAuditMetadata (redaction)', () => {
 describe('recordAudit / getAuditLogs (in-memory fallback)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetAuditMemoryForTests();
   });
 
   it('5. records and returns an audit entry scoped to workspace', async () => {
@@ -115,15 +119,18 @@ describe('recordAudit / getAuditLogs (in-memory fallback)', () => {
       'c-2',
       {
         summary: 'ایجاد',
-        // Simulate a buggy caller passing credentials through
-        credentials: { username: 'admin', password: 'hunter2', apiKey: 'sk-123' },
+        // Simulate a buggy caller passing credentials through. Note: the
+        // nested keys (password/apiKey) are the redaction contract — the
+        // parent key "login_form" is deliberately NOT sensitive-named so
+        // the nested values themselves get inspected.
+        login_form: { username: 'admin', password: 'hunter2', apiKey: 'sk-123' },
       },
     );
 
     const logs = await getAuditLogs(WS);
     const entry = logs.find((l) => l.id === id);
     const meta = entry!.metadata as Record<string, unknown>;
-    const creds = meta.credentials as Record<string, unknown>;
+    const creds = meta.login_form as Record<string, unknown>;
     expect(creds.username).toBe('admin');
     expect(creds.password).toBe('[REDACTED]');
     expect(creds.apiKey).toBe('[REDACTED]');

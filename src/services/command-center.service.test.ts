@@ -6,10 +6,40 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
  * Verifies the dashboard aggregates REAL module data: workspace-scoped
  * brands/contents, task stats from FlowBoard, finance totals, attention
  * items and honest empty results (never fabricated numbers).
+ *
+ * Network isolation: the service reaches Supabase through two paths —
+ * the db.ts wrapper (table probing) and social.service (raw client).
+ * Both are mocked so a unit test never performs DNS lookups: with the
+ * real placeholder client some fetches hang indefinitely instead of
+ * failing fast, which would trip the per-test timeout.
  */
 
-vi.mock('@/lib/supabase', () => ({
-  supabase: {},
+vi.mock('@/lib/supabase', () => ({ supabase: {} }));
+
+vi.mock('@/lib/db', () => ({
+  getSupabase: vi.fn(async () => ({})),
+  // Every table "exists" but the client is an empty object → supabase-js
+  // builder methods are absent, so services take their memory fallback.
+  isTableAvailable: vi.fn(async () => false),
+}));
+
+// getSocialOverview hits the raw supabase client (placeholder URL) — the
+// service only consumes `summary.totalFollowers/totalAccounts` from it.
+vi.mock('@/services/social.service', () => ({
+  getSocialOverview: vi.fn(async () => ({
+    accounts: [],
+    platforms: [],
+    brands: [],
+    months: [],
+    summary: {
+      totalFollowers: 0,
+      totalAccounts: 0,
+      totalBrands: 0,
+      avgGrowthPct: 0,
+      topPlatform: 'instagram',
+      monthCount: 0,
+    },
+  })),
 }));
 
 const mockGetCurrentUser = vi.fn();
@@ -27,10 +57,17 @@ vi.mock('@/lib/flowboard/db', () => ({
   },
 }));
 
-import { getCommandCenterData, getTaskStats } from '@/services/command-center.service';
-import { createContent, transitionContentStatus } from '@/services/content.service';
+import {
+  getCommandCenterData,
+  getTaskStats,
+} from '@/services/command-center.service';
+import {
+  createContent,
+  transitionContentStatus,
+  resetContentMemoryForTests,
+} from '@/services/content.service';
+import { resetAuditMemoryForTests } from '@/services/audit.service';
 
-const WS = 'ws-1';
 const USER = 'user-1';
 
 describe('getTaskStats (FlowBoard)', () => {
@@ -95,6 +132,10 @@ describe('getCommandCenterData', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mockGetCurrentUser.mockResolvedValue(null);
+    // Module-scope in-memory stores persist across tests in this file —
+    // clear them so cases stay isolated.
+    resetContentMemoryForTests();
+    resetAuditMemoryForTests();
   });
 
   it('5. returns honest empty pipeline and zero KPIs with no data', async () => {
@@ -112,7 +153,7 @@ describe('getCommandCenterData', () => {
   });
 
   it('6. aggregates real contents into the pipeline and attention center', async () => {
-    const c1 = await createContent({ title: 'پیش‌نویس ۱' }, 'ws-a', USER);
+    await createContent({ title: 'پیش‌نویس ۱' }, 'ws-a', USER);
     const c2 = await createContent({ title: 'بازبینی ۱' }, 'ws-a', USER);
     await transitionContentStatus(c2!.id, 'review', 'ws-a', USER);
 
@@ -129,6 +170,7 @@ describe('getCommandCenterData', () => {
       (a) => a.kind === 'content_review',
     );
     expect(reviewAttention).toBeDefined();
+    // The service formats counts with Persian digits.
     expect(reviewAttention!.title).toContain('۱ محتوا');
     expect(reviewAttention!.href).toBe('/content?status=review');
 

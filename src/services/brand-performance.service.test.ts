@@ -102,6 +102,9 @@ vi.mock('@/services/finance/finance.service', () => ({
 import { getBrandPerformance } from '@/services/brand-performance.service';
 import { createContent } from '@/services/content.service';
 
+// Unique workspace id per test case: content.service keeps ONE module-scope
+// in-memory store shared by every test in this file (the mock forces the
+// fallback path), so isolation comes from disjoint workspaces.
 const WS = 'ws-perf';
 
 describe('getBrandPerformance', () => {
@@ -124,17 +127,19 @@ describe('getBrandPerformance', () => {
   });
 
   it('2. includes the brand contents in the pipeline counts', async () => {
-    await createContent({ title: 'محتوای برند', brandId: 'b1' }, WS, 'u1');
+    const ws = 'ws-perf-2';
+    await createContent({ title: 'محتوای برند', brandId: 'b1' }, ws, 'u1');
 
-    const perf = await getBrandPerformance('b1', WS);
+    const perf = await getBrandPerformance('b1', ws);
     expect(perf!.content.total).toBe(1);
     expect(perf!.content.byStatus.draft).toBe(1);
   });
 
   it('3. other-brand contents never leak into this brand', async () => {
-    await createContent({ title: 'محتوای برند دیگر', brandId: 'b2' }, WS, 'u1');
+    const ws = 'ws-perf-3';
+    await createContent({ title: 'محتوای برند دیگر', brandId: 'b2' }, ws, 'u1');
 
-    const perf = await getBrandPerformance('b1', WS);
+    const perf = await getBrandPerformance('b1', ws);
     expect(perf!.content.total).toBe(0);
   });
 

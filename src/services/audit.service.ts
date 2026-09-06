@@ -97,6 +97,11 @@ function memoryList(workspaceId: string, limit: number): AuditLog[] {
     .slice(0, limit);
 }
 
+/** Clear the in-memory fallback store (test isolation only). */
+export function resetAuditMemoryForTests(): void {
+  _memory.length = 0;
+}
+
 /* =========================================================================
  * Row mapper
  * ========================================================================= */

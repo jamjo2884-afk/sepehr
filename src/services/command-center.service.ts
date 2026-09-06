@@ -28,6 +28,7 @@ import {
   getUnreadCount,
 } from '@/services/notification.service';
 import { CONTENT_STATUS_LABELS, type ContentStatus } from '@/types/content';
+import { toPersianDigits } from '@/utils/persian';
 
 /* =========================================================================
  * Task stats (FlowBoard via Prisma — dynamic import so the rest of the
@@ -300,7 +301,7 @@ export async function getCommandCenterData(input: {
     attention.push({
       id: 'content-review',
       kind: 'content_review',
-      title: `${pendingReview} محتوا در انتظار بازبینی`,
+      title: `${toPersianDigits(pendingReview)} محتوا در انتظار بازبینی`,
       description: 'محتواهایی که باید تأیید یا رد شوند.',
       href: '/content?status=review',
       severity: 'warning',
@@ -310,7 +311,7 @@ export async function getCommandCenterData(input: {
     attention.push({
       id: 'tasks-overdue',
       kind: 'tasks_overdue',
-      title: `${tasks.overdueTasks} وظیفه عقب‌افتاده`,
+      title: `${toPersianDigits(tasks.overdueTasks)} وظیفه عقب‌افتاده`,
       description: 'وظایفی که مهلت آن‌ها گذشته است.',
       href: '/tasks',
       severity: 'danger',
@@ -320,7 +321,7 @@ export async function getCommandCenterData(input: {
     attention.push({
       id: 'tasks-due-soon',
       kind: 'tasks_due_soon',
-      title: `${tasks.dueSoonTasks} وظیفه تا ۳ روز آینده`,
+      title: `${toPersianDigits(tasks.dueSoonTasks)} وظیفه تا ۳ روز آینده`,
       description: 'وظایفی که به مهلت آن‌ها نزدیک می‌شویم.',
       href: '/tasks',
       severity: 'info',
@@ -330,7 +331,7 @@ export async function getCommandCenterData(input: {
     attention.push({
       id: 'unread-notifications',
       kind: 'unread',
-      title: `${unread} اعلان خوانده‌نشده`,
+      title: `${toPersianDigits(unread)} اعلان خوانده‌نشده`,
       description: 'آخرین رویدادها و هشدارهای سیستم.',
       href: '/notifications',
       severity: 'info',

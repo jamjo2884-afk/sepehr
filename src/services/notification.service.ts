@@ -62,6 +62,11 @@ function memoryList(workspaceId: string): MemoryNotification[] {
     .sort((a, b) => b._seq - a._seq);
 }
 
+/** Clear the in-memory fallback store (test isolation only). */
+export function resetNotificationMemoryForTests(): void {
+  _memory.length = 0;
+}
+
 /* =========================================================================
  * Row mapper
  * ========================================================================= */
