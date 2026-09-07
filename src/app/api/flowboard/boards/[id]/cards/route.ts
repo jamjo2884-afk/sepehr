@@ -45,6 +45,8 @@ export async function POST(
         startDate: data.startDate ? new Date(data.startDate) : undefined,
         coverColor: data.coverColor,
         coverImage: data.coverImage,
+        brandId: data.brandId ?? undefined,
+        contentId: data.contentId ?? undefined,
         createdBy: user.id,
       },
       include: {

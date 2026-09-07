@@ -5,10 +5,12 @@ import { motion } from 'framer-motion';
 import {
   AlertTriangle,
   CalendarClock,
+  CheckSquare,
   FileText,
   Plus,
   RefreshCw,
   Trash2,
+  Workflow,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/stores/auth.store';
@@ -71,6 +73,12 @@ interface CampaignOption {
   name: string;
 }
 
+interface BoardOption {
+  id: string;
+  title: string;
+  lists: { id: string; title: string; position: number }[];
+}
+
 interface ContentFormState {
   title: string;
   type: ContentType;
@@ -81,6 +89,15 @@ interface ContentFormState {
   scheduledAt: string;
 }
 
+interface TaskFormState {
+  title: string;
+  boardId: string;
+  listId: string;
+  priority: string;
+  dueDate: string;
+  description: string;
+}
+
 const EMPTY_FORM: ContentFormState = {
   title: '',
   type: 'post',
@@ -89,6 +106,15 @@ const EMPTY_FORM: ContentFormState = {
   platform: '',
   body: '',
   scheduledAt: '',
+};
+
+const EMPTY_TASK_FORM: TaskFormState = {
+  title: '',
+  boardId: '',
+  listId: '',
+  priority: 'MEDIUM',
+  dueDate: '',
+  description: '',
 };
 
 type LoadState = 'loading' | 'ready' | 'error';
@@ -102,24 +128,37 @@ export default function ContentPage() {
   const [contents, setContents] = useState<Content[]>([]);
   const [brands, setBrands] = useState<BrandOption[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
-  const [filter, setFilter] = useState<ContentStatus | 'all'>('all');
+  const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
+  const [boards, setBoards] = useState<BoardOption[]>([]);
+
+  const [statusFilter, setStatusFilter] = useState<ContentStatus | 'all'>('all');
+  const [brandFilter, setBrandFilter] = useState<string>('all');
+  const [campaignFilter, setCampaignFilter] = useState<string>('all');
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Content | null>(null);
   const [form, setForm] = useState<ContentFormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [transitioningId, setTransitioningId] = useState<string | null>(null);
 
+  // Task creation dialog
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [taskContent, setTaskContent] = useState<Content | null>(null);
+  const [taskForm, setTaskForm] = useState<TaskFormState>(EMPTY_TASK_FORM);
+  const [taskSaving, setTaskSaving] = useState(false);
+
   const load = useCallback(async () => {
     setState('loading');
     try {
-      const [contentsRes, brandsRes, campaignsRes] = await Promise.all([
-        fetch('/api/content', { cache: 'no-store' }),
-        fetch('/api/brands', { cache: 'no-store' }),
-        fetch('/api/finance/campaigns', { cache: 'no-store' }),
-      ]);
-      if (!contentsRes.ok || !brandsRes.ok || !campaignsRes.ok) {
-        throw new Error('failed');
-      }
+      const [contentsRes, brandsRes, campaignsRes, taskCountRes, boardsRes] =
+        await Promise.all([
+          fetch('/api/content', { cache: 'no-store' }),
+          fetch('/api/brands', { cache: 'no-store' }),
+          fetch('/api/finance/campaigns', { cache: 'no-store' }),
+          fetch('/api/content/tasks-count', { cache: 'no-store' }),
+          fetch('/api/flowboard/boards-list', { cache: 'no-store' }),
+        ]);
+
       const contentsBody = (await contentsRes.json()) as {
         ok: boolean;
         contents: Content[];
@@ -132,9 +171,20 @@ export default function ContentPage() {
         ok: boolean;
         campaigns: CampaignOption[];
       };
+      const taskCountBody = (await taskCountRes.json()) as {
+        ok: boolean;
+        counts: Record<string, number>;
+      };
+      const boardsBody = (await boardsRes.json()) as {
+        ok: boolean;
+        boards: BoardOption[];
+      };
+
       setContents(contentsBody.contents ?? []);
       setBrands(brandsBody.brands ?? []);
       setCampaigns(campaignsBody.campaigns ?? []);
+      setTaskCounts(taskCountBody.counts ?? {});
+      setBoards(boardsBody.boards ?? []);
       setState('ready');
     } catch {
       setState('error');
@@ -145,16 +195,32 @@ export default function ContentPage() {
     void load();
   }, [load]);
 
-  const filtered = useMemo(
-    () => (filter === 'all' ? contents : contents.filter((c) => c.status === filter)),
-    [contents, filter],
-  );
+  const filtered = useMemo(() => {
+    let result = contents;
+    if (statusFilter !== 'all') {
+      result = result.filter((c) => c.status === statusFilter);
+    }
+    if (brandFilter !== 'all') {
+      result = result.filter((c) => c.brandId === brandFilter);
+    }
+    if (campaignFilter !== 'all') {
+      result = result.filter((c) => c.campaignId === campaignFilter);
+    }
+    return result;
+  }, [contents, statusFilter, brandFilter, campaignFilter]);
 
   const countByStatus = useMemo(() => {
     const map = new Map<ContentStatus, number>(ALL_STATUSES.map((s) => [s, 0]));
     for (const c of contents) map.set(c.status, (map.get(c.status) ?? 0) + 1);
     return map;
   }, [contents]);
+
+  const filteredCampaigns = useMemo(() => {
+    if (brandFilter === 'all') return campaigns;
+    return campaigns.filter(
+      (c) => !c.brandId || c.brandId === brandFilter,
+    );
+  }, [campaigns, brandFilter]);
 
   const openCreate = () => {
     setEditing(null);
@@ -174,6 +240,15 @@ export default function ContentPage() {
       scheduledAt: content.scheduledAt ? content.scheduledAt.slice(0, 10) : '',
     });
     setDialogOpen(true);
+  };
+
+  const openTaskDialog = (content: Content) => {
+    setTaskContent(content);
+    setTaskForm({
+      ...EMPTY_TASK_FORM,
+      title: `تسک محتوا: ${content.title}`,
+    });
+    setTaskDialogOpen(true);
   };
 
   const save = async () => {
@@ -217,6 +292,44 @@ export default function ContentPage() {
     }
   };
 
+  const saveTask = async () => {
+    if (!taskContent || !taskForm.title.trim()) {
+      toast.error('عنوان تسک الزامی است.');
+      return;
+    }
+    if (!taskForm.boardId || !taskForm.listId) {
+      toast.error('بورد و لیست را انتخاب کنید.');
+      return;
+    }
+    setTaskSaving(true);
+    try {
+      const res = await fetch(`/api/content/${taskContent.id}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: taskForm.title.trim(),
+          boardId: taskForm.boardId,
+          listId: taskForm.listId,
+          priority: taskForm.priority,
+          dueDate: taskForm.dueDate || null,
+          description: taskForm.description || undefined,
+        }),
+      });
+      const body = (await res.json()) as { ok: boolean; error?: string };
+      if (!res.ok || !body.ok) {
+        toast.error(body.error ?? 'ایجاد تسک ناموفق بود.');
+        return;
+      }
+      toast.success('تسک ایجاد شد.');
+      setTaskDialogOpen(false);
+      await load();
+    } catch {
+      toast.error('ایجاد تسک ناموفق بود.');
+    } finally {
+      setTaskSaving(false);
+    }
+  };
+
   const transition = async (content: Content, to: ContentStatus) => {
     setTransitioningId(content.id);
     try {
@@ -242,7 +355,9 @@ export default function ContentPage() {
   const remove = async (content: Content) => {
     if (!window.confirm(`«${content.title}» حذف شود؟`)) return;
     try {
-      const res = await fetch(`/api/content/${content.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/content/${content.id}`, {
+        method: 'DELETE',
+      });
       const body = (await res.json()) as { ok: boolean; error?: string };
       if (!res.ok || !body.ok) {
         toast.error(body.error ?? 'حذف محتوا ناموفق بود.');
@@ -254,6 +369,8 @@ export default function ContentPage() {
       toast.error('حذف محتوا ناموفق بود.');
     }
   };
+
+  const selectedBoard = boards.find((b) => b.id === taskForm.boardId);
 
   return (
     <motion.div
@@ -286,20 +403,54 @@ export default function ContentPage() {
       {/* Status filter chips */}
       <div className="flex flex-wrap gap-2">
         <StatusChip
-          active={filter === 'all'}
-          onClick={() => setFilter('all')}
+          active={statusFilter === 'all'}
+          onClick={() => setStatusFilter('all')}
           label="همه"
           count={contents.length}
         />
         {ALL_STATUSES.map((status) => (
           <StatusChip
             key={status}
-            active={filter === status}
-            onClick={() => setFilter(status)}
+            active={statusFilter === status}
+            onClick={() => setStatusFilter(status)}
             label={CONTENT_STATUS_LABELS[status]}
             count={countByStatus.get(status) ?? 0}
           />
         ))}
+      </div>
+
+      {/* Brand + Campaign filters */}
+      <div className="flex flex-wrap gap-3">
+        <div className="w-48">
+          <Select value={brandFilter} onValueChange={setBrandFilter}>
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue placeholder="همه برندها" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">همه برندها</SelectItem>
+              {brands.map((b) => (
+                <SelectItem key={b.id} value={b.id}>
+                  {b.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="w-48">
+          <Select value={campaignFilter} onValueChange={setCampaignFilter}>
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue placeholder="همه کمپین‌ها" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">همه کمپین‌ها</SelectItem>
+              {filteredCampaigns.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {state === 'loading' ? (
@@ -353,14 +504,26 @@ export default function ContentPage() {
                       {content.platform}
                     </span>
                   )}
+                  {taskCounts[content.id] ? (
+                    <span className="flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-xs text-purple-500">
+                      <CheckSquare className="h-3 w-3" />
+                      {taskCounts[content.id]} تسک
+                    </span>
+                  ) : null}
                 </div>
                 <p className="text-sm font-semibold text-foreground">
                   {content.title}
                 </p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  {content.brandId && <span>برند: {brandName(content.brandId, brands)}</span>}
+                  {content.brandId && (
+                    <span>
+                      برند: {brandName(content.brandId, brands)}
+                    </span>
+                  )}
                   {content.campaignId && (
-                    <span>کمپین: {campaignName(content.campaignId, campaigns)}</span>
+                    <span>
+                      کمپین: {campaignName(content.campaignId, campaigns)}
+                    </span>
                   )}
                   {content.scheduledAt && (
                     <span className="flex items-center gap-1">
@@ -377,6 +540,17 @@ export default function ContentPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 text-xs"
+                    onClick={() => openTaskDialog(content)}
+                  >
+                    <Workflow className="h-3 w-3" />
+                    ایجاد تسک
+                  </Button>
+                )}
                 {ALLOWED_ACTIONS[content.status].map((to) => (
                   <Button
                     key={to}
@@ -413,7 +587,7 @@ export default function ContentPage() {
         </ul>
       )}
 
-      {/* Create / edit dialog */}
+      {/* Create / edit content dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -437,7 +611,9 @@ export default function ContentPage() {
                 <Label>نوع</Label>
                 <Select
                   value={form.type}
-                  onValueChange={(v) => setForm({ ...form, type: v as ContentType })}
+                  onValueChange={(v) =>
+                    setForm({ ...form, type: v as ContentType })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -455,7 +631,9 @@ export default function ContentPage() {
                 <Label>پلتفرم</Label>
                 <Input
                   value={form.platform}
-                  onChange={(e) => setForm({ ...form, platform: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, platform: e.target.value })
+                  }
                   placeholder="مثلاً: instagram"
                 />
               </div>
@@ -486,7 +664,9 @@ export default function ContentPage() {
                 <Label>کمپین</Label>
                 <Select
                   value={form.campaignId}
-                  onValueChange={(v) => setForm({ ...form, campaignId: v })}
+                  onValueChange={(v) =>
+                    setForm({ ...form, campaignId: v })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="بدون کمپین" />
@@ -494,7 +674,10 @@ export default function ContentPage() {
                   <SelectContent>
                     {campaigns
                       .filter(
-                        (c) => !form.brandId || !c.brandId || c.brandId === form.brandId,
+                        (c) =>
+                          !form.brandId ||
+                          !c.brandId ||
+                          c.brandId === form.brandId,
                       )
                       .map((c) => (
                         <SelectItem key={c.id} value={c.id}>
@@ -511,7 +694,9 @@ export default function ContentPage() {
               <Input
                 type="date"
                 value={form.scheduledAt}
-                onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, scheduledAt: e.target.value })
+                }
               />
               {form.scheduledAt && (
                 <p className="text-xs text-muted-foreground">
@@ -537,6 +722,140 @@ export default function ContentPage() {
               </Button>
               <Button onClick={() => void save()} disabled={saving}>
                 {saving ? 'در حال ثبت...' : 'ثبت'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create task from content dialog */}
+      <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>ایجاد تسک از محتوا</DialogTitle>
+          </DialogHeader>
+          {taskContent && (
+            <div className="rounded-lg border border-border bg-surface/60 p-3 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {taskContent.title}
+              </span>
+              {taskContent.brandId && (
+                <span className="mr-2">
+                  — برند: {brandName(taskContent.brandId, brands)}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label>عنوان تسک</Label>
+              <Input
+                value={taskForm.title}
+                onChange={(e) =>
+                  setTaskForm({ ...taskForm, title: e.target.value })
+                }
+                placeholder="عنوان تسک..."
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label>بورد</Label>
+                <Select
+                  value={taskForm.boardId}
+                  onValueChange={(v) =>
+                    setTaskForm({ ...taskForm, boardId: v, listId: '' })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="انتخاب بورد" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {boards.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>لیست</Label>
+                <Select
+                  value={taskForm.listId}
+                  onValueChange={(v) =>
+                    setTaskForm({ ...taskForm, listId: v })
+                  }
+                  disabled={!taskForm.boardId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="انتخاب لیست" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedBoard?.lists.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label>اولویت</Label>
+                <Select
+                  value={taskForm.priority}
+                  onValueChange={(v) =>
+                    setTaskForm({ ...taskForm, priority: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">بدون اولویت</SelectItem>
+                    <SelectItem value="LOW">پایین</SelectItem>
+                    <SelectItem value="MEDIUM">متوسط</SelectItem>
+                    <SelectItem value="HIGH">بالا</SelectItem>
+                    <SelectItem value="URGENT">فوری</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>تاریخ سررسید</Label>
+                <Input
+                  type="date"
+                  value={taskForm.dueDate}
+                  onChange={(e) =>
+                    setTaskForm({ ...taskForm, dueDate: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>توضیحات</Label>
+              <Textarea
+                rows={3}
+                value={taskForm.description}
+                onChange={(e) =>
+                  setTaskForm({ ...taskForm, description: e.target.value })
+                }
+                placeholder="توضیحات تسک..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setTaskDialogOpen(false)}
+              >
+                انصراف
+              </Button>
+              <Button onClick={() => void saveTask()} disabled={taskSaving}>
+                {taskSaving ? 'در حال ایجاد...' : 'ایجاد تسک'}
               </Button>
             </div>
           </div>
@@ -571,7 +890,9 @@ function StatusChip({
       }`}
     >
       {label}
-      <span className={`mr-1 ${active ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+      <span
+        className={`mr-1 ${active ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}
+      >
         {count}
       </span>
     </button>
@@ -586,8 +907,7 @@ function campaignName(id: string, campaigns: CampaignOption[]): string {
   return campaigns.find((c) => c.id === id)?.name ?? id;
 }
 
-/** Transitions offered as buttons for each status (subset of the service
- * transition map — the API enforces the real rules). */
+/** Transitions offered as buttons for each status */
 const ALLOWED_ACTIONS: Record<ContentStatus, ContentStatus[]> = {
   draft: ['review'],
   review: ['approved', 'rejected'],

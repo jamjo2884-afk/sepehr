@@ -69,6 +69,9 @@ export const createCardSchema = z.object({
   startDate: z.string().optional(),
   coverColor: z.string().max(20).optional(),
   coverImage: z.string().max(500).optional(),
+  // Phase 24: Media Deck entity links
+  brandId: z.string().nullable().optional(),
+  contentId: z.string().nullable().optional(),
 });
 
 export const updateCardSchema = z.object({

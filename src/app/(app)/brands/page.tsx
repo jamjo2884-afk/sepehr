@@ -3,14 +3,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Award, ExternalLink, Loader2, Settings } from 'lucide-react';
+import { Award, CheckSquare, FileText, ExternalLink, Loader2, Megaphone, Settings, Wallet } from 'lucide-react';
 
 import type { SocialAccount, SocialMetric } from '@/types/social';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { BrandLogo } from '@/components/common/brand-logo';
 import { getBrandColor, isBrandIgnored } from '@/constants/brand-colors';
-import { toPersianDigits } from '@/utils/persian';
+import { formatNumber, toPersianDigits } from '@/utils/persian';
 import { BrandManagement } from '@/components/brands/brand-management';
 
 interface BrandCard {
@@ -22,21 +22,34 @@ interface BrandCard {
   accountCount: number;
 }
 
+interface BrandSummary {
+  contentCount: number;
+  taskCount: number;
+  campaignCount: number;
+  totalExpenses: number;
+}
+
 export default function BrandsPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [metrics, setMetrics] = useState<SocialMetric[]>([]);
+  const [summary, setSummary] = useState<Record<string, BrandSummary>>({});
   const [loading, setLoading] = useState(true);
   const [showManagement, setShowManagement] = useState(false);
 
   useEffect(() => {
     let active = true;
-    fetch('/api/social/analytics')
-      .then((r) => r.json())
-      .then((data: { ok: boolean; accounts: SocialAccount[]; metrics: SocialMetric[] }) => {
+    Promise.all([
+      fetch('/api/social/analytics').then((r) => r.json()),
+      fetch('/api/brands/summary').then((r) => r.json()),
+    ])
+      .then(([analyticsData, summaryData]) => {
         if (!active) return;
-        if (data.ok) {
-          setAccounts(data.accounts);
-          setMetrics(data.metrics);
+        if (analyticsData.ok) {
+          setAccounts(analyticsData.accounts);
+          setMetrics(analyticsData.metrics);
+        }
+        if (summaryData.ok) {
+          setSummary(summaryData.summary ?? {});
         }
         setLoading(false);
       })
@@ -214,6 +227,43 @@ export default function BrandsPage() {
                     دنبال‌کننده کل
                   </p>
                 </div>
+
+                {/* Brand summary stats */}
+                {(() => {
+                  // Find matching summary by brand name
+                  const s = summary[brand.name];
+                  if (!s) return null;
+                  const hasAny = s.contentCount > 0 || s.taskCount > 0 || s.campaignCount > 0 || s.totalExpenses > 0;
+                  if (!hasAny) return null;
+                  return (
+                    <div className="mb-3 grid grid-cols-2 gap-2">
+                      {s.contentCount > 0 && (
+                        <div className="flex items-center gap-1.5 rounded-lg bg-surface/60 px-2 py-1">
+                          <FileText className="h-3 w-3 text-blue-500" />
+                          <span className="text-[10px] text-muted-foreground">{toPersianDigits(String(s.contentCount))} محتوا</span>
+                        </div>
+                      )}
+                      {s.taskCount > 0 && (
+                        <div className="flex items-center gap-1.5 rounded-lg bg-surface/60 px-2 py-1">
+                          <CheckSquare className="h-3 w-3 text-purple-500" />
+                          <span className="text-[10px] text-muted-foreground">{toPersianDigits(String(s.taskCount))} تسک</span>
+                        </div>
+                      )}
+                      {s.campaignCount > 0 && (
+                        <div className="flex items-center gap-1.5 rounded-lg bg-surface/60 px-2 py-1">
+                          <Megaphone className="h-3 w-3 text-cyan-500" />
+                          <span className="text-[10px] text-muted-foreground">{toPersianDigits(String(s.campaignCount))} کمپین</span>
+                        </div>
+                      )}
+                      {s.totalExpenses > 0 && (
+                        <div className="flex items-center gap-1.5 rounded-lg bg-surface/60 px-2 py-1">
+                          <Wallet className="h-3 w-3 text-amber-500" />
+                          <span className="text-[10px] text-muted-foreground">{formatNumber(s.totalExpenses)} تومان</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Platform icons */}
                 <div className="flex flex-wrap gap-2">
