@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
+import { registerServerClientFactory } from '@/lib/supabase-registry';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -46,3 +47,8 @@ export async function createSupabaseServerClient() {
     },
   );
 }
+
+// Register the factory so shared services (lib/db.ts) can obtain the
+// authenticated request-scoped client without importing next/headers
+// themselves (which would break client bundles).
+registerServerClientFactory(createSupabaseServerClient);

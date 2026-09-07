@@ -23,7 +23,27 @@ import type {
  * Helpers
  * ========================================================================= */
 
+type AnySupabase = Awaited<ReturnType<typeof getSupabase>>;
 
+/**
+ * Resolve the workspace for a new server-side row. Under Model A the caller is
+ * an authenticated workspace member, so RLS returns exactly their workspace(s).
+ * Returns null when no workspace is visible (demo/anon).
+ */
+async function resolveInsertWorkspaceId(
+  supabase: AnySupabase,
+): Promise<string | null> {
+  try {
+    const { data } = await supabase
+      .from('workspaces')
+      .select('id')
+      .limit(1)
+      .maybeSingle();
+    return (data?.id as string | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /* =========================================================================
  * Row Mappers
@@ -150,8 +170,10 @@ export async function createTeamMember(
   try {
     const supabase = await getSupabase();
     if (await isTableAvailable('team_members')) {
+      const workspace_id = await resolveInsertWorkspaceId(supabase);
       const row = {
         id,
+        workspace_id,
         name: input.name.trim(),
         employment_type: input.employmentType,
         monthly_cost: input.monthlyCost,
@@ -169,7 +191,7 @@ export async function createTeamMember(
 
       // Insert allocations if provided
       if (input.allocations && input.allocations.length > 0) {
-        await createAllocations(id, input.allocations);
+        await createAllocations(id, input.allocations, workspace_id);
       }
 
       return memberFromRow(data as unknown as TeamMemberRow);
@@ -238,7 +260,8 @@ export async function updateTeamMember(
           .delete()
           .eq('team_member_id', id);
         if (patch.allocations.length > 0) {
-          await createAllocations(id, patch.allocations);
+          const workspace_id = await resolveInsertWorkspaceId(supabase);
+          await createAllocations(id, patch.allocations, workspace_id);
         }
       }
 
@@ -302,12 +325,15 @@ export async function deleteTeamMember(id: string): Promise<boolean> {
 async function createAllocations(
   memberId: string,
   allocations: BrandAllocationInput[],
+  workspaceId: string | null,
 ): Promise<void> {
   const supabase = await getSupabase();
   const rows = allocations.map((a) => ({
     id: `ta-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}-${a.brand.replace(/\s+/g, '')}`,
-    team_member_id: memberId,        brand_id: a.brandId ?? null,
-        allocation_percentage: a.allocationPercentage,
+    team_member_id: memberId,
+    workspace_id: workspaceId,
+    brand_id: a.brandId ?? null,
+    allocation_percentage: a.allocationPercentage,
   }));
   const { error } = await supabase
     .from('team_member_brand_allocations')

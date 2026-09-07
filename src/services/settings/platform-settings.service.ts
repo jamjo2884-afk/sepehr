@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/db';
 import type { SocialPlatform } from '@/types/domain';
 
 // ─── Validation ──────────────────────────────────────────────────────────────
@@ -43,6 +43,7 @@ const DEFAULT_SETTINGS: PlatformSetting[] = ALL_PLATFORMS.map((p) => ({
  */
 export async function getPlatformSettings(): Promise<PlatformSettingsResult> {
   try {
+    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from('social_platform_settings')
       .select('platform, enabled')
@@ -98,6 +99,7 @@ export async function updatePlatformSetting(
   }
 
   try {
+    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from('social_platform_settings')
       .upsert(

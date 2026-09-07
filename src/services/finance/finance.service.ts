@@ -34,6 +34,29 @@ function iso(v: unknown): string {
   return typeof v === 'string' ? v : new Date().toISOString();
 }
 
+type AnySupabase = Awaited<ReturnType<typeof getSupabase>>;
+
+/**
+ * Resolve the workspace for a new server-side row. Under Model A the caller is
+ * an authenticated workspace member, so RLS returns exactly their workspace(s).
+ * Returns null when no workspace is visible (demo/anon) — the row is then left
+ * unscoped and RLS will reject the write, letting the caller fall back.
+ */
+async function resolveInsertWorkspaceId(
+  supabase: AnySupabase,
+): Promise<string | null> {
+  try {
+    const { data } = await supabase
+      .from('workspaces')
+      .select('id')
+      .limit(1)
+      .maybeSingle();
+    return (data?.id as string | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 
 
 /* =========================================================================
@@ -163,8 +186,10 @@ export async function createBudget(
         const { resolveBrandId } = await import('@/services/brand.service');
         brandId = await resolveBrandId(input.brand);
       }
+      const workspace_id = await resolveInsertWorkspaceId(supabase);
       const row = {
         id,
+        workspace_id,
         brand_id: brandId,
         period: input.period,
         period_label: input.periodLabel,
@@ -208,8 +233,12 @@ export async function updateBudget(
     const supabase = await getSupabase();
     if (await isTableAvailable('finance_budgets')) {
       const row: Record<string, unknown> = {};
-      if (patch.brand !== undefined) row.brand = patch.brand.trim();
-      if (patch.brandId !== undefined) row.brand_id = patch.brandId ?? null;
+      if (patch.brandId !== undefined) {
+        row.brand_id = patch.brandId ?? null;
+      } else if (patch.brand !== undefined && patch.brand.trim()) {
+        const { resolveBrandId } = await import('@/services/brand.service');
+        row.brand_id = await resolveBrandId(patch.brand.trim());
+      }
       if (patch.period !== undefined) row.period = patch.period;
       if (patch.periodLabel !== undefined) row.period_label = patch.periodLabel;
       if (patch.amount !== undefined) row.amount = patch.amount;
@@ -326,8 +355,10 @@ export async function createExpense(
         const { resolveBrandId } = await import('@/services/brand.service');
         brandId = await resolveBrandId(input.brand);
       }
+      const workspace_id = await resolveInsertWorkspaceId(supabase);
       const row = {
         id,
+        workspace_id,
         brand_id: brandId,
         expense_date: input.expenseDate,
         amount: input.amount,
@@ -394,8 +425,12 @@ export async function updateExpense(
     const supabase = await getSupabase();
     if (await isTableAvailable('finance_expenses')) {
       const row: Record<string, unknown> = {};
-      if (patch.brand !== undefined) row.brand = patch.brand.trim();
-      if (patch.brandId !== undefined) row.brand_id = patch.brandId ?? null;
+      if (patch.brandId !== undefined) {
+        row.brand_id = patch.brandId ?? null;
+      } else if (patch.brand !== undefined && patch.brand.trim()) {
+        const { resolveBrandId } = await import('@/services/brand.service');
+        row.brand_id = await resolveBrandId(patch.brand.trim());
+      }
       if (patch.expenseDate !== undefined) row.expense_date = patch.expenseDate;
       if (patch.amount !== undefined) row.amount = patch.amount;
       if (patch.category !== undefined) row.category = patch.category;
@@ -592,8 +627,10 @@ export async function createCampaign(
         const { resolveBrandId } = await import('@/services/brand.service');
         brandId = await resolveBrandId(input.brand);
       }
+      const workspace_id = await resolveInsertWorkspaceId(supabase);
       const row = {
         id,
+        workspace_id,
         brand_id: brandId,
         name: input.name.trim(),
         start_date: input.startDate,
@@ -641,8 +678,12 @@ export async function updateCampaign(
     const supabase = await getSupabase();
     if (await isTableAvailable('finance_campaigns')) {
       const row: Record<string, unknown> = {};
-      if (patch.brand !== undefined) row.brand = patch.brand.trim();
-      if (patch.brandId !== undefined) row.brand_id = patch.brandId ?? null;
+      if (patch.brandId !== undefined) {
+        row.brand_id = patch.brandId ?? null;
+      } else if (patch.brand !== undefined && patch.brand.trim()) {
+        const { resolveBrandId } = await import('@/services/brand.service');
+        row.brand_id = await resolveBrandId(patch.brand.trim());
+      }
       if (patch.name !== undefined) row.name = patch.name.trim();
       if (patch.startDate !== undefined) row.start_date = patch.startDate;
       if (patch.endDate !== undefined) row.end_date = patch.endDate;

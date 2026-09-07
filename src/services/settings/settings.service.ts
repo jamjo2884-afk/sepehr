@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { supabase } from '@/lib/supabase';
+import { getSupabase } from '@/lib/db';
 import type {
   AppSettings,
   GeneralSettings,
@@ -114,6 +114,7 @@ export type SettingsResult =
  * Returns defaults when no row exists (first-time user).
  */
 export async function getUserSettings(): Promise<SettingsResult> {
+  const supabase = await getSupabase();
   const {
     data: { user },
     error: authError,
@@ -152,6 +153,8 @@ export async function getUserSettings(): Promise<SettingsResult> {
 export async function upsertUserSettings(
   settings: AppSettings,
 ): Promise<SettingsResult> {
+  const supabase = await getSupabase();
+
   // Validate
   const parsed = appSettingsSchema.safeParse(settings);
   if (!parsed.success) {
