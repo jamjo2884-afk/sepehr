@@ -81,13 +81,13 @@ describe('db.ts — isTableAvailable()', () => {
     expect(await isTableAvailable('missing_table')).toBe(false);
   });
 
-  it('returns true for non-PGRST205 errors (table exists, other issue)', async () => {
+  it('returns false for non-PGRST205 errors (RLS/permission/auth issues)', async () => {
     mockLimit.mockResolvedValue({
       data: null,
       error: { code: '42P01', message: 'permission denied' },
     });
 
-    expect(await isTableAvailable('brands')).toBe(true);
+    expect(await isTableAvailable('brands')).toBe(false);
   });
 
   it('returns false on network/throw error', async () => {

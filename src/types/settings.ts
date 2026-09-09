@@ -6,6 +6,7 @@
  */
 
 export type SettingsCategory =
+  | 'account'
   | 'general'
   | 'appearance'
   | 'social'
@@ -20,6 +21,12 @@ export interface SettingsCategoryInfo {
 }
 
 export const SETTINGS_CATEGORIES: SettingsCategoryInfo[] = [
+  {
+    id: 'account',
+    label: 'حساب کاربری',
+    description: 'اطلاعات شخصی، امنیت و ظاهر',
+    enabled: true,
+  },
   {
     id: 'general',
     label: 'عمومی',

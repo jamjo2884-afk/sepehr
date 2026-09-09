@@ -520,11 +520,17 @@ export function Header() {
               ) : null}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2">
+            <DropdownMenuItem
+              className="gap-2"
+              onClick={() => router.push('/profile')}
+            >
               <UserCircle className="h-4 w-4" />
               پروفایل
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2">
+            <DropdownMenuItem
+              className="gap-2"
+              onClick={() => router.push('/settings')}
+            >
               <Settings className="h-4 w-4" />
               تنظیمات حساب
             </DropdownMenuItem>

@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import type { SettingsCategory } from '@/types/settings';
 import { useSettingsStore } from '@/stores/settings.store';
 import { SettingsSidebar } from '@/components/settings/settings-sidebar';
+import { AccountSettings } from '@/components/settings/sections/account-settings';
 import { GeneralSettings } from '@/components/settings/sections/general-settings';
 import { AppearanceSettings } from '@/components/settings/sections/appearance-settings';
 import { SocialSettings } from '@/components/settings/sections/social-settings';
@@ -36,6 +37,8 @@ export function SettingsLayout() {
     }
 
     switch (activeCategory) {
+      case 'account':
+        return <AccountSettings />;
       case 'general':
         return <GeneralSettings />;
       case 'appearance':
