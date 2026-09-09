@@ -86,26 +86,72 @@ export async function getSupabase(): Promise<SupabaseClient> {
 const _cache: Record<string, boolean> = {};
 
 /**
- * Check whether a Supabase table is available (exists and is queryable).
+ * Error classification for Supabase/PostgREST responses.
  *
- * Result is cached per table name after the first probe.
- * Returns `true` when the table exists (even if the query returned an error
- * for a reason other than "relation does not exist").
- * Returns `false` when the table doesn't exist (PGRST205) or on network error.
+ * The old `isTableAvailable` treated every non-PGRST205 result as "table
+ * available", which made RLS/permission/auth/type errors indistinguishable
+ * from a healthy table. This classifier is narrower and intentional.
  */
-export async function isTableAvailable(table: string): Promise<boolean> {
-  if (_cache[table] !== undefined) return _cache[table];
+export type SupabaseTableProbeKind =
+  | { kind: 'missing' }
+  | { kind: 'reachable' }
+  | { kind: 'other' }
+
+/**
+ * Probe a table with a read-only `select id limit 1` and return a coarse
+ * classification.
+ *
+ * - `missing`: relation does not exist (PGRST205) or table name invalid.
+ * - `reachable`: probe returned a non-error response (the table exists AND the
+ *   current client could reach/query it — for an auth client this also implies
+ *   the caller had read permission at probe time).
+ * - `other`: any other error or exception (RLS/permission/auth/type/network/
+ *   unexpected). This is NOT treated as "table available".
+ */
+export async function probeTable(table: string): Promise<SupabaseTableProbeKind> {
+  if (_cache[table] !== undefined) {
+    const cached = _cache[table];
+    if (cached === true) return { kind: 'reachable' };
+    if (cached === false) {
+      // Previously classified as a failure; without a fresh probe keep it as
+      // a non-reachable result.
+      return { kind: 'other' };
+    }
+  }
 
   try {
     const supabase = await getSupabase();
     const { error } = await supabase.from(table).select('id').limit(1);
-    // PGRST205 = "relation does not exist" — table is missing
-    _cache[table] = !error || error.code !== 'PGRST205';
+
+    if (!error) {
+      _cache[table] = true;
+      return { kind: 'reachable' };
+    }
+
+    // PGRST205 = "relation does not exist" — table is missing.
+    // Everything else (RLS/permission/auth/type/network/unknown) is NOT treated
+    // as a healthy, usable table.
+    if (error.code === 'PGRST205') {
+      _cache[table] = false;
+      return { kind: 'missing' };
+    }
+
+    _cache[table] = false;
+    return { kind: 'other' };
   } catch {
     _cache[table] = false;
+    return { kind: 'other' };
   }
+}
 
-  return _cache[table];
+/**
+ * Legacy predicate kept for call sites that only need a boolean.
+ * It now delegates to the narrower classifier and only returns true when the
+ * probe is explicitly `reachable` — non-PGRST205 errors no longer count as
+ * "available".
+ */
+export async function isTableAvailable(table: string): Promise<boolean> {
+  return (await probeTable(table)).kind === 'reachable';
 }
 
 /**
