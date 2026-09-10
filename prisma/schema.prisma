@@ -2,8 +2,11 @@
 // Prisma Schema with PostgreSQL (same Supabase database as Media Deck)
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  // "native" keeps local dev working; "rhel-openssl-3.0.x" matches the Vercel
+  // Lambda runtime so the Linux query engine is emitted for production builds.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
