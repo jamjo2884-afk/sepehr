@@ -16,13 +16,13 @@
 | Technical / repository name | **Sepehr** |
 | GitHub repository | `jamjo2884-afk/sepehr` |
 | Primary branch | `main` |
-| Application root in repo | `project/` |
+| **Project Root (authoritative, single)** | `D:\New folder\project-bolt-sb1-pshfm5bv\project` |
 | Production URL | `https://sepehr-phi.vercel.app` |
 | Vercel project | `sepehr` |
 | Current baseline commit | `afc4d60` |
 | Current production deployment | `dpl_7mLWkzipAftLM3RoBHHEStsTPU9Y` (`sepehr-4ftorjkb3`) |
 
-**Note:** the Vercel project deploys from the repo root such that the Next.js application lives under `project/`. Environment variables are configured at the Vercel project level (Production environment).
+**Project Root policy:** `D:\New folder\project-bolt-sb1-pshfm5bv\project` is the **only** authoritative Project Root — it is simultaneously the repository working root and the application root. All internal paths in this document (`src/`, `prisma/`, `supabase/`, `package.json`, `.github/`, …) are **relative to this Project Root** and do not constitute independent project roots. No other root path is valid.
 
 ---
 
@@ -94,7 +94,7 @@ The system is designed to manage these platforms (stored in a Postgres enum, ext
 
 ---
 
-## 5. Tech Stack (verified against `project/package.json`)
+## 5. Tech Stack (verified against `package.json` at the Project Root)
 
 | Layer | Technology | Version |
 |---|---|---|
@@ -125,8 +125,8 @@ Scripts (`package.json`): `build` = `prisma generate && next build`, `typecheck`
 - **Single database for everything:** Media Deck (Supabase-managed tables) and FlowBoard (Prisma-managed `flow_*` tables) share the **same** database. FlowBoard has **no separate database**, by design.
 - **Cardinal rule:** no feature may Reset, Drop, Truncate, or destroy existing data. Migrations are **versioned** and **non-destructive** (additive columns, `IF NOT EXISTS` / `IF EXISTS` patterns, policy replacement only).
 - Migration locations:
-  - `project/supabase/migrations/*.sql` — Media Deck tables (33 migrations, e.g. `20260719155903_create_auth_workspace_foundation.sql`, `20260828120000_security_hardening_rls.sql`, `20260829100000_workspace_isolation.sql`, `20260907_phase23_control_center.sql`, `20260907_production_schema_reconciliation.sql`)
-  - `project/prisma/migrations/` — FlowBoard tables (`20260903120000_create_flowboard_tables`)
+  - `supabase/migrations/*.sql` — Media Deck tables (33 migrations, e.g. `20260719155903_create_auth_workspace_foundation.sql`, `20260828120000_security_hardening_rls.sql`, `20260829100000_workspace_isolation.sql`, `20260907_phase23_control_center.sql`, `20260907_production_schema_reconciliation.sql`)
+  - `prisma/migrations/` — FlowBoard tables (`20260903120000_create_flowboard_tables`)
 
 ### 6.1 Key tables (Media Deck side)
 
@@ -143,9 +143,9 @@ Scripts (`package.json`): `build` = `prisma generate && next build`, `typecheck`
 ## 7. Prisma
 
 - **Version:** Prisma 7.10.0 (`prisma`, `@prisma/client`, `@prisma/adapter-pg`)
-- **Schema:** `project/prisma/schema.prisma` — generator `prisma-client`, output `../src/generated/prisma`, preview features `queryCompiler` + `driverAdapters`
-- **Config:** `project/prisma.config.ts` loads `DATABASE_URL` via `dotenv/config` for CLI operations
-- **Client instantiation:** `project/src/lib/flowboard/db.ts` — singleton `PrismaClient` with the **`PrismaPg` driver adapter** (`connectionString: process.env.DATABASE_URL`, `ssl: { rejectUnauthorized: false }`), dev-mode global caching
+- **Schema:** `prisma/schema.prisma` — generator `prisma-client`, output `../src/generated/prisma`, preview features `queryCompiler` + `driverAdapters`
+- **Config:** `prisma.config.ts` loads `DATABASE_URL` via `dotenv/config` for CLI operations
+- **Client instantiation:** `src/lib/flowboard/db.ts` — singleton `PrismaClient` with the **`PrismaPg` driver adapter** (`connectionString: process.env.DATABASE_URL`, `ssl: { rejectUnauthorized: false }`), dev-mode global caching
 
 ### 7.1 Architecture Decision — why PrismaPg (Wasm) and not the native engine
 
