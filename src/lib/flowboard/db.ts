@@ -13,6 +13,7 @@ const globalForPrisma = globalThis as unknown as {
 // Vercel Lambda because no platform-specific .so.node file is needed.
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
+  ssl: { rejectUnauthorized: false },
 });
 
 export const prisma =
