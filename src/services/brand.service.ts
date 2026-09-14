@@ -7,12 +7,7 @@
  */
 
 import { getSupabase, isTableAvailable } from '@/lib/db';
-import type {
-  Brand,
-  BrandInput,
-  BrandRow,
-  BrandStatus,
-} from '@/types/brand';
+import type { Brand, BrandInput, BrandRow, BrandStatus } from '@/types/brand';
 
 /* =========================================================================
  * Helpers
@@ -26,8 +21,6 @@ function generateSlug(name: string): string {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
 }
-
-
 
 /**
  * Resolve a brand name to its UUID id within the current workspace.
@@ -71,7 +64,10 @@ export async function resolveBrandIds(
     let query = supabase
       .from('brands')
       .select('id, name')
-      .in('name', brandNames.map((n) => n.trim()))
+      .in(
+        'name',
+        brandNames.map((n) => n.trim()),
+      )
       .eq('status', 'active');
     if (workspaceId) query = query.eq('workspace_id', workspaceId);
     const { data, error } = await query;
@@ -137,13 +133,15 @@ export async function resolveBrandNames(
   }
 }
 
-
-
 /* =========================================================================
  * In-memory store (fallback when Supabase tables don't exist)
  * ========================================================================= */
 
 const _memoryStore: Brand[] = [];
+
+/** Canonical UUID v4-ish shape (any version, any casing). */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /* =========================================================================
  * Row Mapper
@@ -167,7 +165,9 @@ function brandFromRow(row: BrandRow): Brand {
  * Get Default Workspace ID
  * ========================================================================= */
 
-async function getDefaultWorkspaceId(supabase: Awaited<ReturnType<typeof getSupabase>>): Promise<string | null> {
+async function getDefaultWorkspaceId(
+  supabase: Awaited<ReturnType<typeof getSupabase>>,
+): Promise<string | null> {
   try {
     const { data, error } = await supabase
       .from('workspaces')
@@ -225,7 +225,21 @@ export async function getBrandById(id: string): Promise<Brand | null> {
         .eq('id', id)
         .single();
       if (error) throw error;
-      return brandFromRow(data as unknown as BrandRow);
+      if (data) return brandFromRow(data as unknown as BrandRow);
+      // Not found by id — the brands list derives its cards from
+      // social_accounts.brand (name strings) and links cards by name, so a
+      // brand can exist in Social before any `brands` row is created. Fall
+      // back to a name lookup so those brands resolve instead of 404ing.
+      // Only attempted for non-UUID ids (a UUID never collides with a name).
+      if (!UUID_RE.test(id)) {
+        const { data: byName } = await supabase
+          .from('brands')
+          .select('*')
+          .eq('name', id)
+          .maybeSingle();
+        if (byName) return brandFromRow(byName as unknown as BrandRow);
+      }
+      return null;
     }
   } catch {
     // Fall through
@@ -269,11 +283,13 @@ export async function getBrandByName(
   }
 
   // In-memory fallback
-  return _memoryStore.find(
-    (b) =>
-      b.name === name.trim() &&
-      (!workspaceId || b.workspaceId === workspaceId),
-  ) ?? null;
+  return (
+    _memoryStore.find(
+      (b) =>
+        b.name === name.trim() &&
+        (!workspaceId || b.workspaceId === workspaceId),
+    ) ?? null
+  );
 }
 
 export async function createBrand(
