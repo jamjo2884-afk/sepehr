@@ -178,10 +178,6 @@ export default function BrandsPage() {
       {/* Brand mosaic grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {brands.map((brand, i) => {
-          // Use the first account's brand name for the encoded key
-          const encodedKey = encodeURIComponent(
-            [brand.name, brand.accounts[0]?.platform ?? 'instagram', brand.accounts[0]?.username ?? ''].join('|'),
-          );
           const bc = brandColorMap.get(brand.name) ?? { primary: '#6B7280', light: '#6B728018' };
 
           return (
@@ -192,7 +188,7 @@ export default function BrandsPage() {
               transition={{ duration: 0.3, delay: i * 0.04 }}
             >
               <Link
-                href={`/social/${encodedKey}`}
+                href={`/brands/${brand.accounts[0]?.brandId ?? encodeURIComponent(brand.name)}`}
                 className="group block rounded-2xl border p-5 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
                 style={{
                   background: `linear-gradient(135deg, ${bc.light}, transparent)`,
