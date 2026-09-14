@@ -3,6 +3,9 @@ import { requireAuth } from '@/lib/auth';
 import { getCurrentWorkspace } from '@/lib/workspace';
 import { getSupabase, isTableAvailable } from '@/lib/db';
 import { prisma } from '@/lib/flowboard/db';
+import { resolveBrandNames } from '@/services/brand.service';
+import { computeProfileCompleteness } from '@/services/brand-status.service';
+import type { BrandStatusProfileInput } from '@/types/brand-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +28,18 @@ export async function GET(): Promise<NextResponse> {
 
   const summary: Record<
     string,
-    { contentCount: number; taskCount: number; campaignCount: number; totalExpenses: number }
+    {
+      contentCount: number;
+      taskCount: number;
+      campaignCount: number;
+      totalExpenses: number;
+      /** Fill state of the managerial status profile (null = none saved). */
+      statusProfile: {
+        filledCount: number;
+        totalCount: number;
+        percent: number;
+      } | null;
+    }
   > = {};
 
   try {
@@ -42,7 +56,13 @@ export async function GET(): Promise<NextResponse> {
           const bid = (row as { brand_id: string | null }).brand_id;
           if (!bid) continue;
           if (!summary[bid]) {
-            summary[bid] = { contentCount: 0, taskCount: 0, campaignCount: 0, totalExpenses: 0 };
+            summary[bid] = {
+              contentCount: 0,
+              taskCount: 0,
+              campaignCount: 0,
+              totalExpenses: 0,
+              statusProfile: null,
+            };
           }
           summary[bid].contentCount++;
         }
@@ -60,7 +80,13 @@ export async function GET(): Promise<NextResponse> {
           const bid = (row as { brand_id: string | null }).brand_id;
           if (!bid) continue;
           if (!summary[bid]) {
-            summary[bid] = { contentCount: 0, taskCount: 0, campaignCount: 0, totalExpenses: 0 };
+            summary[bid] = {
+              contentCount: 0,
+              taskCount: 0,
+              campaignCount: 0,
+              totalExpenses: 0,
+              statusProfile: null,
+            };
           }
           summary[bid].campaignCount++;
         }
@@ -79,7 +105,13 @@ export async function GET(): Promise<NextResponse> {
           const amt = (row as { amount: number }).amount;
           if (!bid) continue;
           if (!summary[bid]) {
-            summary[bid] = { contentCount: 0, taskCount: 0, campaignCount: 0, totalExpenses: 0 };
+            summary[bid] = {
+              contentCount: 0,
+              taskCount: 0,
+              campaignCount: 0,
+              totalExpenses: 0,
+              statusProfile: null,
+            };
           }
           summary[bid].totalExpenses += Number(amt);
         }
@@ -94,9 +126,101 @@ export async function GET(): Promise<NextResponse> {
     for (const card of taskCards) {
       if (!card.brandId) continue;
       if (!summary[card.brandId]) {
-        summary[card.brandId] = { contentCount: 0, taskCount: 0, campaignCount: 0, totalExpenses: 0 };
+        summary[card.brandId] = {
+          contentCount: 0,
+          taskCount: 0,
+          campaignCount: 0,
+          totalExpenses: 0,
+          statusProfile: null,
+        };
       }
       summary[card.brandId].taskCount++;
+    }
+
+    // Status-profile completeness per brand (صورت وضعیت برند). Only the
+    // editable text columns are needed to compute the fill ratio.
+    if (await isTableAvailable('brand_status_profiles')) {
+      const { data: profileRows } = await supabase
+        .from('brand_status_profiles')
+        .select(
+          'brand_id, brand_definition, brand_mission, brand_audience, brand_position, brand_strengths, brand_weaknesses, content_status, content_formats, content_weaknesses, content_needs, content_staffing_needs, publishing_status, publishing_discipline, publishing_channels, distribution_issues, distribution_opportunities, monetization_topics, ad_capacity, active_campaigns, ad_opportunities, ad_needs, top_need, urgent_needs, midterm_needs, management_suggestions',
+        );
+      if (profileRows && profileRows.length > 0) {
+        // Mirror under the brand name too — the brands list page looks
+        // summaries up by name while rows reference brands by id.
+        const profileBrandIds = [
+          ...new Set(
+            profileRows.map((r) => (r as { brand_id: string | null }).brand_id),
+          ),
+        ].filter((id): id is string => !!id);
+        const idToName = await resolveBrandNames(profileBrandIds);
+
+        const camel: Record<string, keyof BrandStatusProfileInput> = {
+          brand_definition: 'brandDefinition',
+          brand_mission: 'brandMission',
+          brand_audience: 'brandAudience',
+          brand_position: 'brandPosition',
+          brand_strengths: 'brandStrengths',
+          brand_weaknesses: 'brandWeaknesses',
+          content_status: 'contentStatus',
+          content_formats: 'contentFormats',
+          content_weaknesses: 'contentWeaknesses',
+          content_needs: 'contentNeeds',
+          content_staffing_needs: 'contentStaffingNeeds',
+          publishing_status: 'publishingStatus',
+          publishing_discipline: 'publishingDiscipline',
+          publishing_channels: 'publishingChannels',
+          distribution_issues: 'distributionIssues',
+          distribution_opportunities: 'distributionOpportunities',
+          monetization_topics: 'monetizationTopics',
+          ad_capacity: 'adCapacity',
+          active_campaigns: 'activeCampaigns',
+          ad_opportunities: 'adOpportunities',
+          ad_needs: 'adNeeds',
+          top_need: 'topNeed',
+          urgent_needs: 'urgentNeeds',
+          midterm_needs: 'midtermNeeds',
+          management_suggestions: 'managementSuggestions',
+        };
+
+        for (const row of profileRows as Array<
+          Record<string, string | null> & { brand_id: string }
+        >) {
+          const bid = row.brand_id;
+          if (!bid) continue;
+          const input: BrandStatusProfileInput = {};
+          for (const [snake, camelKey] of Object.entries(camel)) {
+            const v = row[snake];
+            if (typeof v === 'string') input[camelKey] = v;
+          }
+          const completeness = computeProfileCompleteness(input);
+
+          if (!summary[bid]) {
+            summary[bid] = {
+              contentCount: 0,
+              taskCount: 0,
+              campaignCount: 0,
+              totalExpenses: 0,
+              statusProfile: null,
+            };
+          }
+          summary[bid].statusProfile = completeness;
+
+          const name = idToName.get(bid);
+          if (name) {
+            if (!summary[name]) {
+              summary[name] = {
+                contentCount: 0,
+                taskCount: 0,
+                campaignCount: 0,
+                totalExpenses: 0,
+                statusProfile: null,
+              };
+            }
+            summary[name].statusProfile = completeness;
+          }
+        }
+      }
     }
 
     return NextResponse.json({ ok: true, summary });

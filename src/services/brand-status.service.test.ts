@@ -19,6 +19,7 @@ vi.mock('@/lib/db', () => ({
 
 import {
   buildBrandSocialStatus,
+  computeProfileCompleteness,
   getBrandStatusProfile,
   upsertBrandStatusProfile,
 } from '@/services/brand-status.service';
@@ -87,6 +88,72 @@ function makeMetric(
   };
 }
 
+describe('computeProfileCompleteness', () => {
+  const TOTAL = 25; // 25 editable fields in BrandStatusProfileInput
+  const PROFILE_KEYS = [
+    'brandDefinition',
+    'brandMission',
+    'brandAudience',
+    'brandPosition',
+    'brandStrengths',
+    'brandWeaknesses',
+    'contentStatus',
+    'contentFormats',
+    'contentWeaknesses',
+    'contentNeeds',
+    'contentStaffingNeeds',
+    'publishingStatus',
+    'publishingDiscipline',
+    'publishingChannels',
+    'distributionIssues',
+    'distributionOpportunities',
+    'monetizationTopics',
+    'adCapacity',
+    'activeCampaigns',
+    'adOpportunities',
+    'adNeeds',
+    'topNeed',
+    'urgentNeeds',
+    'midtermNeeds',
+    'managementSuggestions',
+  ] as const;
+
+  it('returns 0% for null profile', () => {
+    expect(computeProfileCompleteness(null)).toEqual({
+      filledCount: 0,
+      totalCount: TOTAL,
+      percent: 0,
+    });
+  });
+
+  it('returns 0% for an all-empty profile', () => {
+    const empty = Object.fromEntries(PROFILE_KEYS.map((k) => [k, '']));
+    expect(computeProfileCompleteness(empty)).toEqual({
+      filledCount: 0,
+      totalCount: TOTAL,
+      percent: 0,
+    });
+  });
+
+  it('counts whitespace-only fields as empty', () => {
+    const profile = {
+      brandDefinition: '   ',
+      contentStatus: 'متن نمونه',
+      topNeed: '\n\t ',
+    };
+    const r = computeProfileCompleteness(profile);
+    expect(r.filledCount).toBe(1);
+    expect(r.percent).toBe(4); // 1/25 rounded
+  });
+
+  it('returns 100% when all fields are filled', () => {
+    const full = Object.fromEntries(PROFILE_KEYS.map((k) => [k, 'مقدار']));
+    const r = computeProfileCompleteness(full);
+    expect(r.filledCount).toBe(TOTAL);
+    expect(r.percent).toBe(100);
+  });
+});
+
 describe('buildBrandSocialStatus', () => {
   it('reports ok with the latest metric audience per platform', () => {
     const ig = makeAccount('a1', 'instagram');
@@ -133,7 +200,9 @@ describe('buildBrandSocialStatus', () => {
 
   it('uses channelMembers as fallback audience when followers is 0', () => {
     const tg = makeAccount('a1', 'telegram');
-    const metrics = [makeMetric('m1', 'a1', '1404-07', 0, { channelMembers: 5400 })];
+    const metrics = [
+      makeMetric('m1', 'a1', '1404-07', 0, { channelMembers: 5400 }),
+    ];
 
     const { socialPlatforms } = buildBrandSocialStatus([tg], metrics);
     expect(socialPlatforms[0].audience).toBe(5400);

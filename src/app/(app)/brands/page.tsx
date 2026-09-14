@@ -3,7 +3,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Award, CheckSquare, FileText, ExternalLink, Loader2, Megaphone, Settings, Wallet } from 'lucide-react';
+import {
+  Award,
+  CheckSquare,
+  ClipboardList,
+  FileText,
+  ExternalLink,
+  Loader2,
+  Megaphone,
+  Settings,
+  Wallet,
+} from 'lucide-react';
 
 import type { SocialAccount, SocialMetric } from '@/types/social';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
@@ -12,6 +22,7 @@ import { BrandLogo } from '@/components/common/brand-logo';
 import { getBrandColor, isBrandIgnored } from '@/constants/brand-colors';
 import { formatNumber, toPersianDigits } from '@/utils/persian';
 import { BrandManagement } from '@/components/brands/brand-management';
+import { Progress } from '@/components/ui/progress';
 
 interface BrandCard {
   name: string;
@@ -22,11 +33,19 @@ interface BrandCard {
   accountCount: number;
 }
 
+/** Fill state of the managerial status profile (null = none saved). */
+interface StatusProfileCompleteness {
+  filledCount: number;
+  totalCount: number;
+  percent: number;
+}
+
 interface BrandSummary {
   contentCount: number;
   taskCount: number;
   campaignCount: number;
   totalExpenses: number;
+  statusProfile?: StatusProfileCompleteness | null;
 }
 
 export default function BrandsPage() {
@@ -56,7 +75,9 @@ export default function BrandsPage() {
       .catch(() => {
         if (active) setLoading(false);
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   const brands = useMemo<BrandCard[]>(() => {
@@ -72,14 +93,16 @@ export default function BrandsPage() {
     return [...brandMap.entries()]
       .map(([name, brandAccounts]) => {
         const accountIds = new Set(brandAccounts.map((a) => a.id));
-        const brandMetrics = metrics.filter((m) =>
-          accountIds.has(m.accountId),
-        );
+        const brandMetrics = metrics.filter((m) => accountIds.has(m.accountId));
         const totalFollowers = brandAccounts.reduce((sum, a) => {
           const latest = brandMetrics
             .filter((m) => m.accountId === a.id)
             .sort((a, b) =>
-              a.periodLabel < b.periodLabel ? -1 : a.periodLabel > b.periodLabel ? 1 : 0,
+              a.periodLabel < b.periodLabel
+                ? -1
+                : a.periodLabel > b.periodLabel
+                  ? 1
+                  : 0,
             )
             .pop();
           return sum + (latest?.followers ?? 0);
@@ -87,9 +110,7 @@ export default function BrandsPage() {
 
         const periods = brandMetrics.map((m) => m.periodLabel);
         const latestPeriod =
-          periods.length > 0
-            ? periods.sort().pop() ?? null
-            : null;
+          periods.length > 0 ? (periods.sort().pop() ?? null) : null;
 
         const platforms = new Set(brandAccounts.map((a) => a.platform));
 
@@ -120,7 +141,9 @@ export default function BrandsPage() {
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-3">
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">در حال بارگذاری برندها...</p>
+          <p className="text-sm text-muted-foreground">
+            در حال بارگذاری برندها...
+          </p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -138,9 +161,7 @@ export default function BrandsPage() {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
         <Award className="h-12 w-12 text-muted-foreground/30" />
-        <p className="text-muted-foreground">
-          هنوز هیچ برندی ثبت نشده است.
-        </p>
+        <p className="text-muted-foreground">هنوز هیچ برندی ثبت نشده است.</p>
         <p className="text-xs text-muted-foreground/60">
           ابتدا از بخش مدیریت حساب‌ها، حساب‌های شبکه اجتماعی را اضافه کنید.
         </p>
@@ -155,7 +176,8 @@ export default function BrandsPage() {
         <div>
           <h1 className="text-lg font-bold text-foreground">برندها</h1>
           <p className="text-sm text-muted-foreground">
-            {toPersianDigits(String(brands.length))} برند — روی هر برند کلیک کنید تا جزئیات آن را ببینید.
+            {toPersianDigits(String(brands.length))} برند — روی هر برند کلیک
+            کنید تا جزئیات آن را ببینید.
           </p>
         </div>
         <button
@@ -178,7 +200,12 @@ export default function BrandsPage() {
       {/* Brand mosaic grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {brands.map((brand, i) => {
-          const bc = brandColorMap.get(brand.name) ?? { primary: '#6B7280', light: '#6B728018' };
+          const bc = brandColorMap.get(brand.name) ?? {
+            primary: '#6B7280',
+            light: '#6B728018',
+          };
+          // Status-profile completeness for this brand (null = no profile yet).
+          const completeness = summary[brand.name]?.statusProfile ?? null;
 
           return (
             <motion.div
@@ -189,7 +216,7 @@ export default function BrandsPage() {
             >
               <Link
                 href={`/brands/${brand.accounts[0]?.brandId ?? encodeURIComponent(brand.name)}`}
-                className="group block rounded-2xl border p-5 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
+                className="group block rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
                 style={{
                   background: `linear-gradient(135deg, ${bc.light}, transparent)`,
                   borderColor: `${bc.primary}30`,
@@ -198,25 +225,34 @@ export default function BrandsPage() {
                 {/* Brand name + follower count */}
                 <div className="mb-4 flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
-                    <BrandLogo brand={brand.name} className="h-8 w-8 rounded-lg" iconClassName="text-xs" />
+                    <BrandLogo
+                      brand={brand.name}
+                      className="h-8 w-8 rounded-lg"
+                      iconClassName="text-xs"
+                    />
                     <div>
-                    <h2 className="text-base font-bold text-foreground" style={{ color: bc.primary }}>
-                      {brand.name}
-                    </h2>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {toPersianDigits(String(brand.accountCount))} حساب در{' '}
-                      {toPersianDigits(String(brand.platformCount))} پلتفرم
-                    </p>
+                      <h2
+                        className="text-base font-bold text-foreground"
+                        style={{ color: bc.primary }}
+                      >
+                        {brand.name}
+                      </h2>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {toPersianDigits(String(brand.accountCount))} حساب در{' '}
+                        {toPersianDigits(String(brand.platformCount))} پلتفرم
+                      </p>
                     </div>
                   </div>
-                  <ExternalLink className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-colors shrink-0 mt-1" />
+                  <ExternalLink className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/30 transition-colors group-hover:text-primary" />
                 </div>
 
                 {/* Total followers */}
                 <div className="mb-4">
                   <p className="text-2xl font-bold tabular-nums text-foreground">
                     {brand.totalFollowers > 0
-                      ? toPersianDigits(brand.totalFollowers.toLocaleString('en'))
+                      ? toPersianDigits(
+                          brand.totalFollowers.toLocaleString('en'),
+                        )
                       : '—'}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -229,57 +265,75 @@ export default function BrandsPage() {
                   // Find matching summary by brand name
                   const s = summary[brand.name];
                   if (!s) return null;
-                  const hasAny = s.contentCount > 0 || s.taskCount > 0 || s.campaignCount > 0 || s.totalExpenses > 0;
+                  const hasAny =
+                    s.contentCount > 0 ||
+                    s.taskCount > 0 ||
+                    s.campaignCount > 0 ||
+                    s.totalExpenses > 0;
                   if (!hasAny) return null;
                   return (
                     <div className="mb-3 grid grid-cols-2 gap-2">
                       {s.contentCount > 0 && (
                         <div className="flex items-center gap-1.5 rounded-lg bg-surface/60 px-2 py-1">
                           <FileText className="h-3 w-3 text-blue-500" />
-                          <span className="text-[10px] text-muted-foreground">{toPersianDigits(String(s.contentCount))} محتوا</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {toPersianDigits(String(s.contentCount))} محتوا
+                          </span>
                         </div>
                       )}
                       {s.taskCount > 0 && (
                         <div className="flex items-center gap-1.5 rounded-lg bg-surface/60 px-2 py-1">
                           <CheckSquare className="h-3 w-3 text-purple-500" />
-                          <span className="text-[10px] text-muted-foreground">{toPersianDigits(String(s.taskCount))} تسک</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {toPersianDigits(String(s.taskCount))} تسک
+                          </span>
                         </div>
                       )}
                       {s.campaignCount > 0 && (
                         <div className="flex items-center gap-1.5 rounded-lg bg-surface/60 px-2 py-1">
                           <Megaphone className="h-3 w-3 text-cyan-500" />
-                          <span className="text-[10px] text-muted-foreground">{toPersianDigits(String(s.campaignCount))} کمپین</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {toPersianDigits(String(s.campaignCount))} کمپین
+                          </span>
                         </div>
                       )}
                       {s.totalExpenses > 0 && (
                         <div className="flex items-center gap-1.5 rounded-lg bg-surface/60 px-2 py-1">
                           <Wallet className="h-3 w-3 text-amber-500" />
-                          <span className="text-[10px] text-muted-foreground">{formatNumber(s.totalExpenses)} تومان</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatNumber(s.totalExpenses)} تومان
+                          </span>
                         </div>
                       )}
                     </div>
                   );
                 })()}
 
+                {/* Status profile completeness (صورت وضعیت برند) */}
+                <ProfileCompletenessIndicator
+                  completeness={completeness}
+                  barColor={bc.primary}
+                />
+
                 {/* Platform icons */}
                 <div className="flex flex-wrap gap-2">
-                  {[
-                    ...new Set(brand.accounts.map((a) => a.platform)),
-                  ].map((platform) => (
-                    <div
-                      key={platform}
-                      className="flex items-center gap-1.5 rounded-lg bg-surface/80 px-2 py-1"
-                    >
-                      <SocialPlatformIcon
-                        platform={platform}
-                        className="h-4 w-4 rounded"
-                        iconClassName="h-2.5 w-2.5"
-                      />
-                      <span className="text-[10px] text-muted-foreground">
-                        {SOCIAL_PLATFORM_LABELS[platform]}
-                      </span>
-                    </div>
-                  ))}
+                  {[...new Set(brand.accounts.map((a) => a.platform))].map(
+                    (platform) => (
+                      <div
+                        key={platform}
+                        className="flex items-center gap-1.5 rounded-lg bg-surface/80 px-2 py-1"
+                      >
+                        <SocialPlatformIcon
+                          platform={platform}
+                          className="h-4 w-4 rounded"
+                          iconClassName="h-2.5 w-2.5"
+                        />
+                        <span className="text-[10px] text-muted-foreground">
+                          {SOCIAL_PLATFORM_LABELS[platform]}
+                        </span>
+                      </div>
+                    ),
+                  )}
                 </div>
 
                 {/* Latest period */}
@@ -293,6 +347,67 @@ export default function BrandsPage() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/* =========================================================================
+ * Profile completeness indicator
+ * ========================================================================= */
+
+function ProfileCompletenessIndicator({
+  completeness,
+  barColor,
+}: {
+  completeness: StatusProfileCompleteness | null;
+  barColor: string;
+}) {
+  if (!completeness) {
+    return (
+      <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-surface/60 px-2 py-1.5">
+        <ClipboardList className="h-3 w-3 text-muted-foreground/50" />
+        <span className="text-[10px] text-muted-foreground/60">
+          صورت وضعیت ثبت نشده
+        </span>
+      </div>
+    );
+  }
+
+  const { percent, filledCount, totalCount } = completeness;
+  const tone =
+    percent >= 75
+      ? { text: 'text-green-600 dark:text-green-400', bg: 'bg-green-500' }
+      : percent >= 25
+        ? { text: 'text-amber-500', bg: 'bg-amber-500' }
+        : { text: 'text-muted-foreground', bg: 'bg-muted-foreground/40' };
+
+  return (
+    <div className="mb-3">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          <ClipboardList className="h-3 w-3" />
+          صورت وضعیت برند
+        </span>
+        <span className={`text-[10px] font-bold tabular-nums ${tone.text}`}>
+          {toPersianDigits(String(percent))}٪
+        </span>
+      </div>
+      <Progress
+        value={percent}
+        className="h-1.5 bg-surface"
+        aria-label={`صورت وضعیت برند ${toPersianDigits(String(percent))} درصد تکمیل`}
+        // Bar color follows the brand palette; percent drives the tone of the label.
+        style={
+          {
+            '--progress-indicator-color': barColor,
+          } as React.CSSProperties
+        }
+      />
+      <p className="mt-1 text-[10px] text-muted-foreground/60">
+        {toPersianDigits(String(filledCount))} از{' '}
+        {toPersianDigits(String(totalCount))} بخش تکمیل شده
+      </p>
+      {percent >= 75 && <span className="sr-only">پرونده کامل</span>}
     </div>
   );
 }

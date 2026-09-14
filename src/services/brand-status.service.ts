@@ -130,6 +130,32 @@ function profileFromRow(row: BrandStatusProfileRow): BrandStatusProfile {
 }
 
 /* =========================================================================
+ * Profile completeness (used by the brands list cards)
+ * ========================================================================= */
+
+/**
+ * How much of the managerial profile is filled. A field counts as filled
+ * when it has non-whitespace content. Pure + shared by API and UI so the
+ * list cards and the detail page can never disagree.
+ */
+export function computeProfileCompleteness(
+  profile: BrandStatusProfile | BrandStatusProfileInput | null,
+): { filledCount: number; totalCount: number; percent: number } {
+  const keys = Object.keys(COLUMN_BY_KEY) as Array<
+    keyof BrandStatusProfileInput
+  >;
+  if (!profile) return { filledCount: 0, totalCount: keys.length, percent: 0 };
+  const filledCount = keys.filter(
+    (k) => (profile[k] ?? '').trim().length > 0,
+  ).length;
+  return {
+    filledCount,
+    totalCount: keys.length,
+    percent: Math.round((filledCount / keys.length) * 100),
+  };
+}
+
+/* =========================================================================
  * In-memory fallback (demo / test — no Supabase tables)
  * ========================================================================= */
 
@@ -180,7 +206,9 @@ export async function upsertBrandStatusProfile(
   input: BrandStatusProfileInput,
 ): Promise<BrandStatusProfile | null> {
   const patch: Record<string, string> = {};
-  for (const key of Object.keys(COLUMN_BY_KEY) as Array<keyof BrandStatusProfileInput>) {
+  for (const key of Object.keys(COLUMN_BY_KEY) as Array<
+    keyof BrandStatusProfileInput
+  >) {
     const value = input[key];
     if (value !== undefined) patch[COLUMN_BY_KEY[key]] = value;
   }
@@ -322,7 +350,11 @@ export function buildBrandSocialStatus(
       candidate: NonNullable<ReturnType<typeof latestMetric>>,
       incumbent: NonNullable<ReturnType<typeof latestMetric>>,
     ): boolean => {
-      if (candidate.periodStart && incumbent.periodStart && candidate.periodStart !== incumbent.periodStart) {
+      if (
+        candidate.periodStart &&
+        incumbent.periodStart &&
+        candidate.periodStart !== incumbent.periodStart
+      ) {
         return candidate.periodStart > incumbent.periodStart;
       }
       return candidate.periodLabel > incumbent.periodLabel;
@@ -345,8 +377,13 @@ export function buildBrandSocialStatus(
 
     if (bestMetric) {
       totalAudience += bestMetric.followers ?? 0;
-      const ms = new Date(bestMetric.updatedAt || bestMetric.createdAt).getTime();
-      if (Number.isFinite(ms) && (latestUpdateMs === null || ms > latestUpdateMs)) {
+      const ms = new Date(
+        bestMetric.updatedAt || bestMetric.createdAt,
+      ).getTime();
+      if (
+        Number.isFinite(ms) &&
+        (latestUpdateMs === null || ms > latestUpdateMs)
+      ) {
         latestUpdateMs = ms;
       }
     } else {
@@ -354,7 +391,9 @@ export function buildBrandSocialStatus(
     }
 
     const audienceValue =
-      bestMetric && bestMetric.channelMembers !== null && bestMetric.followers === 0
+      bestMetric &&
+      bestMetric.channelMembers !== null &&
+      bestMetric.followers === 0
         ? bestMetric.channelMembers
         : (bestMetric?.followers ?? null);
 
@@ -365,7 +404,9 @@ export function buildBrandSocialStatus(
       audience: availability === 'ok' ? audienceValue : null,
       latestPeriodLabel: bestMetric?.periodLabel ?? null,
       username: bestAccount?.username || null,
-      url: bestAccount?.url ?? socialAccountUrl(platform, bestAccount?.username ?? null),
+      url:
+        bestAccount?.url ??
+        socialAccountUrl(platform, bestAccount?.username ?? null),
       connectionStatus: bestAccount?.connectionStatus ?? null,
       lastSyncAt: bestAccount?.lastSyncAt ?? null,
     });
@@ -377,7 +418,8 @@ export function buildBrandSocialStatus(
       activePlatformCount,
       totalAudience,
       incompleteCount,
-      latestUpdateAt: latestUpdateMs !== null ? new Date(latestUpdateMs).toISOString() : null,
+      latestUpdateAt:
+        latestUpdateMs !== null ? new Date(latestUpdateMs).toISOString() : null,
     },
   };
 }
