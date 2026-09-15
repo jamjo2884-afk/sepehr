@@ -22,6 +22,7 @@ import {
   getBrandByName,
   getOrCreateBrand,
   getBrandNames,
+  getBrandById,
 } from '@/services/brand.service';
 
 describe('Brand Service (in-memory)', () => {
@@ -159,5 +160,70 @@ describe('Brand Service (in-memory)', () => {
     expect(brand!.status).toBe('inactive');
     expect(brand!.logoUrl).toBe('https://example.com/logo.png');
     expect(brand!.color).toBe('#00FF00');
+  });
+
+  describe('getBrandById — Persian name routes (regression: production 404 on /brands/[name])', () => {
+    it('resolves a raw Persian name segment', async () => {
+      const created = await createBrand({ name: 'رگرسیون-نام-فارسی' });
+      expect(created).not.toBeNull();
+
+      const found = await getBrandById('رگرسیون-نام-فارسی');
+      expect(found).not.toBeNull();
+      expect(found!.id).toBe(created!.id);
+    });
+
+    it('resolves a single-encoded Persian name segment (production bug: %DA%A9… reached the service)', async () => {
+      const created = await createBrand({ name: 'کبریت' });
+      expect(created).not.toBeNull();
+
+      // When the client pre-encodes the segment, Next.js hands the route
+      // handler a value that still contains one encoding layer; the stored
+      // name is the plain Persian string. This is the exact production 404
+      // (the log shows this byte sequence double-encoded: %25DA%25A9…).
+      const encoded = encodeURIComponent('کبریت');
+
+      const found = await getBrandById(encoded);
+      expect(found).not.toBeNull();
+      expect(found!.id).toBe(created!.id);
+    });
+
+    it('resolves a double-encoded Persian name segment (stale client bundle)', async () => {
+      // Unique name — in-memory duplicates resolve to the first match.
+      const created = await createBrand({ name: 'کبریت-دوم' });
+      expect(created).not.toBeNull();
+
+      const doubleEncoded = encodeURIComponent(encodeURIComponent('کبریت-دوم'));
+      const found = await getBrandById(doubleEncoded);
+      expect(found).not.toBeNull();
+      expect(found!.id).toBe(created!.id);
+    });
+
+    it('resolves the space-containing name فصل 11 (the brand from the failure report)', async () => {
+      const created = await createBrand({ name: 'فصل 11' });
+      expect(created).not.toBeNull();
+
+      const raw = await getBrandById('فصل 11');
+      expect(raw).not.toBeNull();
+      expect(raw!.id).toBe(created!.id);
+
+      const encoded = await getBrandById(encodeURIComponent('فصل 11'));
+      expect(encoded).not.toBeNull();
+      expect(encoded!.id).toBe(created!.id);
+    });
+
+    it('still resolves by UUID and never treats a UUID as a name', async () => {
+      const created = await createBrand({ name: 'یو-آیدی-تست' });
+      expect(created).not.toBeNull();
+
+      const byId = await getBrandById(created!.id);
+      expect(byId).not.toBeNull();
+      expect(byId!.id).toBe(created!.id);
+
+      // A random UUID must not accidentally match any brand name.
+      const missing = await getBrandById(
+        '00000000-0000-4000-8000-000000000000',
+      );
+      expect(missing).toBeNull();
+    });
   });
 });

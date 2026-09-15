@@ -143,6 +143,29 @@ const _memoryStore: Brand[] = [];
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * Decode a route id. Next.js already URL-decodes dynamic segments once, but
+ * clients that send the segment pre-encoded (the page then encodes it again)
+ * can leave one or two encoding layers on the value the service receives —
+ * e.g. "%DA%A9%DB%8C%D8%AA" instead of "کبریت" — which then matches neither
+ * the brand id nor the stored name. Peel up to two layers so name lookups
+ * (e.g. "کبریت", "فصل 11") can match stored rows. Runs in a try/catch so a
+ * malformed sequence (e.g. a bare "%") can never throw.
+ */
+function decodeRouteId(id: string): string {
+  let out = id;
+  try {
+    for (let i = 0; i < 2 && /%[0-9a-fA-F]{2}/.test(out); i++) {
+      const next = decodeURIComponent(out);
+      if (next === out) break;
+      out = next;
+    }
+  } catch {
+    // Malformed percent-sequence — keep the latest decodable value.
+  }
+  return out;
+}
+
 /* =========================================================================
  * Row Mapper
  * ========================================================================= */
@@ -238,6 +261,17 @@ export async function getBrandById(id: string): Promise<Brand | null> {
           .eq('name', id)
           .maybeSingle();
         if (byName) return brandFromRow(byName as unknown as BrandRow);
+        // Some clients hit the API with the segment still percent-encoded
+        // (double encoding). One more decode lets the name match.
+        const decoded = decodeRouteId(id);
+        if (decoded !== id) {
+          const { data: byDecoded } = await supabase
+            .from('brands')
+            .select('*')
+            .eq('name', decoded)
+            .maybeSingle();
+          if (byDecoded) return brandFromRow(byDecoded as unknown as BrandRow);
+        }
       }
       return null;
     }
@@ -245,8 +279,15 @@ export async function getBrandById(id: string): Promise<Brand | null> {
     // Fall through
   }
 
-  // In-memory fallback
-  return _memoryStore.find((b) => b.id === id) ?? null;
+  // In-memory fallback — same id, name, and decoded-name resolution as the
+  // Supabase path above.
+  const memoryMatch =
+    _memoryStore.find((b) => b.id === id) ??
+    (UUID_RE.test(id) ? undefined : _memoryStore.find((b) => b.name === id)) ??
+    (UUID_RE.test(id)
+      ? undefined
+      : _memoryStore.find((b) => b.name === decodeRouteId(id)));
+  return memoryMatch ?? null;
 }
 
 export async function getBrandByName(
