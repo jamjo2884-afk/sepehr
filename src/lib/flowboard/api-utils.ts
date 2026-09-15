@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
-export function apiSuccess(data: unknown, status = 200) {
-  return NextResponse.json(data, { status });
+export function apiSuccess(
+  data: unknown,
+  status = 200,
+  headers?: Record<string, string>
+) {
+  return NextResponse.json(data, { status, headers });
 }
 
 export function apiError(message: string, status = 400) {

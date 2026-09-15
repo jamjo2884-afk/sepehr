@@ -38,7 +38,12 @@ export default function TemplatesPage() {
       if (!r.ok) { /* No redirect needed in Media Deck */; return; }
       const d = await r.json();
       setWorkspaces(d.workspaces);
-      if (d.workspaces.length > 0 && !currentWorkspace) setCurrentWorkspace(d.workspaces[0]);
+      if (d.workspaces.length > 0 && !currentWorkspace) {
+        const active =
+          d.workspaces.find((w: Workspace) => w.id === d.activeWorkspaceId) ??
+          d.workspaces[0];
+        setCurrentWorkspace(active);
+      }
     } catch { /* No redirect needed in Media Deck */; }
   }, [router, currentWorkspace]);
 

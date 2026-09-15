@@ -56,7 +56,7 @@ export default function CalendarPage() {
       const sessionRes = await fetch("/api/flowboard/auth/session");
       if (!sessionRes.ok) { /* No redirect needed in Media Deck */; return; }
       const session = await sessionRes.json();
-      const workspaceId = session.workspaces?.[0]?.id;
+      const workspaceId = session.activeWorkspaceId ?? session.workspaces?.[0]?.id;
       if (!workspaceId) return;
       const res = await fetch(`/api/flowboard/workspaces/${workspaceId}/cards`);
       if (res.ok) { const data: WorkspaceData = await res.json(); setCards(data.cards); }

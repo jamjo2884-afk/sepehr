@@ -45,7 +45,12 @@ function BoardsPageInner() {
         // No workspace yet — stop loading and show the empty/creation state.
         setLoading(false);
       } else if (!currentWorkspace) {
-        setCurrentWorkspace(d.workspaces[0]);
+        // Server-resolved active workspace (Media Deck workspace first, then
+        // newest membership) — never the oldest one just because it sorts first.
+        const active =
+          d.workspaces.find((w: Workspace) => w.id === d.activeWorkspaceId) ??
+          null;
+        setCurrentWorkspace(active ?? d.workspaces[0]);
       }
     } catch {
       setError(true);
