@@ -18,6 +18,7 @@ import {
 import { useAuthStore } from '@/stores/auth.store';
 import { navItems } from '@/config/navigation.config';
 import type { AttentionItem, CommandCenterData } from '@/services/command-center.service';
+import { SocialTrendsSection } from '@/components/common/social-trends-section';
 
 import {
   formatJalaliDate,
@@ -248,6 +249,9 @@ export default function CommandCenterPage() {
               </ul>
             )}
           </section>
+
+          {/* Social trends — 5 server-aggregated charts with shared filters */}
+          <SocialTrendsSection />
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Task overview */}

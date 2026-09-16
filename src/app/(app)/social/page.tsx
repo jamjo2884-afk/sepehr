@@ -38,6 +38,7 @@ import {
   previousMonthRange,
 } from '@/services/social-analytics';
 import { rankBrandsByScore } from '@/services/social-score';
+import { SocialTrendsSection } from '@/components/common/social-trends-section';
 import type {
   SocialAccount,
   SocialMetric,
@@ -646,6 +647,9 @@ export default function SocialPage() {
               <MonthlyGrowthChart points={monthlyGrowth} />
             </div>
           </section>
+
+          {/* Server-aggregated time-series (5 charts, shared filters) */}
+          <SocialTrendsSection />
 
           {/* Platform breakdown */}
           <section>
