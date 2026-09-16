@@ -49,3 +49,11 @@ src/generated/
 
 .vercel
 .env*
+
+# Local diagnostic output and one-off production diagnostics
+.post*.json
+.proj*.json
+scripts/db-diagnose*.mjs
+scripts/prod-session-test.mjs
+scripts/run-brand-repair.mjs
+scripts/security-check-social-trends.mjs
