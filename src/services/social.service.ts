@@ -608,10 +608,15 @@ interface MetricRow {
 }
 
 export function toSocialAccount(row: AccountRow, brandNames?: Map<string, string>): SocialAccount {
+  // brand_id is the authoritative link (migration 20260916120000 backfills it
+  // for every legacy row). Resolve the display name from the id whenever the
+  // mapping has it; keep row.brand only as a legacy fallback so pre-migration
+  // data keeps rendering.
   const brandId = row.brand_id ?? null;
+  const brandName = (brandId && brandNames?.get(brandId)) || null;
   return {
     id: row.id,
-    brand: (brandId && brandNames?.get(brandId)) ?? row.brand ?? '',
+    brand: brandName ?? row.brand ?? '',
     brandId,
     platform: row.platform,
     username: row.username,

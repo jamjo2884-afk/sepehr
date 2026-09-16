@@ -21,12 +21,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  getBrands,
-  createBrand,
-  updateBrand,
-  deleteBrand,
-} from '@/services/brand.service';
+import { createBrand, updateBrand, deleteBrand } from '@/services/brand.service';
 import type { Brand, BrandInput } from '@/types/brand';
 import { BRAND_STATUS_LABELS } from '@/types/brand';
 import { toPersianDigits } from '@/utils/persian';
@@ -43,8 +38,12 @@ export function BrandManagement() {
 
   const loadBrands = useCallback(async () => {
     try {
-      const data = await getBrands();
-      setBrands(data);
+      // Server-resolved workspace list (auth + RLS scoped) — the browser-side
+      // service path has no session cookie and would return an empty result
+      // in Production auth mode.
+      const r = await fetch('/api/brands');
+      const d = await r.json();
+      if (d.ok) setBrands(d.brands);
     } catch {
       // ignore
     } finally {

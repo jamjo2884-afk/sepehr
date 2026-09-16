@@ -16,11 +16,12 @@ const createBrandSchema = z.object({
 /**
  * GET /api/brands
  *
- * Returns all brands for the current workspace.
+ * Returns all brands for the current workspace (server-resolved via withAuth,
+ * then enforced by brands RLS — defense in depth).
  */
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (_req, auth) => {
   try {
-    const brands = await getBrands();
+    const brands = await getBrands(auth.workspace.workspaceId);
     return NextResponse.json({ ok: true, brands });
   } catch (err) {
     console.warn('[api/brands] GET error:', err);
@@ -36,7 +37,7 @@ export const GET = withAuth(async () => {
  *
  * Create a new brand.
  */
-export const POST = withAuth(async (req) => {
+export const POST = withAuth(async (req, auth) => {
   let body: unknown;
   try {
     body = await req.json();
@@ -53,7 +54,10 @@ export const POST = withAuth(async (req) => {
     return NextResponse.json({ ok: false, error: message }, { status: 400 });
   }
 
-  const brand = await createBrand(parsed.data);
+  // Workspace-aware creation (PRD Dev Rule 4): the caller's server-resolved
+  // workspace wins; the service's LIMIT-1 default-workspace fallback is only
+  // reached in non-request contexts. createBrand dedupes by (workspace, name).
+  const brand = await createBrand(parsed.data, auth.workspace.workspaceId);
   if (!brand) {
     return NextResponse.json(
       { ok: false, error: 'ایجاد برند ناموفق بود.' },
