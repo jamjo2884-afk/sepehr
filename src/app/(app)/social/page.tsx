@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import {
   AlertTriangle,
-  BarChart3,
   CalendarRange,
   Database,
   GitCompareArrows,
@@ -33,7 +32,6 @@ import {
   filterAccounts,
   jalaliMonthName,
   metricsInMonthRange,
-  monthlyGrowthSeries,
   monthRangeOfPreset,
   previousMonthRange,
 } from '@/services/social-analytics';
@@ -50,7 +48,6 @@ import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import { AnalyticsFilterBar } from '@/components/social/analytics/filter-bar';
 import { AnalyticsKpiCards } from '@/components/social/analytics/kpi-cards';
 import { FollowersTrendChart } from '@/components/social/analytics/followers-trend-chart';
-import { MonthlyGrowthChart } from '@/components/social/analytics/monthly-growth-chart';
 import { PlatformBreakdownChart } from '@/components/social/analytics/platform-breakdown-chart';
 import { BrandComparisonTable } from '@/components/social/analytics/brand-comparison-table';
 import { PlatformComparisonTable } from '@/components/social/analytics/platform-comparison-table';
@@ -80,8 +77,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-
-const MAX_COMPARE_BRANDS = 5;
 
 export default function SocialPage() {
   const [raw, setRaw] = useState<{
@@ -242,25 +237,15 @@ export default function SocialPage() {
     if (selectedBrands.length === 0) {
       return [{ name: 'همه برندها', points: aggregateTrend }];
     }
-    return selectedBrands.slice(0, MAX_COMPARE_BRANDS).map((brand) => {
+    // No cap: every selected brand draws its own line (issue: the old
+    // slice(0,5) silently hid brands 6+).
+    return selectedBrands.map((brand) => {
       const t = brandTrends.find((x) => x.brand === brand);
       return { name: brand, points: t?.points ?? [] };
     });
   }, [selectedBrands, aggregateTrend, brandTrends]);
 
-  const overLimitNote =
-    selectedBrands.length > MAX_COMPARE_BRANDS
-      ? `برای نمایش همزمان حداکثر ${formatNumber(
-          MAX_COMPARE_BRANDS,
-        )} برند میتوانید انتخاب کنید — ${formatNumber(
-          selectedBrands.length,
-        )} برند انتخاب شده است.`
-      : undefined;
-
-  const monthlyGrowth = useMemo(
-    () => monthlyGrowthSeries(aggregateTrend),
-    [aggregateTrend],
-  );
+  const overLimitNote = undefined;
 
   const brandStats = useMemo(
     () => buildBrandStats(brandTableAccounts, metricsAll, range, prevRange),
@@ -351,14 +336,6 @@ export default function SocialPage() {
     }
     if (selectedBrands.includes(brand)) {
       setSelectedBrands((prev) => prev.filter((b) => b !== brand));
-      return;
-    }
-    if (selectedBrands.length >= MAX_COMPARE_BRANDS) {
-      setBrandWarning(
-        `برای مقایسه همزمان حداکثر ${formatNumber(
-          MAX_COMPARE_BRANDS,
-        )} برند میتوانید انتخاب کنید.`,
-      );
       return;
     }
     setSelectedBrands((prev) => [...prev, brand]);
@@ -640,22 +617,16 @@ export default function SocialPage() {
             <AnalyticsKpiCards kpis={kpis} comparison={kpiComparison} />
           </section>
 
-          {/* Follower trend chart */}
+          {/* Follower trend chart — the single absolute-total follower
+              chart of this page (growth-rate chart removed; the server
+              trend section below reuses this same data shape) */}
           <section>
-            <SectionTitle icon={TrendingUp} title="روند رشد دنبال‌کنندگان" />
+            <SectionTitle icon={TrendingUp} title="روند کل دنبال‌کنندگان" />
             <div className="rounded-xl border border-border bg-surface/60 p-4">
               <FollowersTrendChart
                 series={trendSeries}
                 overLimitNote={overLimitNote}
               />
-            </div>
-          </section>
-
-          {/* Monthly growth chart */}
-          <section>
-            <SectionTitle icon={BarChart3} title="رشد ماهانه دنبال‌کنندگان" />
-            <div className="rounded-xl border border-border bg-surface/60 p-4">
-              <MonthlyGrowthChart points={monthlyGrowth} />
             </div>
           </section>
 

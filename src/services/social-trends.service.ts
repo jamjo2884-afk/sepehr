@@ -34,10 +34,17 @@ export interface SocialTrendSeriesPoint {
   value: number;
 }
 
-/** One named series (brand or platform or aggregate). */
+/**
+ * One named series (brand or platform or aggregate).
+ *
+ * `byBrand` (optional) carries the per-brand split of a platform series so
+ * the chart tooltip can show a second level (platform → brands of that
+ * platform for the hovered month) without a second round trip.
+ */
 export interface SocialTrendSeries {
   name: string;
   points: SocialTrendSeriesPoint[];
+  byBrand?: SocialTrendSeries[];
 }
 
 /** Full payload for the trend dashboard. */
@@ -198,7 +205,9 @@ export async function getSocialTrends(input: {
       list.push(r);
       byMonth.set(r.period_label, list);
     }
-    const months = [...byMonth.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const months = [...byMonth.keys()].sort((a, b) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    );
 
     // ---- Chart 1: total followers ----
     const totalFollowers: SocialTrendSeriesPoint[] = months.map((month) => {
@@ -217,8 +226,8 @@ export async function getSocialTrends(input: {
     // ---- Chart 4: followers by brand ----
     const followersByBrand: SocialTrendSeries[] = [];
     {
-      const brandNames = [...new Set(accountIdToBrandName.values())].sort((a, b) =>
-        a.localeCompare(b, 'fa'),
+      const brandNames = [...new Set(accountIdToBrandName.values())].sort(
+        (a, b) => a.localeCompare(b, 'fa'),
       );
       for (const bname of brandNames) {
         const ids = new Set(
@@ -228,7 +237,9 @@ export async function getSocialTrends(input: {
         );
         const points: SocialTrendSeriesPoint[] = [];
         for (const month of months) {
-          const list = (byMonth.get(month) ?? []).filter((r) => ids.has(r.account_id));
+          const list = (byMonth.get(month) ?? []).filter((r) =>
+            ids.has(r.account_id),
+          );
           let sum = 0;
           let any = false;
           for (const r of list) {
@@ -237,23 +248,36 @@ export async function getSocialTrends(input: {
               any = true;
             }
           }
-          if (any) points.push({ month, monthLabel: jalaliMonthName(month), value: sum });
+          if (any)
+            points.push({
+              month,
+              monthLabel: jalaliMonthName(month),
+              value: sum,
+            });
         }
         if (points.length > 0) followersByBrand.push({ name: bname, points });
       }
     }
 
     // ---- Chart 5: followers by platform ----
+    // Followers are a SNAPSHOT metric: real points only (no fabricated
+    // zeros), but every platform of the workspace gets a series, each with
+    // a `byBrand` split for the tooltip's second level. Sparse months stay
+    // gaps inside the line (connectNulls off) instead of dropping the
+    // platform from the legend.
     const followersByPlatform: SocialTrendSeries[] = [];
     {
       const platforms = [...new Set(accounts.map((a) => a.platform))].sort();
       for (const p of platforms) {
-        const ids = new Set(
-          accounts.filter((a) => a.platform === p).map((a) => a.id),
-        );
+        const platformAccountIds = accounts
+          .filter((a) => a.platform === p)
+          .map((a) => a.id);
+        const ids = new Set(platformAccountIds);
         const points: SocialTrendSeriesPoint[] = [];
         for (const month of months) {
-          const list = (byMonth.get(month) ?? []).filter((r) => ids.has(r.account_id));
+          const list = (byMonth.get(month) ?? []).filter((r) =>
+            ids.has(r.account_id),
+          );
           let sum = 0;
           let any = false;
           for (const r of list) {
@@ -262,14 +286,60 @@ export async function getSocialTrends(input: {
               any = true;
             }
           }
-          if (any) points.push({ month, monthLabel: jalaliMonthName(month), value: sum });
+          if (any)
+            points.push({
+              month,
+              monthLabel: jalaliMonthName(month),
+              value: sum,
+            });
         }
-        if (points.length > 0)
-          followersByPlatform.push({ name: p, points });
+        // Per-brand split of this platform (tooltip level 2).
+        const brandNamesOnPlatform = [
+          ...new Set(
+            platformAccountIds.map(
+              (id) => accountIdToBrandName.get(id) ?? 'برند ناشناس',
+            ),
+          ),
+        ].sort((a, b) => a.localeCompare(b, 'fa'));
+        const byBrand: SocialTrendSeries[] = [];
+        for (const bname of brandNamesOnPlatform) {
+          const bIds = new Set(
+            platformAccountIds.filter(
+              (id) => accountIdToBrandName.get(id) === bname,
+            ),
+          );
+          const bPoints: SocialTrendSeriesPoint[] = [];
+          for (const month of months) {
+            const list = (byMonth.get(month) ?? []).filter((r) =>
+              bIds.has(r.account_id),
+            );
+            let sum = 0;
+            let any = false;
+            for (const r of list) {
+              if (typeof r.followers === 'number') {
+                sum += r.followers;
+                any = true;
+              }
+            }
+            if (any)
+              bPoints.push({
+                month,
+                monthLabel: jalaliMonthName(month),
+                value: sum,
+              });
+          }
+          if (bPoints.length > 0)
+            byBrand.push({ name: bname, points: bPoints });
+        }
+        if (points.length > 0 || byBrand.length > 0)
+          followersByPlatform.push({ name: p, points, byBrand });
       }
     }
 
     // ---- Chart 2: views by platform ----
+    // Views are a FLOW metric: every platform of the workspace is emitted
+    // (so the legend always lists them all) and months without recorded
+    // views are honest zeros — never gaps, never dropped series.
     const viewsByPlatform: SocialTrendSeries[] = [];
     {
       const platforms = [...new Set(accounts.map((a) => a.platform))].sort();
@@ -277,20 +347,17 @@ export async function getSocialTrends(input: {
         const ids = new Set(
           accounts.filter((a) => a.platform === p).map((a) => a.id),
         );
-        const points: SocialTrendSeriesPoint[] = [];
-        for (const month of months) {
-          const list = (byMonth.get(month) ?? []).filter((r) => ids.has(r.account_id));
+        const points: SocialTrendSeriesPoint[] = months.map((month) => {
+          const list = (byMonth.get(month) ?? []).filter((r) =>
+            ids.has(r.account_id),
+          );
           let sum = 0;
-          let any = false;
           for (const r of list) {
-            if (typeof r.views === 'number') {
-              sum += r.views;
-              any = true;
-            }
+            if (typeof r.views === 'number') sum += r.views;
           }
-          if (any) points.push({ month, monthLabel: jalaliMonthName(month), value: sum });
-        }
-        if (points.length > 0) viewsByPlatform.push({ name: p, points });
+          return { month, monthLabel: jalaliMonthName(month), value: sum };
+        });
+        viewsByPlatform.push({ name: p, points });
       }
     }
 

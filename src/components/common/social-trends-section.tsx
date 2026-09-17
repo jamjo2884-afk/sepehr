@@ -182,6 +182,50 @@ export function SocialTrendsSection({ className }: { className?: string }) {
     followersByBrand.length > 0 ||
     followersByPlatform.length > 0;
 
+  /**
+   * CASCADING brand → time-window (issue 5): the month set of the data
+   * restricted to the selected brands. A preset is offered (chip enabled)
+   * only when at least one selected brand has data in that window; with no
+   * brand selected every preset is available. Presets without data render
+   * disabled (dimmed) instead of hiding — consistent with the FilterChip
+   * language of AnalyticsFilterBar while keeping the affordance visible.
+   */
+  const brandMonths = useMemo(() => {
+    if (!data) return [] as string[];
+    if (selectedBrands.length === 0) return data.months;
+    const keep = new Set(selectedBrands);
+    const months = new Set<string>();
+    for (const s of data.followersByBrand) {
+      if (!keep.has(s.name)) continue;
+      for (const p of s.points) months.add(p.month);
+    }
+    return [...months].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  }, [data, selectedBrands]);
+
+  const presetAvailable = useCallback(
+    (months: number) => {
+      if (months === 0) return brandMonths.length > 0;
+      if (brandMonths.length === 0) return false;
+      // The newest brand month must be within the preset's lookback of the
+      // overall window end — i.e. the window actually contains ≥1 data month.
+      const all = data?.months ?? [];
+      const end = all[all.length - 1];
+      const start = all[Math.max(0, all.length - months)];
+      return brandMonths.some((m) => m >= start && m <= end);
+    },
+    [brandMonths, data],
+  );
+
+  // Auto-recover from a now-empty preset (brand narrowed into a window
+  // without data): fall back to the widest available view.
+  useEffect(() => {
+    const preset = TIME_PRESETS.find((p) => p.value === timePreset)!;
+    if (!presetAvailable(preset.months)) {
+      setTimePreset('all');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brandMonths]);
+
   const platformLabel = (p: string) =>
     (SOCIAL_PLATFORM_LABELS as Record<string, string>)[p] ?? p;
 
@@ -272,18 +316,22 @@ export function SocialTrendsSection({ className }: { className?: string }) {
             </FilterRow>
 
             <FilterRow label="بازه زمانی">
-              {TIME_PRESETS.map((p) => (
-                <FilterChip
-                  key={p.value}
-                  active={timePreset === p.value}
-                  onClick={() => setTimePreset(p.value)}
-                  label={p.label}
-                />
-              ))}
+              {TIME_PRESETS.map((p) => {
+                const available = presetAvailable(p.months);
+                return (
+                  <FilterChip
+                    key={p.value}
+                    active={timePreset === p.value}
+                    disabled={!available}
+                    onClick={() => setTimePreset(p.value)}
+                    label={p.label}
+                  />
+                );
+              })}
             </FilterRow>
             <span className="text-[11px] text-muted-foreground">
               واحد زمان نمودارها «ماه» است (تقویم جلالی) — دیتای متریک ماهانه
-              ثبت می‌شود.
+              ثبت می‌شود؛ بازه‌های بدون داده برای برندهای انتخابی غیرفعال‌اند.
             </span>
           </div>
 
@@ -294,10 +342,15 @@ export function SocialTrendsSection({ className }: { className?: string }) {
           <ChartCard
             icon={Eye}
             title="روند بازدید به تفکیک پلتفرم"
-            extra={seriesCountNote(viewsByPlatform)}
+            extra={
+              <span className="text-[11px] text-muted-foreground">
+                {formatNumber(viewsByPlatform.length)} پلتفرم — ماه‌های بدون
+                بازدید صفر نشان داده می‌شود
+              </span>
+            }
           >
             {viewsByPlatform.length > 0 ? (
-              <TrendLineChart series={viewsByPlatform} />
+              <TrendLineChart series={viewsByPlatform} zeroFill />
             ) : (
               <EmptyNote />
             )}
@@ -336,10 +389,19 @@ export function SocialTrendsSection({ className }: { className?: string }) {
           <ChartCard
             icon={Waypoints}
             title="روند دنبال‌کنندگان به تفکیک شبکه اجتماعی"
-            extra={seriesCountNote(followersByPlatform)}
+            extra={
+              <span className="text-[11px] text-muted-foreground">
+                {formatNumber(followersByPlatform.length)} پلتفرم — hover: شکست
+                برند داخل هر پلتفرم
+              </span>
+            }
           >
             {followersByPlatform.length > 0 ? (
-              <TrendLineChart series={followersByPlatform} height="h-[320px]" />
+              <TrendLineChart
+                series={followersByPlatform}
+                height="h-[320px]"
+                tooltipBreakdown
+              />
             ) : (
               <EmptyNote />
             )}
@@ -348,13 +410,6 @@ export function SocialTrendsSection({ className }: { className?: string }) {
       )}
     </section>
   );
-}
-
-/** Note showing how many series a per-platform chart is drawing. */
-function seriesCountNote(series: SocialTrendSeries[]): string | undefined {
-  return series.length === 0
-    ? 'داده‌ای ثبت نشده است'
-    : `${formatNumber(series.length)} سری فعال`;
 }
 
 /** Heading identical to the analytics dashboard's SectionTitle pattern. */
@@ -434,19 +489,23 @@ function FilterChip({
   onClick,
   label,
   icon,
+  disabled,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
   icon?: React.ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={cn(
         'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-        active
+        disabled && 'cursor-not-allowed opacity-40',
+        !disabled && active
           ? 'border-transparent bg-primary text-primary-foreground'
           : 'border-border bg-background/40 text-muted-foreground hover:border-primary/40 hover:text-foreground',
       )}
