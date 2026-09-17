@@ -57,3 +57,7 @@ scripts/db-diagnose*.mjs
 scripts/prod-session-test.mjs
 scripts/run-brand-repair.mjs
 scripts/security-check-social-trends.mjs
+scripts/cascade-sim.mjs
+scripts/count-brand-series.mjs
+scripts/diagnose-brand-links.mjs
+scripts/trends-audit.mjs

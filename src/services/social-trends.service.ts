@@ -141,20 +141,48 @@ export async function getSocialTrends(input: {
       (brandRows ?? []).map((r) => [r.id as string, r.name as string]),
     );
 
-    // Accounts of THIS workspace only (brand_id IN workspace brand ids).
+    // Accounts of THIS workspace only. A legacy import left 58/110 accounts
+    // with brand_id NULL but the brand NAME intact (`brand` column); matching
+    // ONLY on brand_id silently dropped 8 of the 13 catalog brands from the
+    // per-brand chart. Fetch by brand_id OR by the workspace brands' names —
+    // the strict id link wins for labeling, the name is the fallback.
+    const brandNames = [...brandName.values()];
     const accounts: AccountRowLite[] = [];
     {
       const PAGE = 1000;
-      for (let from = 0; ; from += PAGE) {
-        const { data, error } = await supabase
-          .from('social_accounts')
-          .select('id, brand_id, brand, platform')
-          .in('brand_id', brandIds)
-          .range(from, from + PAGE - 1);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        accounts.push(...(data as unknown as AccountRowLite[]));
-        if (data.length < PAGE) break;
+      const load = async (filter: Record<string, unknown>) => {
+        for (let from = 0; ; from += PAGE) {
+          const { data, error } = await supabase
+            .from('social_accounts')
+            .select('id, brand_id, brand, platform')
+            .match(filter)
+            .range(from, from + PAGE - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          accounts.push(...(data as unknown as AccountRowLite[]));
+          if (data.length < PAGE) break;
+        }
+      };
+      // Direct id links (authoritative).
+      await load({ brand_id: brandIds });
+      const haveIds = new Set(accounts.map((a) => a.id));
+      // Name-linked orphans (brand_id NULL): one request per brand name is
+      // avoided by fetching `brand in (names)` + brand_id IS NULL.
+      if (brandNames.length > 0) {
+        for (let from = 0; ; from += PAGE) {
+          const { data, error } = await supabase
+            .from('social_accounts')
+            .select('id, brand_id, brand, platform')
+            .in('brand', brandNames)
+            .is('brand_id', null)
+            .range(from, from + PAGE - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          for (const row of data as unknown as AccountRowLite[]) {
+            if (!haveIds.has(row.id)) accounts.push(row);
+          }
+          if (data.length < PAGE) break;
+        }
       }
     }
     if (accounts.length === 0) return empty;

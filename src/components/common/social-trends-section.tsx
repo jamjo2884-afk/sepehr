@@ -5,7 +5,6 @@ import {
   Eye,
   LineChart as LineChartIcon,
   TrendingUp,
-  Users,
   Waypoints,
   type LucideIcon,
 } from 'lucide-react';
@@ -42,9 +41,11 @@ type TimePreset = (typeof TIME_PRESETS)[number]['value'];
  * /command-center — filters are component-local so the two pages stay
  * independent.
  *
- * Server contract: brand_ids is only a NARROWING filter; the API always
- * intersects it with the caller's workspace brands (workspace isolation is
- * enforced server-side, never by the UI).
+ * Server contract: workspace isolation is enforced server-side (the API
+ * resolves the caller's workspace brands and never serves another
+ * workspace's rows). The component fetches that full workspace payload ONCE
+ * and narrows client-side — see `load` for why the old per-brand re-query
+ * broke the cascading time filter.
  *
  * Visual contract (matches /social + /command-center natives):
  * - Section heading = the same `SectionTitle` rhythm the analytics dashboard
@@ -65,22 +66,21 @@ export function SocialTrendsSection({ className }: { className?: string }) {
   );
   const [timePreset, setTimePreset] = useState<TimePreset>('12m');
 
-  /** Debounced brand selection that re-queries the server aggregation. */
-  const [brandQuery, setBrandQuery] = useState<string[]>([]);
-  useEffect(() => {
-    const t = setTimeout(() => setBrandQuery(selectedBrands), 350);
-    return () => clearTimeout(t);
-  }, [selectedBrands]);
-
+  /**
+   * ONE fetch of the whole workspace aggregation. Brand narrowing is
+   * deliberately client-side: the cascading time-window logic must measure
+   * the selected brands' coverage against the STABLE global month grid. The
+   * previous debounced re-query with `brand_ids` shrank `data.months` to the
+   * selected brands' own span, so "last N months of the grid" shifted with
+   * every selection and every preset stayed available — the chips appeared
+   * disconnected from the brand filter. The payload is small (≤13 series ×
+   * ≤27 points), so instant client filtering also beats a 350ms round trip.
+   */
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      // Server re-aggregates for the selected brands (brand_ids is a
-      // narrowing filter — the API still intersects it with the workspace).
-      const qs = new URLSearchParams({ months: '36' });
-      if (brandQuery.length > 0) qs.set('brand_ids', brandQuery.join(','));
-      const r = await fetch(`/api/social/trends?${qs.toString()}`, {
+      const r = await fetch('/api/social/trends?months=36', {
         cache: 'no-store',
       });
       const body = (await r.json()) as { ok: boolean } & SocialTrendsPayload;
@@ -91,7 +91,7 @@ export function SocialTrendsSection({ className }: { className?: string }) {
     } finally {
       setLoading(false);
     }
-  }, [brandQuery]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -107,9 +107,8 @@ export function SocialTrendsSection({ className }: { className?: string }) {
     setSelectedPlatforms((prev) => prev.filter((p) => known.has(p)));
   }, [data]);
 
-  /** Client-side narrowing of already workspace-scoped series. Instant
-   * feedback for chart 4 while the debounced server re-query is in flight;
-   * the server still re-aggregates (this is a UI nicety, not the boundary). */
+  /** Client-side narrowing of the workspace-scoped series (the payload is
+   * the full workspace; the brand chips slice it instantly, no round trip). */
   const narrowByBrand = useCallback(
     (series: SocialTrendSeries[]): SocialTrendSeries[] =>
       selectedBrands.length === 0
@@ -150,12 +149,6 @@ export function SocialTrendsSection({ className }: { className?: string }) {
     [data, timePreset],
   );
 
-  const totalFollowers = useMemo(
-    () =>
-      cutByWindow([{ name: 'کل', points: data?.totalFollowers ?? [] }]).at(0)
-        ?.points ?? [],
-    [cutByWindow, data],
-  );
   const totalReach = useMemo(
     () =>
       cutByWindow([{ name: 'کل', points: data?.totalReach ?? [] }]).at(0)
@@ -176,7 +169,7 @@ export function SocialTrendsSection({ className }: { className?: string }) {
   );
 
   const hasAnyData =
-    totalFollowers.length > 0 ||
+    (data?.totalFollowers.length ?? 0) > 0 ||
     totalReach.length > 0 ||
     viewsByPlatform.length > 0 ||
     followersByBrand.length > 0 ||
@@ -335,9 +328,9 @@ export function SocialTrendsSection({ className }: { className?: string }) {
             </span>
           </div>
 
-          <ChartCard icon={Users} title="روند کل دنبال‌کنندگان">
-            <TrendLineChart series={[{ name: 'کل', points: totalFollowers }]} />
-          </ChartCard>
+          {/* NOTE: no total-followers chart here — the page's own
+              FollowersTrendChart (روند کل دنبال‌کنندگان) already shows the
+              absolute totals; drawing the same series twice would duplicate it. */}
 
           <ChartCard
             icon={Eye}
