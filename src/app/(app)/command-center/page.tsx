@@ -17,7 +17,10 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { navItems } from '@/config/navigation.config';
-import type { AttentionItem, CommandCenterData } from '@/services/command-center.service';
+import type {
+  AttentionItem,
+  CommandCenterData,
+} from '@/services/command-center.service';
 import { SocialTrendsSection } from '@/components/common/social-trends-section';
 
 import {
@@ -66,7 +69,10 @@ export default function CommandCenterPage() {
     try {
       const res = await fetch('/api/command-center', { cache: 'no-store' });
       if (!res.ok) throw new Error('failed');
-      const body = (await res.json()) as { ok: boolean; data?: CommandCenterData };
+      const body = (await res.json()) as {
+        ok: boolean;
+        data?: CommandCenterData;
+      };
       if (!body.ok || !body.data) throw new Error('empty');
       setData(body.data);
       setState('ready');
@@ -87,7 +93,10 @@ export default function CommandCenterPage() {
   }, []);
 
   const workspaceName = workspace?.name ?? 'Media Deck';
-  const maxPipeline = Math.max(1, ...(data?.pipeline.map((p) => p.count) ?? [1]));
+  const maxPipeline = Math.max(
+    1,
+    ...(data?.pipeline.map((p) => p.count) ?? [1]),
+  );
 
   return (
     <motion.div
@@ -160,6 +169,11 @@ export default function CommandCenterPage() {
               value={formatNumber(data.kpis.totalFollowers)}
             />
           </section>
+
+          {/* Social trends — 5 server-aggregated charts with shared filters,
+              mounted right after the KPI cards so the "total audience" KPI
+              is immediately followed by its trend */}
+          <SocialTrendsSection />
 
           {/* Attention center */}
           <section className="rounded-xl border border-border bg-surface p-5">
@@ -250,13 +264,14 @@ export default function CommandCenterPage() {
             )}
           </section>
 
-          {/* Social trends — 5 server-aggregated charts with shared filters */}
-          <SocialTrendsSection />
-
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Task overview */}
             <section>
-              <SectionTitle icon={ListTodo} title="وظایف" href="/tasks/boards" />
+              <SectionTitle
+                icon={ListTodo}
+                title="وظایف"
+                href="/tasks/boards"
+              />
               <div className="grid grid-cols-2 gap-2">
                 <TaskStat
                   label="باز"
@@ -281,7 +296,11 @@ export default function CommandCenterPage() {
 
             {/* Content pipeline */}
             <section>
-              <SectionTitle icon={FileText} title="خط لوله محتوا" href="/content" />
+              <SectionTitle
+                icon={FileText}
+                title="خط لوله محتوا"
+                href="/content"
+              />
               <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
                 {data.pipeline
                   .filter((p) => p.count > 0)
@@ -307,7 +326,10 @@ export default function CommandCenterPage() {
                 {data.pipeline.every((p) => p.count === 0) && (
                   <p className="text-sm text-muted-foreground">
                     هنوز محتوایی ثبت نشده است.{' '}
-                    <Link href="/content" className="text-primary hover:underline">
+                    <Link
+                      href="/content"
+                      className="text-primary hover:underline"
+                    >
                       اولین محتوا را ایجاد کنید
                     </Link>
                   </p>
@@ -462,4 +484,4 @@ function SectionTitle({
       ) : null}
     </div>
   );
-}
+}

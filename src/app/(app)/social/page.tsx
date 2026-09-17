@@ -119,16 +119,22 @@ export default function SocialPage() {
     setLoading(true);
     fetch('/api/social/analytics')
       .then((r) => r.json())
-      .then((data: { ok: boolean; accounts: SocialAccount[]; metrics: SocialMetric[] }) => {
-        if (active) {
-          if (data.ok) {
-            setRaw({ accounts: data.accounts, metrics: data.metrics });
-          } else {
-            setRaw(null);
+      .then(
+        (data: {
+          ok: boolean;
+          accounts: SocialAccount[];
+          metrics: SocialMetric[];
+        }) => {
+          if (active) {
+            if (data.ok) {
+              setRaw({ accounts: data.accounts, metrics: data.metrics });
+            } else {
+              setRaw(null);
+            }
+            setLoading(false);
           }
-          setLoading(false);
-        }
-      })
+        },
+      )
       .catch(() => {
         if (active) {
           setRaw(null);
@@ -147,14 +153,18 @@ export default function SocialPage() {
   // kept even though they have no accounts yet).
   const visibleBrands = useMemo(() => {
     if (!raw) return [];
-    const base = [...new Set(accountsAll.map((a) => a.brand || a.brandId || ''))].filter(
-      (b) => b && !removed.includes(b) && !isBrandIgnored(b),
-    );
-    return [...base, ...added.filter((a) => !base.includes(a) && !isBrandIgnored(a))];
+    const base = [
+      ...new Set(accountsAll.map((a) => a.brand || a.brandId || '')),
+    ].filter((b) => b && !removed.includes(b) && !isBrandIgnored(b));
+    return [
+      ...base,
+      ...added.filter((a) => !base.includes(a) && !isBrandIgnored(a)),
+    ];
   }, [raw, accountsAll, added, removed]);
 
   const accountsBase = useMemo(
-    () => accountsAll.filter((a) => !removed.includes(a.brand || a.brandId || '')),
+    () =>
+      accountsAll.filter((a) => !removed.includes(a.brand || a.brandId || '')),
     [accountsAll, removed],
   );
 
@@ -287,7 +297,8 @@ export default function SocialPage() {
     return accountRows
       .filter(
         (a) =>
-          (selectedBrands.length === 0 || selectedBrands.includes(a.brand || a.brandId || '')) &&
+          (selectedBrands.length === 0 ||
+            selectedBrands.includes(a.brand || a.brandId || '')) &&
           (selectedPlatforms.length === 0 ||
             selectedPlatforms.includes(a.platform)),
       )
@@ -648,7 +659,9 @@ export default function SocialPage() {
             </div>
           </section>
 
-          {/* Server-aggregated time-series (5 charts, shared filters) */}
+          {/* Server-aggregated time-series (5 charts, shared filters) —
+              mounted inside the analytics flow, between the monthly growth
+              and platform breakdown sections */}
           <SocialTrendsSection />
 
           {/* Platform breakdown */}
@@ -666,7 +679,8 @@ export default function SocialPage() {
               title="روند تعامل برندها"
               extra={
                 <span className="text-[11px] text-muted-foreground">
-                  مقایسه روند تعامل (لایک، کامنت، اشتراک) برندها در بازه زمانی انتخابی
+                  مقایسه روند تعامل (لایک، کامنت، اشتراک) برندها در بازه زمانی
+                  انتخابی
                 </span>
               }
             />
