@@ -296,8 +296,8 @@ export function buildSocialOverview(
 ): SocialOverview {
   const rows = buildAccountRows(accounts, metrics);
   const months = collectMonthsFromRows(rows);
-  const brands = [...new Set(rows.map((a) => a.brandId ?? a.brand))].sort((a, b) =>
-    a.localeCompare(b, 'fa'),
+  const brands = [...new Set(rows.map((a) => a.brandId ?? a.brand))].sort(
+    (a, b) => a.localeCompare(b, 'fa'),
   );
   const summary = summarizeAccounts(rows);
   return {
@@ -607,16 +607,21 @@ interface MetricRow {
   updated_at: string;
 }
 
-export function toSocialAccount(row: AccountRow, brandNames?: Map<string, string>): SocialAccount {
+export function toSocialAccount(
+  row: AccountRow,
+  brandNames?: Map<string, string>,
+): SocialAccount {
   // brand_id is the authoritative link (migration 20260916120000 backfills it
   // for every legacy row). Resolve the display name from the id whenever the
-  // mapping has it; keep row.brand only as a legacy fallback so pre-migration
-  // data keeps rendering.
+  // mapping has it; keep row.brand as the fallback so anon/RLS sessions (where
+  // the brands table is unreadable) still label every account with its real
+  // brand NAME instead of showing raw UUIDs in filters and tables.
   const brandId = row.brand_id ?? null;
   const brandName = (brandId && brandNames?.get(brandId)) || null;
+  const legacyName = row.brand && row.brand.trim() !== '' ? row.brand : null;
   return {
     id: row.id,
-    brand: brandName ?? row.brand ?? '',
+    brand: brandName ?? legacyName ?? '',
     brandId,
     platform: row.platform,
     username: row.username,
@@ -669,7 +674,7 @@ export async function getSocialAccounts(): Promise<SocialAccount[]> {
     let { data, error } = await supabase
       .from('social_accounts')
       .select(
-        'id, brand_id, platform, username, display_name, url, external_id, ' +
+        'id, brand_id, brand, platform, username, display_name, url, external_id, ' +
           'status, connection_status, last_sync_at, last_sync_status, ' +
           'last_successful_sync_at, created_at, updated_at',
       )
@@ -698,7 +703,9 @@ export async function getSocialAccounts(): Promise<SocialAccount[]> {
     // Resolve brand names if we got brand_id, otherwise use brand column
     if (rows[0] && 'brand_id' in rows[0]) {
       const { resolveBrandNames } = await import('@/services/brand.service');
-      const brandIds = rows.map((r) => r.brand_id).filter((id): id is string => !!id);
+      const brandIds = rows
+        .map((r) => r.brand_id)
+        .filter((id): id is string => !!id);
       const brandNames = await resolveBrandNames(brandIds);
       return rows.map((r) => toSocialAccount(r, brandNames));
     }
@@ -796,8 +803,12 @@ export async function createSocialAccount(
     if (error) throw error;
     const { resolveBrandNames } = await import('@/services/brand.service');
     const createdRow = data as unknown as AccountRow;
-    const createdBrandId = (createdRow as unknown as { brand_id?: string | null }).brand_id;
-    const brandNames = createdBrandId ? await resolveBrandNames([createdBrandId]) : new Map<string, string>();
+    const createdBrandId = (
+      createdRow as unknown as { brand_id?: string | null }
+    ).brand_id;
+    const brandNames = createdBrandId
+      ? await resolveBrandNames([createdBrandId])
+      : new Map<string, string>();
     return toSocialAccount(createdRow, brandNames);
   } catch (err) {
     console.warn('[social] Could not create social account.', err);
@@ -835,15 +846,18 @@ export async function updateSocialAccount(
       .update(row)
       .eq('id', accountId)
       .select()
-      .single();    if (error) throw error;
+      .single();
+    if (error) throw error;
     const { resolveBrandNames } = await import('@/services/brand.service');
     const updatedRow = data as unknown as AccountRow;
-    const updatedBrandId = (updatedRow as unknown as { brand_id?: string | null }).brand_id;
-    const brandNames = updatedBrandId ? await resolveBrandNames([updatedBrandId]) : new Map<string, string>();
+    const updatedBrandId = (
+      updatedRow as unknown as { brand_id?: string | null }
+    ).brand_id;
+    const brandNames = updatedBrandId
+      ? await resolveBrandNames([updatedBrandId])
+      : new Map<string, string>();
     return toSocialAccount(updatedRow, brandNames);
   } catch (err) {
-
-
     console.warn('[social] Could not update social account.', err);
     return null;
   }
@@ -864,15 +878,17 @@ export async function setSocialAccountStatus(
       .update({ status })
       .eq('id', accountId)
       .select()
-      .single();    if (error) throw error;
+      .single();
+    if (error) throw error;
     const { resolveBrandNames } = await import('@/services/brand.service');
     const updatedRow = data as unknown as AccountRow;
-    const brandId = (updatedRow as unknown as { brand_id?: string | null }).brand_id;
-    const brandNames = brandId ? await resolveBrandNames([brandId]) : new Map<string, string>();
+    const brandId = (updatedRow as unknown as { brand_id?: string | null })
+      .brand_id;
+    const brandNames = brandId
+      ? await resolveBrandNames([brandId])
+      : new Map<string, string>();
     return toSocialAccount(updatedRow, brandNames);
   } catch (err) {
-
-
     console.warn('[social] Could not update social account status.', err);
     return null;
   }
@@ -974,7 +990,9 @@ export async function getBrandMetrics(
   brand: string,
   period?: SocialMetricPeriod,
 ): Promise<SocialMetric[]> {
-  const accounts = (await getSocialAccounts()).filter((a) => (a.brandId ?? a.brand) === brand);
+  const accounts = (await getSocialAccounts()).filter(
+    (a) => (a.brandId ?? a.brand) === brand,
+  );
   const ids = accounts.map((a) => a.id);
   if (ids.length === 0) return [];
   return getSocialMetrics(ids, period);
@@ -1339,7 +1357,9 @@ export async function updateSocialMetric(
       }
       targetAccountId = accountId;
       targetPeriod = period;
-      targetLabel = period ? periodLabelForDate(date ?? new Date(), period) : undefined;
+      targetLabel = period
+        ? periodLabelForDate(date ?? new Date(), period)
+        : undefined;
 
       const { data: current } = await supabase
         .from('social_metrics')
@@ -1356,10 +1376,10 @@ export async function updateSocialMetric(
         .neq('id', metricId)
         .maybeSingle();
       if (clash) {
-        console.warn(
-          '[social] Duplicate metric key on update; aborted.',
-          { metricId, row },
-        );
+        console.warn('[social] Duplicate metric key on update; aborted.', {
+          metricId,
+          row,
+        });
         return null;
       }
     }

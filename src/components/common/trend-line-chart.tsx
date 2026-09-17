@@ -102,6 +102,10 @@ export function TrendLineChart({
     return config;
   }, [series]);
 
+  // Any series with ≤1 real point (or sparse snapshot gaps) needs visible
+  // dots — a lone point otherwise renders nothing at all.
+  const hasSparseSeries = series.some((s) => s.points.length <= 1);
+
   if (series.length === 0 || chartData.length === 0) {
     return (
       <p className="py-10 text-center text-sm text-muted-foreground">
@@ -189,7 +193,9 @@ export function TrendLineChart({
               connectNulls={false}
               stroke={`var(--color-s${i})`}
               strokeWidth={2}
-              dot={false}
+              // A single-point series draws no line segment — without a dot
+              // it would be INVISIBLE (e.g. a brand with one month of data).
+              dot={hasSparseSeries ? { r: 3 } : false}
               activeDot={{ r: 4 }}
             />
           ))}

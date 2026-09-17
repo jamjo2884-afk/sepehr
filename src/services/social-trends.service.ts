@@ -22,6 +22,7 @@
  */
 
 import { getSupabase, isTableAvailable } from '@/lib/db';
+import { isDemoMode } from '@/lib/auth';
 import { jalaliMonthName } from '@/services/social-analytics';
 import type { SocialPlatform } from '@/types/domain';
 
@@ -101,8 +102,12 @@ interface AccountRowLite {
  * Get the workspace's social trend aggregation.
  *
  * @param brandIds Brand ids belonging to the caller's workspace (from
- *        `getBrands(workspaceId)`). Empty array → empty payload (honest zero),
- *        never "all brands of every workspace".
+ *        `getBrands(workspaceId)`). Empty array → empty payload for an
+ *        AUTHENTICATED caller (honest zero, never "all brands of every
+ *        workspace") — EXCEPT in demo mode, where no session exists and the
+ *        workspace id is synthetic: there the tables are read workspace-
+ *        agnostically, exactly like every other social reader (see the
+ *        account-loading note below).
  * @param monthStart Inclusive Jalali 'YYYY-MM' lower bound.
  * @param monthEnd Inclusive Jalali 'YYYY-MM' upper bound.
  */
@@ -124,7 +129,18 @@ export async function getSocialTrends(input: {
     platforms: [],
   };
 
-  if (brandIds.length === 0) return empty;
+  /**
+   * Demo mode has no real session: `getBrands('demo-workspace-000')` returns
+   * nothing (and `brands` is RLS-hidden from anon anyway), so a strict empty
+   * return would render an EMPTY trends block next to a fully populated
+   * /social page — /api/social/analytics, getSocialAccounts and
+   * getSocialMetrics all read the tables workspace-agnostically by design.
+   * In demo there is no real user, so reading every account cannot leak
+   * another workspace's data. An authenticated caller with zero brands keeps
+   * the honest empty payload below.
+   */
+  const demo = await isDemoMode();
+  if (brandIds.length === 0 && !demo) return empty;
 
   try {
     const supabase = await getSupabase();
@@ -150,39 +166,49 @@ export async function getSocialTrends(input: {
     const accounts: AccountRowLite[] = [];
     {
       const PAGE = 1000;
-      const load = async (filter: Record<string, unknown>) => {
+      const load = async (filter: Record<string, unknown> | null) => {
         for (let from = 0; ; from += PAGE) {
-          const { data, error } = await supabase
-            .from('social_accounts')
-            .select('id, brand_id, brand, platform')
-            .match(filter)
-            .range(from, from + PAGE - 1);
+          const query = filter
+            ? supabase
+                .from('social_accounts')
+                .select('id, brand_id, brand, platform')
+                .match(filter)
+            : supabase
+                .from('social_accounts')
+                .select('id, brand_id, brand, platform');
+          const { data, error } = await query.range(from, from + PAGE - 1);
           if (error) throw error;
           if (!data || data.length === 0) break;
           accounts.push(...(data as unknown as AccountRowLite[]));
           if (data.length < PAGE) break;
         }
       };
-      // Direct id links (authoritative).
-      await load({ brand_id: brandIds });
-      const haveIds = new Set(accounts.map((a) => a.id));
-      // Name-linked orphans (brand_id NULL): one request per brand name is
-      // avoided by fetching `brand in (names)` + brand_id IS NULL.
-      if (brandNames.length > 0) {
-        for (let from = 0; ; from += PAGE) {
-          const { data, error } = await supabase
-            .from('social_accounts')
-            .select('id, brand_id, brand, platform')
-            .in('brand', brandNames)
-            .is('brand_id', null)
-            .range(from, from + PAGE - 1);
-          if (error) throw error;
-          if (!data || data.length === 0) break;
-          for (const row of data as unknown as AccountRowLite[]) {
-            if (!haveIds.has(row.id)) accounts.push(row);
+      if (brandIds.length > 0) {
+        // Direct id links (authoritative).
+        await load({ brand_id: brandIds });
+        const haveIds = new Set(accounts.map((a) => a.id));
+        // Name-linked orphans (brand_id NULL): one request per brand name is
+        // avoided by fetching `brand in (names)` + brand_id IS NULL.
+        if (brandNames.length > 0) {
+          for (let from = 0; ; from += PAGE) {
+            const { data, error } = await supabase
+              .from('social_accounts')
+              .select('id, brand_id, brand, platform')
+              .in('brand', brandNames)
+              .is('brand_id', null)
+              .range(from, from + PAGE - 1);
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            for (const row of data as unknown as AccountRowLite[]) {
+              if (!haveIds.has(row.id)) accounts.push(row);
+            }
+            if (data.length < PAGE) break;
           }
-          if (data.length < PAGE) break;
         }
+      } else if (demo) {
+        // Demo: no workspace brand set — read every account (see the note
+        // above the empty-payload guard; same contract as /api/social/analytics).
+        await load(null);
       }
     }
     if (accounts.length === 0) return empty;
@@ -406,7 +432,15 @@ export async function getSocialTrends(input: {
       followersByBrand,
       followersByPlatform,
       months,
-      brands: [...brandName.values()],
+      // Authenticated path: the workspace catalog (even brands without data).
+      // Demo path (no catalog readable): the distinct brand names of the
+      // accounts actually read, so the brand chips match the series.
+      brands:
+        brandName.size > 0
+          ? [...brandName.values()]
+          : [...new Set(accountIdToBrandName.values())].sort((a, b) =>
+              a.localeCompare(b, 'fa'),
+            ),
       platforms: [...new Set(accounts.map((a) => a.platform))].sort(),
     };
   } catch (err) {
