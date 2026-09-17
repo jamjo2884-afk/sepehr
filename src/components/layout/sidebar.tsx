@@ -2,20 +2,54 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { navItems } from '@/config/navigation.config';
+import {
+  EXTRA_SECTIONS_STORAGE_KEY,
+  getVisibleNavItems,
+  isActivePath,
+} from '@/lib/sidebar-sections';
 import { Logo } from '@/components/common/logo';
 import { useUIStore } from '@/stores/ui.store';
 import { useIsMobile } from '@/hooks/use-media-query';
 import { TOGGLE_SIDEBAR_LABEL } from '@/constants/ui.constants';
-import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import {
+  MoreHorizontal,
+  PanelRightClose,
+  PanelRightOpen,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function Sidebar() {
   const pathname = usePathname();
   const isMobile = useIsMobile();
   const { sidebarOpen, toggleSidebar, setSidebarOpen } = useUIStore();
+  const [showExtra, setShowExtra] = useState(false);
+
+  useEffect(() => {
+    try {
+      setShowExtra(localStorage.getItem(EXTRA_SECTIONS_STORAGE_KEY) === 'true');
+    } catch {
+      // Keep the default hidden state when browser storage is unavailable.
+    }
+  }, []);
+
+  const toggleExtraSections = () => {
+    const nextVisible = !showExtra;
+    setShowExtra(nextVisible);
+    try {
+      localStorage.setItem(EXTRA_SECTIONS_STORAGE_KEY, String(nextVisible));
+    } catch {
+      // The toggle still works for this session if storage is blocked.
+    }
+  };
+  const extraSectionsLabel = showExtra
+    ? 'پنهان کردن بخش‌های بیشتر'
+    : 'نمایش بخش‌های بیشتر';
+  // A stable icon so the collapsed rail and mobile drawer do not "jump"
+  // when toggling; the change is communicated by the list itself.
+  const ExtraSectionsIcon = MoreHorizontal;
+  const visibleNavItems = getVisibleNavItems(showExtra, pathname);
 
   // Keep the desktop default open without exposing the full sidebar on the
   // first mobile render. This only runs when the breakpoint changes, so a
@@ -65,9 +99,8 @@ export function Sidebar() {
 
         <nav className="scrollbar-thin flex-1 overflow-y-auto px-3 py-2">
           <ul className="flex flex-col gap-1">
-            {navItems.map((item) => {
-              const active =
-                pathname === item.href || pathname.startsWith(`${item.href}/`);
+            {visibleNavItems.map((item) => {
+              const active = isActivePath(pathname, item.href);
               const Icon = item.icon;
               return (
                 <li key={item.id}>
@@ -107,6 +140,25 @@ export function Sidebar() {
                 </li>
               );
             })}
+            <li>
+              <button
+                type="button"
+                onClick={toggleExtraSections}
+                aria-expanded={showExtra}
+                aria-label={extraSectionsLabel}
+                title={collapsed ? extraSectionsLabel : undefined}
+                className={cn(
+                  'group relative flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-secondary hover:text-foreground',
+                  collapsed && 'justify-center',
+                )}
+              >
+                <ExtraSectionsIcon
+                  aria-hidden="true"
+                  className="h-5 w-5 shrink-0 text-muted-foreground transition-colors duration-200 group-hover:text-foreground"
+                />
+                {!collapsed ? <span>{extraSectionsLabel}</span> : null}
+              </button>
+            </li>
           </ul>
         </nav>
 
