@@ -166,16 +166,17 @@ export async function getSocialTrends(input: {
     const accounts: AccountRowLite[] = [];
     {
       const PAGE = 1000;
-      const load = async (filter: Record<string, unknown> | null) => {
+      // `scoped` filters brand_id IN (workspace brand ids) — MUST use `.in()`:
+      // `.match({ brand_id: [...] })` stringifies the array into one
+      // comma-joined value and PostgREST rejects it with `invalid input
+      // syntax for type uuid`, which emptied the charts whenever "همهٔ
+      // برندها" (multiple ids) was selected.
+      const load = async (scoped: boolean) => {
         for (let from = 0; ; from += PAGE) {
-          const query = filter
-            ? supabase
-                .from('social_accounts')
-                .select('id, brand_id, brand, platform')
-                .match(filter)
-            : supabase
-                .from('social_accounts')
-                .select('id, brand_id, brand, platform');
+          let query = supabase
+            .from('social_accounts')
+            .select('id, brand_id, brand, platform');
+          if (scoped) query = query.in('brand_id', brandIds);
           const { data, error } = await query.range(from, from + PAGE - 1);
           if (error) throw error;
           if (!data || data.length === 0) break;
@@ -185,7 +186,7 @@ export async function getSocialTrends(input: {
       };
       if (brandIds.length > 0) {
         // Direct id links (authoritative).
-        await load({ brand_id: brandIds });
+        await load(true);
         const haveIds = new Set(accounts.map((a) => a.id));
         // Name-linked orphans (brand_id NULL): one request per brand name is
         // avoided by fetching `brand in (names)` + brand_id IS NULL.
@@ -208,7 +209,7 @@ export async function getSocialTrends(input: {
       } else if (demo) {
         // Demo: no workspace brand set — read every account (see the note
         // above the empty-payload guard; same contract as /api/social/analytics).
-        await load(null);
+        await load(false);
       }
     }
     if (accounts.length === 0) return empty;

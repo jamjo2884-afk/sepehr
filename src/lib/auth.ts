@@ -53,7 +53,25 @@ export function isDemoMode(): boolean {
  */
 export async function getAuthUser(): Promise<AuthUser | null> {
   if (isDemoMode()) {
-    // No Supabase configured or demo mode — synthetic user (in-memory only)
+    // Demo mode prefers the REAL session when one exists (e.g. a logged-in
+    // developer): server requests then run as `authenticated` under RLS and
+    // read the caller's own workspace. The legacy blanket anon policies were
+    // removed (2026-09-19 security fix), so a session-less demo user can no
+    // longer read social tables as anon — the synthetic DEMO_USER remains
+    // only for fully session-less/no-Supabase local runs.
+    try {
+      const { createSupabaseServerClient } =
+        await import('@/lib/supabase-server');
+      const supabase = await createSupabaseServerClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        return { id: user.id, email: user.email ?? '' };
+      }
+    } catch {
+      // No Supabase config / not in request scope → synthetic demo user.
+    }
     return DEMO_USER;
   }
 
