@@ -31,6 +31,7 @@ import type {
   SocialMetric,
   SocialMetricPeriod,
 } from '@/types/social';
+import { getSupabase } from '@/lib/db';
 
 /**
  * PHASE 15 — Social Data Quality (READ-ONLY).
@@ -446,8 +447,7 @@ export function analyzeSocialDataQuality(
 export async function getSocialDataQuality(
   options: { supabase?: SupabaseClient } = {},
 ): Promise<SocialDataQualityReport> {
-  const supabase =
-    options.supabase ?? (await import('@/lib/supabase')).supabase;
+  const supabase = options.supabase ?? (await getSupabase());
   const [accountResult, metricRows] = await Promise.all([
     supabase
       .from('social_accounts')
@@ -458,8 +458,8 @@ export async function getSocialDataQuality(
   ]);
   if (accountResult.error) throw accountResult.error;
   const rows = (accountResult.data ?? []) as unknown as Parameters<
-      typeof toSocialAccount
-    >[0][];
+    typeof toSocialAccount
+  >[0][];
   const { resolveBrandNames } = await import('@/services/brand.service');
   const brandIds = rows
     .map((r) => (r as unknown as { brand_id?: string | null }).brand_id)

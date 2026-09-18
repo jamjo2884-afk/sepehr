@@ -43,6 +43,7 @@ import {
   summarizeMetrics,
   weeklyRangeForDate,
 } from '@/services/social-metrics';
+import { getSupabase } from '@/lib/db';
 
 // Re-export generated types for convenience.
 export type {
@@ -669,7 +670,7 @@ export function toSocialMetric(row: MetricRow): SocialMetric {
 /** All social accounts (Supabase first, snapshot fallback). */
 export async function getSocialAccounts(): Promise<SocialAccount[]> {
   try {
-    const { supabase } = await import('@/lib/supabase');
+    const supabase = await getSupabase();
     // Try with brand_id first (post-migration schema)
     let { data, error } = await supabase
       .from('social_accounts')
@@ -780,7 +781,7 @@ export async function createSocialAccount(
   input: SocialAccountInput,
 ): Promise<SocialAccount | null> {
   try {
-    const { supabase } = await import('@/lib/supabase');
+    const supabase = await getSupabase();
     // Resolve brand name to brandId if not provided
     let brandId = input.brandId ?? null;
     if (!brandId && input.brand) {
@@ -826,7 +827,7 @@ export async function updateSocialAccount(
   input: SocialAccountInput,
 ): Promise<SocialAccount | null> {
   try {
-    const { supabase } = await import('@/lib/supabase');
+    const supabase = await getSupabase();
     // Resolve brand name to brandId if not provided
     let brandId = input.brandId ?? null;
     if (!brandId && input.brand) {
@@ -872,7 +873,7 @@ export async function setSocialAccountStatus(
   status: SocialAccountStatus,
 ): Promise<SocialAccount | null> {
   try {
-    const { supabase } = await import('@/lib/supabase');
+    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from('social_accounts')
       .update({ status })
@@ -907,7 +908,7 @@ export async function getSocialMetrics(
   period?: SocialMetricPeriod,
 ): Promise<SocialMetric[]> {
   try {
-    const { supabase } = await import('@/lib/supabase');
+    const supabase = await getSupabase();
     const rows = await fetchAllMetricRows(supabase, accountIds, period);
     if (rows.length === 0) {
       // Fall back to the snapshot when the table is empty so callers never
@@ -1129,8 +1130,7 @@ export async function recordSocialMetrics(
   } = {},
 ): Promise<SocialMetric | null> {
   try {
-    const supabase =
-      options.supabase ?? (await import('@/lib/supabase')).supabase;
+    const supabase = options.supabase ?? (await getSupabase());
     const date = options.date ?? new Date();
     const periodLabel = options.periodLabel ?? periodLabelForDate(date, period);
     // Weekly labels can't be converted back to a range without an anchor
@@ -1218,7 +1218,7 @@ export async function recordSocialMetricsBulk(
 ): Promise<number | null> {
   try {
     if (accounts.length === 0) return 0;
-    const { supabase } = await import('@/lib/supabase');
+    const supabase = await getSupabase();
     const date = options.date ?? new Date();
     const periodLabel = options.periodLabel ?? periodLabelForDate(date, period);
     const range =
@@ -1326,7 +1326,7 @@ export async function updateSocialMetric(
   } = {},
 ): Promise<SocialMetric | null> {
   try {
-    const { supabase } = await import('@/lib/supabase');
+    const supabase = await getSupabase();
     const row: Record<string, number | string | null> = {};
     for (const key of Object.keys(values) as Array<keyof SocialMetricValues>) {
       const value = values[key];
@@ -1411,7 +1411,7 @@ export async function deleteSocialMetric(
   options: { expectedUpdatedAt?: string | null } = {},
 ): Promise<boolean> {
   try {
-    const { supabase } = await import('@/lib/supabase');
+    const supabase = await getSupabase();
     let query = supabase.from('social_metrics').delete().eq('id', metricId);
     if (options.expectedUpdatedAt) {
       query = query.eq('updated_at', options.expectedUpdatedAt);

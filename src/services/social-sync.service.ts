@@ -16,6 +16,7 @@ import type {
 } from '@/services/connectors/types';
 import { sanitizeErrorMessage } from '@/services/connectors/utils';
 import { SOCIAL_ENGAGEMENT_RATE_CAP } from '@/services/social-score';
+import { getSupabase } from '@/lib/db';
 
 /**
  * Central sync service.
@@ -212,8 +213,7 @@ async function runSync(
   options: SocialSyncDeps,
 ): Promise<SocialSyncResult> {
   const startedAt = new Date();
-  const supabase =
-    options.supabase ?? (await import('@/lib/supabase')).supabase;
+  const supabase = options.supabase ?? (await getSupabase());
 
   // 1. Load the account.
   const { data: accountData, error: accountError } = await supabase
@@ -527,8 +527,7 @@ export async function syncAllConnectedAccounts(
   // importing `@/lib/supabase` on its own would trigger many concurrent
   // module loads (and is unreliable under vitest's mock runner); one
   // resolution per run is also cheaper.
-  const supabase =
-    options.supabase ?? (await import('@/lib/supabase')).supabase;
+  const supabase = options.supabase ?? (await getSupabase());
   const { getSocialAccounts } = await import('@/services/social.service');
   const accounts = await getSocialAccounts();
 
@@ -675,7 +674,7 @@ export async function getSyncOverview(): Promise<SyncOverview> {
   const { getSocialAccounts } = await import('@/services/social.service');
   const { isPlatformCredentialConfigured } =
     await import('@/lib/server/social-credentials');
-  const { supabase } = await import('@/lib/supabase');
+  const supabase = await getSupabase();
 
   const [accounts, logResult] = await Promise.all([
     getSocialAccounts(),
@@ -779,7 +778,7 @@ export async function getLatestSyncLogs(
   accountIds: string[],
   limitPerAccount = 5,
 ): Promise<Record<string, SyncOverviewRecent[]>> {
-  const { supabase } = await import('@/lib/supabase');
+  const supabase = await getSupabase();
   const out: Record<string, SyncOverviewRecent[]> = {};
   for (const id of accountIds) {
     const { data } = await supabase

@@ -9,10 +9,7 @@
  */
 
 import type { SocialPlatform } from '@/types/domain';
-import type {
-  SocialAccount,
-  SocialMetric,
-} from '@/types/social';
+import type { SocialAccount, SocialMetric } from '@/types/social';
 import type {
   ExpenseCategory,
   FinanceOverviewKpis,
@@ -30,6 +27,7 @@ import {
   getExpenses,
   getAllAllocations,
 } from '@/services/finance/finance.service';
+import { getSupabase } from '@/lib/db';
 
 /* =========================================================================
  * Overview KPIs
@@ -75,7 +73,10 @@ export async function getBudgetVsActual(
   // Group budgets by period_label
   const budgetByLabel = new Map<string, number>();
   for (const b of budgets) {
-    budgetByLabel.set(b.periodLabel, (budgetByLabel.get(b.periodLabel) ?? 0) + b.amount);
+    budgetByLabel.set(
+      b.periodLabel,
+      (budgetByLabel.get(b.periodLabel) ?? 0) + b.amount,
+    );
   }
 
   // Group expenses by month (extract YYYY-MM from expense_date)
@@ -135,10 +136,18 @@ export async function getBrandCosts(): Promise<FinanceBrandCost[]> {
   const expenses = await getExpenses();
 
   // Group by brandId when available, fall back to brand string
-  const byBrand = new Map<string, { brand: string; brandId: string | null; total: number; count: number }>();
+  const byBrand = new Map<
+    string,
+    { brand: string; brandId: string | null; total: number; count: number }
+  >();
   for (const e of expenses) {
     const key = e.brandId ?? e.brand;
-    const existing = byBrand.get(key) ?? { brand: e.brand, brandId: e.brandId ?? null, total: 0, count: 0 };
+    const existing = byBrand.get(key) ?? {
+      brand: e.brand,
+      brandId: e.brandId ?? null,
+      total: 0,
+      count: 0,
+    };
     existing.total += e.amount;
     existing.count += 1;
     byBrand.set(key, existing);
@@ -200,7 +209,8 @@ export async function getPlatformEfficiency(
     if (latest && first && latest.periodLabel !== first.periodLabel) {
       growthByPlatform.set(
         platform,
-        (growthByPlatform.get(platform) ?? 0) + (latest.followers - first.followers),
+        (growthByPlatform.get(platform) ?? 0) +
+          (latest.followers - first.followers),
       );
     }
   }
@@ -211,36 +221,38 @@ export async function getPlatformEfficiency(
     ...growthByPlatform.keys(),
   ]);
 
-  return [...allPlatforms].map((platform) => {
-    const spend = spendByPlatform.get(platform) ?? 0;
-    const growth = growthByPlatform.get(platform) ?? 0;
+  return [...allPlatforms]
+    .map((platform) => {
+      const spend = spendByPlatform.get(platform) ?? 0;
+      const growth = growthByPlatform.get(platform) ?? 0;
 
-    let growthStatus: 'positive' | 'negative' | 'zero' | 'no_data';
-    let costPerNewFollower: number | null;
+      let growthStatus: 'positive' | 'negative' | 'zero' | 'no_data';
+      let costPerNewFollower: number | null;
 
-    if (growth > 0) {
-      growthStatus = 'positive';
-      costPerNewFollower = spend / growth;
-    } else if (growth < 0) {
-      growthStatus = 'negative';
-      costPerNewFollower = null;
-    } else if (spend > 0) {
-      growthStatus = 'zero';
-      costPerNewFollower = null;
-    } else {
-      growthStatus = 'no_data';
-      costPerNewFollower = null;
-    }
+      if (growth > 0) {
+        growthStatus = 'positive';
+        costPerNewFollower = spend / growth;
+      } else if (growth < 0) {
+        growthStatus = 'negative';
+        costPerNewFollower = null;
+      } else if (spend > 0) {
+        growthStatus = 'zero';
+        costPerNewFollower = null;
+      } else {
+        growthStatus = 'no_data';
+        costPerNewFollower = null;
+      }
 
-    return {
-      platform,
-      platformLabel: SOCIAL_PLATFORM_LABELS[platform] ?? platform,
-      allocatedSpend: spend,
-      followerGrowth: growth,
-      costPerNewFollower,
-      growthStatus,
-    };
-  }).sort((a, b) => b.allocatedSpend - a.allocatedSpend);
+      return {
+        platform,
+        platformLabel: SOCIAL_PLATFORM_LABELS[platform] ?? platform,
+        allocatedSpend: spend,
+        followerGrowth: growth,
+        costPerNewFollower,
+        growthStatus,
+      };
+    })
+    .sort((a, b) => b.allocatedSpend - a.allocatedSpend);
 }
 
 /* =========================================================================
@@ -255,12 +267,20 @@ export async function getBrandPerformance(
   const budgets = await getBudgets();
 
   // Spend by brand (prefer brandId)
-  const spendByBrand = new Map<string, { brand: string; brandId: string | null; amount: number }>();
+  const spendByBrand = new Map<
+    string,
+    { brand: string; brandId: string | null; amount: number }
+  >();
   for (const e of expenses) {
     const key = e.brandId ?? e.brand;
     const existing = spendByBrand.get(key);
     if (existing) existing.amount += e.amount;
-    else spendByBrand.set(key, { brand: e.brand, brandId: e.brandId ?? null, amount: e.amount });
+    else
+      spendByBrand.set(key, {
+        brand: e.brand,
+        brandId: e.brandId ?? null,
+        amount: e.amount,
+      });
   }
 
   // Budget by brand (prefer brandId)
@@ -297,49 +317,47 @@ export async function getBrandPerformance(
   }
 
   // Build result
-  const allBrands = new Set([
-    ...spendByBrand.keys(),
-    ...growthByBrand.keys(),
-  ]);
+  const allBrands = new Set([...spendByBrand.keys(), ...growthByBrand.keys()]);
 
-  return [...allBrands].map((key) => {
-    const spendData = spendByBrand.get(key);
-    const spend = spendData?.amount ?? 0;
-    const brandName = spendData?.brand ?? key;
-    const brandId = spendData?.brandId ?? null;
-    const growth = growthByBrand.get(key) ?? 0;
-    const budget = budgetByBrand.get(key) ?? 0;
+  return [...allBrands]
+    .map((key) => {
+      const spendData = spendByBrand.get(key);
+      const spend = spendData?.amount ?? 0;
+      const brandName = spendData?.brand ?? key;
+      const brandId = spendData?.brandId ?? null;
+      const growth = growthByBrand.get(key) ?? 0;
+      const budget = budgetByBrand.get(key) ?? 0;
 
-    let growthStatus: 'positive' | 'negative' | 'zero' | 'no_data';
-    let costPerNewFollower: number | null;
+      let growthStatus: 'positive' | 'negative' | 'zero' | 'no_data';
+      let costPerNewFollower: number | null;
 
-    if (growth > 0) {
-      growthStatus = 'positive';
-      costPerNewFollower = spend / growth;
-    } else if (growth < 0) {
-      growthStatus = 'negative';
-      costPerNewFollower = null;
-    } else if (spend > 0) {
-      growthStatus = 'zero';
-      costPerNewFollower = null;
-    } else {
-      growthStatus = 'no_data';
-      costPerNewFollower = null;
-    }
+      if (growth > 0) {
+        growthStatus = 'positive';
+        costPerNewFollower = spend / growth;
+      } else if (growth < 0) {
+        growthStatus = 'negative';
+        costPerNewFollower = null;
+      } else if (spend > 0) {
+        growthStatus = 'zero';
+        costPerNewFollower = null;
+      } else {
+        growthStatus = 'no_data';
+        costPerNewFollower = null;
+      }
 
-    const budgetUsagePercent =
-      budget > 0 ? (spend / budget) * 100 : null;
+      const budgetUsagePercent = budget > 0 ? (spend / budget) * 100 : null;
 
-    return {
-      brand: brandName,
-      brandId,
-      totalSpend: spend,
-      followerGrowth: growth,
-      costPerNewFollower,
-      growthStatus,
-      budgetUsagePercent,
-    };
-  }).sort((a, b) => b.totalSpend - a.totalSpend);
+      return {
+        brand: brandName,
+        brandId,
+        totalSpend: spend,
+        followerGrowth: growth,
+        costPerNewFollower,
+        growthStatus,
+        budgetUsagePercent,
+      };
+    })
+    .sort((a, b) => b.totalSpend - a.totalSpend);
 }
 
 /* =========================================================================
@@ -356,7 +374,10 @@ export async function getScatterData(
   // Group allocations by platform
   const spendByPlatform = new Map<SocialPlatform, number>();
   for (const a of allocations) {
-    spendByPlatform.set(a.platform, (spendByPlatform.get(a.platform) ?? 0) + a.amount);
+    spendByPlatform.set(
+      a.platform,
+      (spendByPlatform.get(a.platform) ?? 0) + a.amount,
+    );
   }
 
   // Calculate growth per brand+platform (use brandId as canonical key)
@@ -374,9 +395,7 @@ export async function getScatterData(
     const [brandKey, platform] = key.split('|');
     const brand = brandPlatformAccounts[0]?.brand ?? brandKey;
     const accountIds = new Set(brandPlatformAccounts.map((a) => a.id));
-    const bpMetrics = sortedMetrics.filter((m) =>
-      accountIds.has(m.accountId),
-    );
+    const bpMetrics = sortedMetrics.filter((m) => accountIds.has(m.accountId));
 
     const latest = bpMetrics[bpMetrics.length - 1];
     const first = bpMetrics[0];
@@ -441,7 +460,7 @@ export async function getFinanceDashboardData(
 /** Re-export from finance.service to avoid circular imports */
 async function getFinanceBrands(): Promise<string[]> {
   try {
-    const { supabase } = await import('@/lib/supabase');
+    const supabase = await getSupabase();
     const { data } = await supabase
       .from('brands')
       .select('name')

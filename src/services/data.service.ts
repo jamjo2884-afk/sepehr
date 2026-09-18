@@ -9,7 +9,7 @@ import {
   mockNotifications,
   type ActivityItem,
 } from '@/features/mock-data';
-
+import { getSupabase } from '@/lib/db';
 /**
  * Generic data service.
  *
@@ -41,7 +41,7 @@ async function fetchTable<T extends SupabaseRow>(
   order: string,
 ): Promise<T[] | null> {
   try {
-    const { supabase } = await import('@/lib/supabase');
+    const supabase = await getSupabase();
     const { data, error } = await supabase
       .from(table)
       .select(columns)
@@ -75,7 +75,7 @@ async function insertRow(
   table: string,
   payload: Record<string, unknown>,
 ): Promise<string> {
-  const { supabase } = await import('@/lib/supabase');
+  const supabase = await getSupabase();
   const { data, error } = await supabase
     .from(table)
     .insert(payload)
@@ -92,14 +92,14 @@ async function updateRow(
   id: string,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  const { supabase } = await import('@/lib/supabase');
+  const supabase = await getSupabase();
   const { error } = await supabase.from(table).update(payload).eq('id', id);
   if (error) throw writeError('به‌روزرسانی', table, error);
 }
 
 /** Delete a row by id. Throws on failure. */
 async function deleteRow(table: string, id: string): Promise<void> {
-  const { supabase } = await import('@/lib/supabase');
+  const supabase = await getSupabase();
   const { error } = await supabase.from(table).delete().eq('id', id);
   if (error) throw writeError('حذف', table, error);
 }
@@ -292,9 +292,7 @@ export async function getCampaignsByProject(
 }
 
 /** A single operation by id. */
-export async function getOperationById(
-  id: string,
-): Promise<Operation | null> {
+export async function getOperationById(id: string): Promise<Operation | null> {
   const all = await getOperations();
   return all.find((o) => o.id === id) ?? null;
 }
@@ -306,9 +304,7 @@ export async function getAssetById(id: string): Promise<MediaAsset | null> {
 }
 
 /** A single campaign by id. */
-export async function getCampaignById(
-  id: string,
-): Promise<Campaign | null> {
+export async function getCampaignById(id: string): Promise<Campaign | null> {
   const all = await getCampaigns();
   return all.find((c) => c.id === id) ?? null;
 }

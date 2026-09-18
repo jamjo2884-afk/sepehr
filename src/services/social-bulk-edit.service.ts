@@ -16,6 +16,7 @@ import type {
   SocialMetricPeriod,
   SocialMetricValues,
 } from '@/types/social';
+import { getSupabase } from '@/lib/db';
 
 /**
  * Bulk edit service (PHASE 17).
@@ -147,8 +148,7 @@ export async function bulkEditSocialMetrics(
     updateMetric?: typeof updateSocialMetric;
   } = {},
 ): Promise<BulkEditSummary> {
-  const supabase =
-    options.supabase ?? (await import('@/lib/supabase')).supabase;
+  const supabase = options.supabase ?? (await getSupabase());
   const updateMetric = options.updateMetric ?? updateSocialMetric;
 
   const rows: BulkEditRowResult[] = [];

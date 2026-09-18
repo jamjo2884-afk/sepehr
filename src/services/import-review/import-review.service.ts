@@ -6,6 +6,7 @@
  *
  * All writes go through this service. The client never touches Supabase directly.
  */
+import { getSupabase } from '@/lib/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   ImportSession,
@@ -32,7 +33,7 @@ import { METRIC_COLUMN_BY_KEY } from '@/services/social.service';
 
 async function getClient(supabase?: SupabaseClient): Promise<SupabaseClient> {
   if (supabase) return supabase;
-  const { supabase: client } = await import('@/lib/supabase');
+  const client = await getSupabase();
   return client;
 }
 
@@ -84,7 +85,10 @@ export async function listImportSessions(
     .from('import_sessions')
     .select('*')
     .order('created_at', { ascending: false })
-    .range(options.offset ?? 0, (options.offset ?? 0) + (options.limit ?? 50) - 1);
+    .range(
+      options.offset ?? 0,
+      (options.offset ?? 0) + (options.limit ?? 50) - 1,
+    );
   if (error) throw error;
   return (data ?? []) as ImportSession[];
 }
@@ -92,7 +96,18 @@ export async function listImportSessions(
 /** Update session status + counts. */
 export async function updateImportSession(
   sessionId: string,
-  patch: Partial<Pick<ImportSession, 'status' | 'valid_rows' | 'error_rows' | 'ambiguous_rows' | 'resolved_rows' | 'rejected_rows' | 'imported_rows'>>,
+  patch: Partial<
+    Pick<
+      ImportSession,
+      | 'status'
+      | 'valid_rows'
+      | 'error_rows'
+      | 'ambiguous_rows'
+      | 'resolved_rows'
+      | 'rejected_rows'
+      | 'imported_rows'
+    >
+  >,
   options: { supabase?: SupabaseClient } = {},
 ): Promise<void> {
   const sb = await getClient(options.supabase);
@@ -185,14 +200,30 @@ export async function getImportRow(
 /** Update a single row. */
 export async function updateImportRow(
   rowId: string,
-  patch: Partial<Pick<ImportRow, 'status' | 'error_type' | 'error_message' | 'matched_account_id' | 'resolution_type' | 'resolution_data' | 'resolved_at' | 'platform' | 'account_identifier' | 'username' | 'display_name' | 'brand' | 'period' | 'period_label' | 'normalized_data'>>,
+  patch: Partial<
+    Pick<
+      ImportRow,
+      | 'status'
+      | 'error_type'
+      | 'error_message'
+      | 'matched_account_id'
+      | 'resolution_type'
+      | 'resolution_data'
+      | 'resolved_at'
+      | 'platform'
+      | 'account_identifier'
+      | 'username'
+      | 'display_name'
+      | 'brand'
+      | 'period'
+      | 'period_label'
+      | 'normalized_data'
+    >
+  >,
   options: { supabase?: SupabaseClient } = {},
 ): Promise<void> {
   const sb = await getClient(options.supabase);
-  const { error } = await sb
-    .from('import_rows')
-    .update(patch)
-    .eq('id', rowId);
+  const { error } = await sb.from('import_rows').update(patch).eq('id', rowId);
   if (error) throw error;
 }
 
@@ -208,15 +239,13 @@ export async function logAuditEntry(
   options: { supabase?: SupabaseClient } = {},
 ): Promise<void> {
   const sb = await getClient(options.supabase);
-  const { error } = await sb
-    .from('import_audit_log')
-    .insert({
-      session_id: sessionId,
-      row_id: rowId,
-      action,
-      old_value: oldValue,
-      new_value: newValue,
-    });
+  const { error } = await sb.from('import_audit_log').insert({
+    session_id: sessionId,
+    row_id: rowId,
+    action,
+    old_value: oldValue,
+    new_value: newValue,
+  });
   if (error) throw error;
 }
 
@@ -247,12 +276,18 @@ export async function validateSession(
   options: { supabase?: SupabaseClient } = {},
 ): Promise<ImportSessionSummary> {
   const sb = await getClient(options.supabase);
-  await updateImportSession(sessionId, { status: 'validating' }, { supabase: sb });
+  await updateImportSession(
+    sessionId,
+    { status: 'validating' },
+    { supabase: sb },
+  );
 
   const rows = await getImportRows(sessionId, { supabase: sb });
   const accounts = await getSocialAccounts();
 
-  let valid = 0, error = 0, ambiguous = 0;
+  let valid = 0,
+    error = 0,
+    ambiguous = 0;
 
   for (const row of rows) {
     const platform = row.platform;
@@ -262,41 +297,65 @@ export async function validateSession(
     // are now supported by the Supabase enum (see migration 20260823100000).
     // We only reject truly unknown platforms that aren't in the type at all.
     const KNOWN_PLATFORMS: string[] = [
-      'instagram', 'telegram', 'youtube', 'twitter', 'bale', 'eita',
-      'rubika', 'soroushplus', 'aparat', 'threads', 'shad', 'igap',
-      'site', 'gap', 'virasty',
+      'instagram',
+      'telegram',
+      'youtube',
+      'twitter',
+      'bale',
+      'eita',
+      'rubika',
+      'soroushplus',
+      'aparat',
+      'threads',
+      'shad',
+      'igap',
+      'site',
+      'gap',
+      'virasty',
     ];
     if (platform && !KNOWN_PLATFORMS.includes(platform)) {
-      await updateImportRow(row.id, {
-        status: 'error',
-        error_type: 'PLATFORM_NOT_SUPPORTED',
-        error_message: 'این شبکه شناخته نشده است.',
-        matched_account_id: null,
-      }, { supabase: sb });
+      await updateImportRow(
+        row.id,
+        {
+          status: 'error',
+          error_type: 'PLATFORM_NOT_SUPPORTED',
+          error_message: 'این شبکه شناخته نشده است.',
+          matched_account_id: null,
+        },
+        { supabase: sb },
+      );
       error++;
       continue;
     }
 
     // Check missing identifier
     if (!identifier || identifier.trim() === '') {
-      await updateImportRow(row.id, {
-        status: 'error',
-        error_type: 'MISSING_IDENTIFIER',
-        error_message: 'شناسه حساب وارد نشده است.',
-        matched_account_id: null,
-      }, { supabase: sb });
+      await updateImportRow(
+        row.id,
+        {
+          status: 'error',
+          error_type: 'MISSING_IDENTIFIER',
+          error_message: 'شناسه حساب وارد نشده است.',
+          matched_account_id: null,
+        },
+        { supabase: sb },
+      );
       error++;
       continue;
     }
 
     // Check invalid platform
     if (!platform) {
-      await updateImportRow(row.id, {
-        status: 'error',
-        error_type: 'INVALID_PLATFORM',
-        error_message: 'پلتفرم نامعتبر است.',
-        matched_account_id: null,
-      }, { supabase: sb });
+      await updateImportRow(
+        row.id,
+        {
+          status: 'error',
+          error_type: 'INVALID_PLATFORM',
+          error_message: 'پلتفرم نامعتبر است.',
+          matched_account_id: null,
+        },
+        { supabase: sb },
+      );
       error++;
       continue;
     }
@@ -308,39 +367,55 @@ export async function validateSession(
     });
 
     if (result.status === 'matched') {
-      await updateImportRow(row.id, {
-        status: 'valid',
-        error_type: null,
-        error_message: null,
-        matched_account_id: result.accountId,
-      }, { supabase: sb });
+      await updateImportRow(
+        row.id,
+        {
+          status: 'valid',
+          error_type: null,
+          error_message: null,
+          matched_account_id: result.accountId,
+        },
+        { supabase: sb },
+      );
       valid++;
     } else if (result.status === 'ambiguous') {
       const candidateIds = result.candidates.map((c) => c.id);
-      await updateImportRow(row.id, {
-        status: 'ambiguous',
-        error_type: 'AMBIGUOUS_ACCOUNT',
-        error_message: `${result.candidates.length} حساب با این شناسه یافت شد. لطفاً یکی را انتخاب کنید.`,
-        matched_account_id: null,
-        resolution_data: { candidate_ids: candidateIds },
-      }, { supabase: sb });
+      await updateImportRow(
+        row.id,
+        {
+          status: 'ambiguous',
+          error_type: 'AMBIGUOUS_ACCOUNT',
+          error_message: `${result.candidates.length} حساب با این شناسه یافت شد. لطفاً یکی را انتخاب کنید.`,
+          matched_account_id: null,
+          resolution_data: { candidate_ids: candidateIds },
+        },
+        { supabase: sb },
+      );
       ambiguous++;
     } else if (result.status === 'unmatched') {
-      await updateImportRow(row.id, {
-        status: 'error',
-        error_type: 'ACCOUNT_NOT_FOUND',
-        error_message: 'حسابی با این شناسه یافت نشد.',
-        matched_account_id: null,
-      }, { supabase: sb });
+      await updateImportRow(
+        row.id,
+        {
+          status: 'error',
+          error_type: 'ACCOUNT_NOT_FOUND',
+          error_message: 'حسابی با این شناسه یافت نشد.',
+          matched_account_id: null,
+        },
+        { supabase: sb },
+      );
       error++;
     } else {
       // empty
-      await updateImportRow(row.id, {
-        status: 'error',
-        error_type: 'MISSING_IDENTIFIER',
-        error_message: 'شناسه حساب وارد نشده است.',
-        matched_account_id: null,
-      }, { supabase: sb });
+      await updateImportRow(
+        row.id,
+        {
+          status: 'error',
+          error_type: 'MISSING_IDENTIFIER',
+          error_message: 'شناسه حساب وارد نشده است.',
+          matched_account_id: null,
+        },
+        { supabase: sb },
+      );
       error++;
     }
   }
@@ -349,7 +424,9 @@ export async function validateSession(
   // After matching, run anomaly detection on all valid+resolved rows
   // to flag unusual metric values.
   try {
-    const anomalySummary = await detectAnomaliesForSession(sessionId, { supabase: sb });
+    const anomalySummary = await detectAnomaliesForSession(sessionId, {
+      supabase: sb,
+    });
 
     // Store anomaly data on flagged rows via resolution_data
     for (const report of anomalySummary.reports) {
@@ -357,7 +434,8 @@ export async function validateSession(
         .from('import_rows')
         .update({
           resolution_data: {
-            ...(await getImportRow(report.rowId, { supabase: sb }))?.resolution_data ?? {},
+            ...((await getImportRow(report.rowId, { supabase: sb }))
+              ?.resolution_data ?? {}),
             anomalies: report.anomalies,
             anomaly_severity: report.overallSeverity,
           },
@@ -380,12 +458,16 @@ export async function validateSession(
   };
 
   const hasIssues = error > 0 || ambiguous > 0;
-  await updateImportSession(sessionId, {
-    status: hasIssues ? 'review_required' : 'ready',
-    valid_rows: valid,
-    error_rows: error,
-    ambiguous_rows: ambiguous,
-  }, { supabase: sb });
+  await updateImportSession(
+    sessionId,
+    {
+      status: hasIssues ? 'review_required' : 'ready',
+      valid_rows: valid,
+      error_rows: error,
+      ambiguous_rows: ambiguous,
+    },
+    { supabase: sb },
+  );
 
   return summary;
 }
@@ -401,7 +483,8 @@ export async function getCandidates(
   const row = await getImportRow(rowId, { supabase: sb });
   if (!row || !row.resolution_data) return [];
 
-  const candidateIds = (row.resolution_data as { candidate_ids?: string[] }).candidate_ids;
+  const candidateIds = (row.resolution_data as { candidate_ids?: string[] })
+    .candidate_ids;
   if (!candidateIds?.length) return [];
 
   const { data, error } = await sb
@@ -422,21 +505,35 @@ export async function resolveRowMatchExisting(
   const row = await getImportRow(rowId, { supabase: sb });
   if (!row) throw new Error('Row not found');
 
-  const oldValue = { status: row.status, matched_account_id: row.matched_account_id };
+  const oldValue = {
+    status: row.status,
+    matched_account_id: row.matched_account_id,
+  };
 
-  await updateImportRow(rowId, {
-    status: 'resolved',
-    matched_account_id: accountId,
-    resolution_type: 'match_existing',
-    resolved_at: new Date().toISOString(),
-    error_type: null,
-    error_message: null,
-  }, { supabase: sb });
+  await updateImportRow(
+    rowId,
+    {
+      status: 'resolved',
+      matched_account_id: accountId,
+      resolution_type: 'match_existing',
+      resolved_at: new Date().toISOString(),
+      error_type: null,
+      error_message: null,
+    },
+    { supabase: sb },
+  );
 
-  await logAuditEntry(row.session_id, rowId, 'match_existing', oldValue, {
-    status: 'resolved',
-    matched_account_id: accountId,
-  }, { supabase: sb });
+  await logAuditEntry(
+    row.session_id,
+    rowId,
+    'match_existing',
+    oldValue,
+    {
+      status: 'resolved',
+      matched_account_id: accountId,
+    },
+    { supabase: sb },
+  );
 
   await recalcSessionCounts(row.session_id, { supabase: sb });
 }
@@ -453,17 +550,28 @@ export async function rejectRow(
 
   const oldValue = { status: row.status };
 
-  await updateImportRow(rowId, {
-    status: 'rejected',
-    resolution_type: 'reject',
-    resolution_data: { reason },
-    resolved_at: new Date().toISOString(),
-  }, { supabase: sb });
+  await updateImportRow(
+    rowId,
+    {
+      status: 'rejected',
+      resolution_type: 'reject',
+      resolution_data: { reason },
+      resolved_at: new Date().toISOString(),
+    },
+    { supabase: sb },
+  );
 
-  await logAuditEntry(row.session_id, rowId, 'reject', oldValue, {
-    status: 'rejected',
-    reason,
-  }, { supabase: sb });
+  await logAuditEntry(
+    row.session_id,
+    rowId,
+    'reject',
+    oldValue,
+    {
+      status: 'rejected',
+      reason,
+    },
+    { supabase: sb },
+  );
 
   await recalcSessionCounts(row.session_id, { supabase: sb });
 }
@@ -487,23 +595,38 @@ export async function editAndRevalidateRow(
   const row = await getImportRow(rowId, { supabase: sb });
   if (!row) throw new Error('Row not found');
 
-  const oldValue = { status: row.status, platform: row.platform, account_identifier: row.account_identifier };
+  const oldValue = {
+    status: row.status,
+    platform: row.platform,
+    account_identifier: row.account_identifier,
+  };
 
-  await updateImportRow(rowId, {
-    ...edits,
-    status: 'pending',
-    error_type: null,
-    error_message: null,
-    matched_account_id: null,
-    resolution_type: null,
-    resolution_data: null,
-    resolved_at: null,
-  }, { supabase: sb });
+  await updateImportRow(
+    rowId,
+    {
+      ...edits,
+      status: 'pending',
+      error_type: null,
+      error_message: null,
+      matched_account_id: null,
+      resolution_type: null,
+      resolution_data: null,
+      resolved_at: null,
+    },
+    { supabase: sb },
+  );
 
-  await logAuditEntry(row.session_id, rowId, 'edit', oldValue, {
-    ...edits,
-    status: 'pending',
-  }, { supabase: sb });
+  await logAuditEntry(
+    row.session_id,
+    rowId,
+    'edit',
+    oldValue,
+    {
+      ...edits,
+      status: 'pending',
+    },
+    { supabase: sb },
+  );
 
   // Re-validate just this row
   const updatedRow = await getImportRow(rowId, { supabase: sb });
@@ -511,54 +634,95 @@ export async function editAndRevalidateRow(
 
   const accounts = await getSocialAccounts();
   const KNOWN_PLATFORMS: string[] = [
-    'instagram', 'telegram', 'youtube', 'twitter', 'bale', 'eita',
-    'rubika', 'soroushplus', 'aparat', 'threads', 'shad', 'igap',
-    'site', 'gap', 'virasty',
+    'instagram',
+    'telegram',
+    'youtube',
+    'twitter',
+    'bale',
+    'eita',
+    'rubika',
+    'soroushplus',
+    'aparat',
+    'threads',
+    'shad',
+    'igap',
+    'site',
+    'gap',
+    'virasty',
   ];
 
   if (updatedRow.platform && !KNOWN_PLATFORMS.includes(updatedRow.platform)) {
-    await updateImportRow(rowId, {
-      status: 'error',
-      error_type: 'PLATFORM_NOT_SUPPORTED',
-      error_message: 'این شبکه شناخته نشده است.',
-    }, { supabase: sb });
-  } else if (!updatedRow.account_identifier || updatedRow.account_identifier.trim() === '') {
-    await updateImportRow(rowId, {
-      status: 'error',
-      error_type: 'MISSING_IDENTIFIER',
-      error_message: 'شناسه حساب وارد نشده است.',
-    }, { supabase: sb });
+    await updateImportRow(
+      rowId,
+      {
+        status: 'error',
+        error_type: 'PLATFORM_NOT_SUPPORTED',
+        error_message: 'این شبکه شناخته نشده است.',
+      },
+      { supabase: sb },
+    );
+  } else if (
+    !updatedRow.account_identifier ||
+    updatedRow.account_identifier.trim() === ''
+  ) {
+    await updateImportRow(
+      rowId,
+      {
+        status: 'error',
+        error_type: 'MISSING_IDENTIFIER',
+        error_message: 'شناسه حساب وارد نشده است.',
+      },
+      { supabase: sb },
+    );
   } else if (!updatedRow.platform) {
-    await updateImportRow(rowId, {
-      status: 'error',
-      error_type: 'INVALID_PLATFORM',
-      error_message: 'پلتفرم نامعتبر است.',
-    }, { supabase: sb });
+    await updateImportRow(
+      rowId,
+      {
+        status: 'error',
+        error_type: 'INVALID_PLATFORM',
+        error_message: 'پلتفرم نامعتبر است.',
+      },
+      { supabase: sb },
+    );
   } else {
     const result = matchImportRowToAccount(accounts, {
       accountIdentifier: updatedRow.account_identifier,
       platform: updatedRow.platform as never,
     });
     if (result.status === 'matched') {
-      await updateImportRow(rowId, {
-        status: 'resolved',
-        matched_account_id: result.accountId,
-        resolution_type: 'edit',
-        resolved_at: new Date().toISOString(),
-      }, { supabase: sb });
+      await updateImportRow(
+        rowId,
+        {
+          status: 'resolved',
+          matched_account_id: result.accountId,
+          resolution_type: 'edit',
+          resolved_at: new Date().toISOString(),
+        },
+        { supabase: sb },
+      );
     } else if (result.status === 'ambiguous') {
-      await updateImportRow(rowId, {
-        status: 'ambiguous',
-        error_type: 'AMBIGUOUS_ACCOUNT',
-        error_message: `${result.candidates.length} حساب یافت شد.`,
-        resolution_data: { candidate_ids: result.candidates.map((c) => c.id) },
-      }, { supabase: sb });
+      await updateImportRow(
+        rowId,
+        {
+          status: 'ambiguous',
+          error_type: 'AMBIGUOUS_ACCOUNT',
+          error_message: `${result.candidates.length} حساب یافت شد.`,
+          resolution_data: {
+            candidate_ids: result.candidates.map((c) => c.id),
+          },
+        },
+        { supabase: sb },
+      );
     } else {
-      await updateImportRow(rowId, {
-        status: 'error',
-        error_type: 'ACCOUNT_NOT_FOUND',
-        error_message: 'حسابی با این شناسه یافت نشد.',
-      }, { supabase: sb });
+      await updateImportRow(
+        rowId,
+        {
+          status: 'error',
+          error_type: 'ACCOUNT_NOT_FOUND',
+          error_message: 'حسابی با این شناسه یافت نشد.',
+        },
+        { supabase: sb },
+      );
     }
   }
 
@@ -575,7 +739,14 @@ export async function recalcSessionCounts(
   const sb = await getClient(options.supabase);
   const rows = await getImportRows(sessionId, { supabase: sb });
 
-  const counts = { valid_rows: 0, error_rows: 0, ambiguous_rows: 0, resolved_rows: 0, rejected_rows: 0, imported_rows: 0 };
+  const counts = {
+    valid_rows: 0,
+    error_rows: 0,
+    ambiguous_rows: 0,
+    resolved_rows: 0,
+    rejected_rows: 0,
+    imported_rows: 0,
+  };
   for (const r of rows) {
     if (r.status === 'valid') counts.valid_rows++;
     else if (r.status === 'error') counts.error_rows++;
@@ -586,7 +757,10 @@ export async function recalcSessionCounts(
   }
 
   const hasIssues = counts.error_rows > 0 || counts.ambiguous_rows > 0;
-  const allDone = counts.error_rows === 0 && counts.ambiguous_rows === 0 && counts.resolved_rows === 0;
+  const allDone =
+    counts.error_rows === 0 &&
+    counts.ambiguous_rows === 0 &&
+    counts.resolved_rows === 0;
   let status: ImportSessionStatus = 'review_required';
   if (allDone && counts.valid_rows + counts.resolved_rows > 0) status = 'ready';
   else if (!hasIssues && counts.valid_rows > 0) status = 'ready';
@@ -603,7 +777,9 @@ export async function getCommitPreview(
 ): Promise<ImportCommitPreview> {
   const sb = await getClient(options.supabase);
   const rows = await getImportRows(sessionId, { supabase: sb });
-  const importable = rows.filter((r) => r.status === 'valid' || r.status === 'resolved');
+  const importable = rows.filter(
+    (r) => r.status === 'valid' || r.status === 'resolved',
+  );
 
   const accounts = await getSocialAccounts();
   const accountMap = new Map<string, SocialAccount>();
@@ -632,15 +808,32 @@ export async function getCommitPreview(
   };
 }
 
-const METRIC_KEYS = ['followers', 'following', 'posts', 'views', 'likes', 'comments', 'shares', 'saves', 'reach', 'impressions', 'engagementRate', 'storyViews', 'channelMembers', 'retweets', 'subscribers'] as const;
+const METRIC_KEYS = [
+  'followers',
+  'following',
+  'posts',
+  'views',
+  'likes',
+  'comments',
+  'shares',
+  'saves',
+  'reach',
+  'impressions',
+  'engagementRate',
+  'storyViews',
+  'channelMembers',
+  'retweets',
+  'subscribers',
+] as const;
 
 function extractValues(row: ImportRow): SocialMetricValues {
   const nd = row.normalized_data as Record<string, unknown>;
   // Values may be nested inside a 'values' sub-object (from the parse pipeline)
   // or at the top level.
-  const source = (nd.values && typeof nd.values === 'object' && !Array.isArray(nd.values))
-    ? nd.values as Record<string, unknown>
-    : nd;
+  const source =
+    nd.values && typeof nd.values === 'object' && !Array.isArray(nd.values)
+      ? (nd.values as Record<string, unknown>)
+      : nd;
   const values: SocialMetricValues = {};
   for (const key of METRIC_KEYS) {
     if (source[key] !== undefined && source[key] !== null) {
@@ -661,10 +854,16 @@ export async function commitImport(
   options: { supabase?: SupabaseClient } = {},
 ): Promise<ImportCommitResult> {
   const sb = await getClient(options.supabase);
-  await updateImportSession(sessionId, { status: 'importing' }, { supabase: sb });
+  await updateImportSession(
+    sessionId,
+    { status: 'importing' },
+    { supabase: sb },
+  );
 
   const rows = await getImportRows(sessionId, { supabase: sb });
-  const importable = rows.filter((r) => r.status === 'valid' || r.status === 'resolved');
+  const importable = rows.filter(
+    (r) => r.status === 'valid' || r.status === 'resolved',
+  );
 
   let inserted = 0;
   const errors: Array<{ row_number: number; message: string }> = [];
@@ -673,7 +872,11 @@ export async function commitImport(
   const accountIdMap = new Map<string, string>(); // row.id -> accountId
   for (const row of importable) {
     let accountId = row.matched_account_id;
-    if (!accountId && row.resolution_type === 'create_account' && row.resolution_data) {
+    if (
+      !accountId &&
+      row.resolution_type === 'create_account' &&
+      row.resolution_data
+    ) {
       try {
         const rd = row.resolution_data as Record<string, string>;
         const { data: newAcct, error: acctErr } = await sb
@@ -681,7 +884,8 @@ export async function commitImport(
           .insert({
             brand: rd.brand || row.brand || 'unknown',
             platform: row.platform,
-            username: rd.username || row.username || row.account_identifier || '',
+            username:
+              rd.username || row.username || row.account_identifier || '',
             display_name: rd.display_name || row.display_name || null,
             status: 'active',
           })
@@ -689,9 +893,16 @@ export async function commitImport(
           .single();
         if (acctErr) throw acctErr;
         accountId = newAcct.id;
-        await updateImportRow(row.id, { matched_account_id: accountId }, { supabase: sb });
+        await updateImportRow(
+          row.id,
+          { matched_account_id: accountId },
+          { supabase: sb },
+        );
       } catch (err) {
-        errors.push({ row_number: row.row_number, message: err instanceof Error ? err.message : 'خطای ایجاد حساب' });
+        errors.push({
+          row_number: row.row_number,
+          message: err instanceof Error ? err.message : 'خطای ایجاد حساب',
+        });
         continue;
       }
     }
@@ -700,18 +911,24 @@ export async function commitImport(
 
   // Step 2: Group rows by (accountId, period, periodLabel) for bulk upsert
   // If multiple import rows map to the same key, merge their values (last wins)
-  const grouped = new Map<string, {
-    accountId: string;
-    period: string;
-    periodLabel: string;
-    values: SocialMetricValues;
-    rowNumbers: number[];
-  }>();
+  const grouped = new Map<
+    string,
+    {
+      accountId: string;
+      period: string;
+      periodLabel: string;
+      values: SocialMetricValues;
+      rowNumbers: number[];
+    }
+  >();
 
   for (const row of importable) {
     const accountId = accountIdMap.get(row.id);
     if (!accountId) {
-      errors.push({ row_number: row.row_number, message: 'حسابی برای این ردیف یافت نشد.' });
+      errors.push({
+        row_number: row.row_number,
+        message: 'حسابی برای این ردیف یافت نشد.',
+      });
       continue;
     }
     const period = row.period ?? 'monthly';
@@ -728,12 +945,20 @@ export async function commitImport(
       }
       existing.rowNumbers.push(row.row_number);
     } else {
-      grouped.set(key, { accountId, period, periodLabel, values, rowNumbers: [row.row_number] });
+      grouped.set(key, {
+        accountId,
+        period,
+        periodLabel,
+        values,
+        rowNumbers: [row.row_number],
+      });
     }
   }
 
   // Step 3: Fetch existing metrics in bulk for all relevant accounts
-  const allAccountIds = [...new Set([...grouped.values()].map((g) => g.accountId))];
+  const allAccountIds = [
+    ...new Set([...grouped.values()].map((g) => g.accountId)),
+  ];
   const existingMetricsByAccount = new Map<string, Record<string, unknown>>();
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
@@ -758,7 +983,10 @@ export async function commitImport(
     const existing = existingMetricsByAccount.get(
       `${group.accountId}|${group.period}|${group.periodLabel}`,
     );
-    const range = periodRangeForLabel(group.period as 'daily' | 'weekly' | 'monthly', group.periodLabel);
+    const range = periodRangeForLabel(
+      group.period as 'daily' | 'weekly' | 'monthly',
+      group.periodLabel,
+    );
     const row: Record<string, unknown> = {
       account_id: group.accountId,
       period: group.period,
@@ -812,11 +1040,16 @@ export async function commitImport(
   }
   inserted = importedIds.length;
 
-  const finalStatus: ImportSessionStatus = errors.length === 0 ? 'completed' : 'failed';
-  await updateImportSession(sessionId, {
-    status: finalStatus,
-    imported_rows: inserted,
-  }, { supabase: sb });
+  const finalStatus: ImportSessionStatus =
+    errors.length === 0 ? 'completed' : 'failed';
+  await updateImportSession(
+    sessionId,
+    {
+      status: finalStatus,
+      imported_rows: inserted,
+    },
+    { supabase: sb },
+  );
 
   return { inserted, updated: 0, rejected: errors.length, errors };
 }
@@ -837,6 +1070,9 @@ export async function getErrorTypeCounts(
     }
   }
   return [...counts.entries()]
-    .map(([error_type, count]) => ({ error_type: error_type as ImportErrorType, count }))
+    .map(([error_type, count]) => ({
+      error_type: error_type as ImportErrorType,
+      count,
+    }))
     .sort((a, b) => b.count - a.count);
 }

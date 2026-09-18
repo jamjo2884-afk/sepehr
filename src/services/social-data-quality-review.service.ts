@@ -12,6 +12,7 @@ import type {
   SocialDataQualityReviewInput,
   SocialDataQualityReviewStatus,
 } from '@/types/social';
+import { getSupabase } from '@/lib/db';
 
 /**
  * PHASE 16 — Social Data Quality Review Center.
@@ -134,8 +135,7 @@ function toReview(row: ReviewRow): SocialDataQualityReview {
 export async function getSocialDataQualityReviews(
   options: { supabase?: SupabaseClient } = {},
 ): Promise<SocialDataQualityReview[]> {
-  const supabase =
-    options.supabase ?? (await import('@/lib/supabase')).supabase;
+  const supabase = options.supabase ?? (await getSupabase());
   const { data, error } = await supabase
     .from('social_data_quality_reviews')
     .select('*')
@@ -184,8 +184,7 @@ export async function upsertSocialDataQualityReview(
   options: { supabase?: SupabaseClient } = {},
 ): Promise<SocialDataQualityReview> {
   validateReviewInput(input);
-  const supabase =
-    options.supabase ?? (await import('@/lib/supabase')).supabase;
+  const supabase = options.supabase ?? (await getSupabase());
   const existing = await findReviewRow(supabase, input);
   const now = new Date().toISOString();
 
@@ -228,8 +227,7 @@ export async function deleteSocialDataQualityReview(
   options: { supabase?: SupabaseClient } = {},
 ): Promise<boolean> {
   validateReviewInput({ ...input, status: 'reviewed' });
-  const supabase =
-    options.supabase ?? (await import('@/lib/supabase')).supabase;
+  const supabase = options.supabase ?? (await getSupabase());
   const existing = await findReviewRow(supabase, input);
   if (!existing) return false;
   const { error } = await supabase

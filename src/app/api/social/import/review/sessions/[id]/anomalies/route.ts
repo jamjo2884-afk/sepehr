@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { detectAnomaliesForSession, detectAnomaliesForRowById } from '@/services/import-review/anomaly-detection';
+import {
+  detectAnomaliesForSession,
+  detectAnomaliesForRowById,
+} from '@/services/import-review/anomaly-detection';
 import { updateImportRow } from '@/services/import-review/import-review.service';
+import { getSupabase } from '@/lib/db';
 
 /**
  * GET /api/social/import/review/sessions/[id]/anomalies
@@ -21,7 +25,10 @@ export async function GET(
     return NextResponse.json({ summary });
   } catch (err) {
     console.error('[anomalies] GET error:', err);
-    return NextResponse.json({ error: 'خطا در خواندن anomali‌ها.' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'خطا در خواندن anomali‌ها.' },
+      { status: 500 },
+    );
   }
 }
 
@@ -55,7 +62,7 @@ export async function PATCH(
     }
 
     // Fetch current row to get normalized_data
-    const { supabase } = await import('@/lib/supabase');
+    const supabase = await getSupabase();
 
     // Read current normalized_data
     const { data: row, error: fetchErr } = await supabase
@@ -69,16 +76,21 @@ export async function PATCH(
     }
 
     const nd = (row.normalized_data as Record<string, unknown>) ?? {};
-    const source = (nd.values && typeof nd.values === 'object' && !Array.isArray(nd.values))
-      ? { ...(nd.values as Record<string, unknown>) }
-      : { ...nd };
+    const source =
+      nd.values && typeof nd.values === 'object' && !Array.isArray(nd.values)
+        ? { ...(nd.values as Record<string, unknown>) }
+        : { ...nd };
 
     // Update the specific field
     source[field] = newValue;
 
     // Rebuild normalized_data
     const updatedNd: Record<string, unknown> = { ...nd };
-    if (nd.values && typeof nd.values === 'object' && !Array.isArray(nd.values)) {
+    if (
+      nd.values &&
+      typeof nd.values === 'object' &&
+      !Array.isArray(nd.values)
+    ) {
       updatedNd.values = source;
     } else {
       Object.assign(updatedNd, source);
@@ -96,13 +108,14 @@ export async function PATCH(
       .update({
         resolution_data: {
           anomalies: newAnomalies.length > 0 ? newAnomalies : undefined,
-          anomaly_severity: newAnomalies.length > 0
-            ? newAnomalies.some((a) => a.severity === 'critical')
-              ? 'critical'
-              : newAnomalies.some((a) => a.severity === 'warning')
-                ? 'warning'
-                : 'info'
-            : undefined,
+          anomaly_severity:
+            newAnomalies.length > 0
+              ? newAnomalies.some((a) => a.severity === 'critical')
+                ? 'critical'
+                : newAnomalies.some((a) => a.severity === 'warning')
+                  ? 'warning'
+                  : 'info'
+              : undefined,
         },
       })
       .eq('id', rowId);
@@ -116,6 +129,9 @@ export async function PATCH(
     });
   } catch (err) {
     console.error('[anomalies] PATCH error:', err);
-    return NextResponse.json({ error: 'خطا در اصلاح anomali.' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'خطا در اصلاح anomali.' },
+      { status: 500 },
+    );
   }
 }

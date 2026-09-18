@@ -11,6 +11,7 @@
  * 4. Domain rules: negative values, impossible engagement rates, etc.
  */
 
+import { getSupabase } from '@/lib/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   ImportRow,
@@ -47,9 +48,21 @@ const DROP_RATIO = 3;
 // ─── Metric fields to check ────────────────────────────────────────────────
 
 const METRIC_FIELDS_TO_CHECK: SocialMetricFieldKey[] = [
-  'followers', 'following', 'posts', 'views', 'likes',
-  'comments', 'shares', 'saves', 'reach', 'impressions',
-  'engagementRate', 'storyViews', 'channelMembers', 'retweets', 'subscribers',
+  'followers',
+  'following',
+  'posts',
+  'views',
+  'likes',
+  'comments',
+  'shares',
+  'saves',
+  'reach',
+  'impressions',
+  'engagementRate',
+  'storyViews',
+  'channelMembers',
+  'retweets',
+  'subscribers',
 ];
 
 // ─── Statistical Helpers ────────────────────────────────────────────────────
@@ -65,7 +78,8 @@ interface Stats {
 function computeStats(values: number[]): Stats | null {
   if (values.length === 0) return null;
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
+  const variance =
+    values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
   const stdDev = Math.sqrt(variance);
   return {
     mean,
@@ -85,7 +99,7 @@ function zScore(value: number, stats: Stats): number {
 
 async function getClient(supabase?: SupabaseClient): Promise<SupabaseClient> {
   if (supabase) return supabase;
-  const { supabase: client } = await import('@/lib/supabase');
+  const client = await getSupabase();
   return client;
 }
 
@@ -158,9 +172,12 @@ function detectAnomaliesForRow(
         type: 'negative_value',
         severity: 'critical',
         importValue: importVal,
-        historicalMean: histValues.length > 0 ? computeStats(histValues)!.mean : null,
-        historicalMax: histValues.length > 0 ? computeStats(histValues)!.max : null,
-        historicalMin: histValues.length > 0 ? computeStats(histValues)!.min : null,
+        historicalMean:
+          histValues.length > 0 ? computeStats(histValues)!.mean : null,
+        historicalMax:
+          histValues.length > 0 ? computeStats(histValues)!.max : null,
+        historicalMin:
+          histValues.length > 0 ? computeStats(histValues)!.min : null,
         previousValue: previousPeriodValues?.[field] ?? null,
         deviationFactor: null,
         message: `مقدار منفی (${importVal}) غیرمعتبر است.`,
@@ -176,9 +193,12 @@ function detectAnomaliesForRow(
         type: 'impossible_engagement',
         severity: 'critical',
         importValue: importVal,
-        historicalMean: histValues.length > 0 ? computeStats(histValues)!.mean : null,
-        historicalMax: histValues.length > 0 ? computeStats(histValues)!.max : null,
-        historicalMin: histValues.length > 0 ? computeStats(histValues)!.min : null,
+        historicalMean:
+          histValues.length > 0 ? computeStats(histValues)!.mean : null,
+        historicalMax:
+          histValues.length > 0 ? computeStats(histValues)!.max : null,
+        historicalMin:
+          histValues.length > 0 ? computeStats(histValues)!.min : null,
         previousValue: previousPeriodValues?.[field] ?? null,
         deviationFactor: null,
         message: `نرخ تعامل ${importVal}% بیشتر از ۱۰۰٪ است.`,
@@ -198,9 +218,12 @@ function detectAnomaliesForRow(
           type: 'zero_followers_with_data',
           severity: 'warning',
           importValue: importVal,
-          historicalMean: histValues.length > 0 ? computeStats(histValues)!.mean : null,
-          historicalMax: histValues.length > 0 ? computeStats(histValues)!.max : null,
-          historicalMin: histValues.length > 0 ? computeStats(histValues)!.min : null,
+          historicalMean:
+            histValues.length > 0 ? computeStats(histValues)!.mean : null,
+          historicalMax:
+            histValues.length > 0 ? computeStats(histValues)!.max : null,
+          historicalMin:
+            histValues.length > 0 ? computeStats(histValues)!.min : null,
           previousValue: previousPeriodValues?.[field] ?? null,
           deviationFactor: null,
           message: 'دنبال‌کننده صفر است ولی سایر آمار وجود دارد.',
@@ -222,11 +245,11 @@ function detectAnomaliesForRow(
     if (absZ > Z_THRESHOLD && stats.stdDev > 0) {
       const severity: AnomalySeverity = absZ > 5 ? 'critical' : 'warning';
       const direction = z > 0 ? 'high' : 'low';
-      const type: AnomalyType = direction === 'high' ? 'value_too_high' : 'value_too_low';
+      const type: AnomalyType =
+        direction === 'high' ? 'value_too_high' : 'value_too_low';
 
-      const ratioText = stats.mean > 0
-        ? `${(importVal / stats.mean).toFixed(1)}x`
-        : '';
+      const ratioText =
+        stats.mean > 0 ? `${(importVal / stats.mean).toFixed(1)}x` : '';
 
       anomalies.push({
         field,
@@ -239,9 +262,10 @@ function detectAnomaliesForRow(
         historicalMin: stats.min,
         previousValue: previousPeriodValues?.[field] ?? null,
         deviationFactor: absZ,
-        message: direction === 'high'
-          ? `مقدار ${importVal} بیش از ${absZ.toFixed(1)} برابر انحراف معیار از میانگین تاریخی (${Math.round(stats.mean)}) بالاتر است${ratioText ? ` (${ratioText})` : ''}.`
-          : `مقدار ${importVal} بیش از ${absZ.toFixed(1)} برابر انحراف معیار از میانگین تاریخی (${Math.round(stats.mean)}) پایین‌تر است${ratioText ? ` (${ratioText})` : ''}.`,
+        message:
+          direction === 'high'
+            ? `مقدار ${importVal} بیش از ${absZ.toFixed(1)} برابر انحراف معیار از میانگین تاریخی (${Math.round(stats.mean)}) بالاتر است${ratioText ? ` (${ratioText})` : ''}.`
+            : `مقدار ${importVal} بیش از ${absZ.toFixed(1)} برابر انحراف معیار از میانگین تاریخی (${Math.round(stats.mean)}) پایین‌تر است${ratioText ? ` (${ratioText})` : ''}.`,
       });
       continue;
     }
@@ -275,7 +299,7 @@ function detectAnomaliesForRow(
           historicalMin: stats.min,
           previousValue: previousPeriodValues?.[field] ?? null,
           deviationFactor: 1 / ratio,
-          message: `مقدار ${importVal} کمتر از ${((1 / ratio)).toFixed(1)} برابر میانگین تاریخی (${Math.round(stats.mean)}) است.`,
+          message: `مقدار ${importVal} کمتر از ${(1 / ratio).toFixed(1)} برابر میانگین تاریخی (${Math.round(stats.mean)}) است.`,
         });
       }
     }
@@ -287,9 +311,12 @@ function detectAnomaliesForRow(
       const importVal = importValues[field];
       const prevVal = previousPeriodValues[field];
       if (
-        importVal === null || importVal === undefined ||
-        prevVal === null || prevVal === undefined
-      ) continue;
+        importVal === null ||
+        importVal === undefined ||
+        prevVal === null ||
+        prevVal === undefined
+      )
+        continue;
       if (prevVal <= 0 || importVal <= 0) continue;
 
       const ratio = importVal / prevVal;
@@ -326,7 +353,7 @@ function detectAnomaliesForRow(
           historicalMin: null,
           previousValue: prevVal,
           deviationFactor: 1 / ratio,
-          message: `کاهش ناگهانی: مقدار ${importVal} نسبت به دوره قبل (${prevVal}) بیش از ${((1 / ratio)).toFixed(1)} برابر کاهش یافته.`,
+          message: `کاهش ناگهانی: مقدار ${importVal} نسبت به دوره قبل (${prevVal}) بیش از ${(1 / ratio).toFixed(1)} برابر کاهش یافته.`,
         });
       }
     }
@@ -363,15 +390,21 @@ export async function detectAnomaliesForSession(
 
   if (error) throw error;
   if (!rows || rows.length === 0) {
-    return { totalFlagged: 0, critical: 0, warning: 0, info: 0, byField: {}, byType: {}, reports: [] };
+    return {
+      totalFlagged: 0,
+      critical: 0,
+      warning: 0,
+      info: 0,
+      byField: {},
+      byType: {},
+      reports: [],
+    };
   }
 
   // Collect all matched account IDs
   const accountIds = [
     ...new Set(
-      rows
-        .map((r) => r.matched_account_id)
-        .filter((id): id is string => !!id),
+      rows.map((r) => r.matched_account_id).filter((id): id is string => !!id),
     ),
   ];
 
@@ -389,9 +422,10 @@ export async function detectAnomaliesForSession(
   for (const row of rows) {
     const importRow = row as unknown as ImportRow;
     const nd = (importRow.normalized_data as Record<string, unknown>) ?? {};
-    const source = (nd.values && typeof nd.values === 'object' && !Array.isArray(nd.values))
-      ? nd.values as Record<string, unknown>
-      : nd;
+    const source =
+      nd.values && typeof nd.values === 'object' && !Array.isArray(nd.values)
+        ? (nd.values as Record<string, unknown>)
+        : nd;
 
     // Extract numeric values from import row
     const importValues: Record<string, number | null> = {};
@@ -430,7 +464,11 @@ export async function detectAnomaliesForSession(
     }
 
     // Detect anomalies
-    const anomalies = detectAnomaliesForRow(importValues, histMetrics, previousPeriodValues);
+    const anomalies = detectAnomaliesForRow(
+      importValues,
+      histMetrics,
+      previousPeriodValues,
+    );
 
     if (anomalies.length > 0) {
       const worstSeverity = anomalies.some((a) => a.severity === 'critical')
@@ -491,9 +529,10 @@ export async function detectAnomaliesForRowById(
 
   const importRow = row as unknown as ImportRow;
   const nd = (importRow.normalized_data as Record<string, unknown>) ?? {};
-  const source = (nd.values && typeof nd.values === 'object' && !Array.isArray(nd.values))
-    ? nd.values as Record<string, unknown>
-    : nd;
+  const source =
+    nd.values && typeof nd.values === 'object' && !Array.isArray(nd.values)
+      ? (nd.values as Record<string, unknown>)
+      : nd;
 
   const importValues: Record<string, number | null> = {};
   for (const field of METRIC_FIELDS_TO_CHECK) {
@@ -510,7 +549,7 @@ export async function detectAnomaliesForRowById(
 
   const accountId = importRow.matched_account_id;
   const histMetrics = accountId
-    ? (await fetchHistoricalMetrics([accountId], sb)).get(accountId) ?? []
+    ? ((await fetchHistoricalMetrics([accountId], sb)).get(accountId) ?? [])
     : [];
 
   let previousPeriodValues: Record<string, number | null> | null = null;

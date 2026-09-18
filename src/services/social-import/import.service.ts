@@ -1,7 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getSocialAccounts, METRIC_COLUMN_BY_KEY } from '@/services/social.service';
+import {
+  getSocialAccounts,
+  METRIC_COLUMN_BY_KEY,
+} from '@/services/social.service';
 import { matchImportRowToAccount } from '@/services/social-import/match';
-import { periodRangeForLabel, weeklyRangeForDate } from '@/services/social-metrics';
+import {
+  periodRangeForLabel,
+  weeklyRangeForDate,
+} from '@/services/social-metrics';
 import { PLATFORM_METRIC_FIELDS } from '@/constants/social-fields';
 import type { SocialMetricFieldKey } from '@/constants/social-fields';
 import type {
@@ -10,6 +16,7 @@ import type {
 } from '@/services/social-import/types';
 import type { SocialAccount, SocialMetricValues } from '@/types/social';
 import { normalizeAccountStatus } from '@/services/social-import/normalize';
+import { getSupabase } from '@/lib/db';
 
 /**
  * Bulk-import service — optimized for batch operations.
@@ -66,13 +73,16 @@ async function batchEnsureAccounts(
   }
 
   // Collect unique missing accounts
-  const needed = new Map<string, {
-    brand: string;
-    platform: string;
-    username: string;
-    link?: string | null;
-    sourceStatus?: string | null;
-  }>();
+  const needed = new Map<
+    string,
+    {
+      brand: string;
+      platform: string;
+      username: string;
+      link?: string | null;
+      sourceStatus?: string | null;
+    }
+  >();
 
   for (const row of rows) {
     if (!row.accountIdentifier || !row.brand) continue;
@@ -116,7 +126,10 @@ async function batchEnsureAccounts(
     .select();
 
   if (error) {
-    console.warn('[social-import] Batch insert accounts failed, falling back to individual.', error);
+    console.warn(
+      '[social-import] Batch insert accounts failed, falling back to individual.',
+      error,
+    );
     // Fallback: try individual inserts
     for (const [key, acc] of needed) {
       if (accountMap.has(key)) continue;
@@ -162,19 +175,36 @@ export async function importSocialMetricsRows(
   } = {},
 ): Promise<SocialImportSummary> {
   const accounts = options.accounts ?? (await getSocialAccounts());
-  const supabase =
-    options.supabase ?? (await import('@/lib/supabase')).supabase;
+  const supabase = options.supabase ?? (await getSupabase());
   const onProgress = options.onProgress ?? (() => {});
 
   // Step 1: Batch-create missing accounts
-  onProgress({ phase: 'accounts', current: 0, total: 1, message: 'در حال ساخت حساب‌ها...' });
+  onProgress({
+    phase: 'accounts',
+    current: 0,
+    total: 1,
+    message: 'در حال ساخت حساب‌ها...',
+  });
   const accountMap = await batchEnsureAccounts(supabase, rows, accounts);
   const totalAccounts = [...accountMap.values()].length;
   const newAccounts = totalAccounts - accounts.length;
-  onProgress({ phase: 'accounts', current: 1, total: 1, message: newAccounts > 0 ? `${newAccounts} حساب جدید ساخته شد` : 'حساب‌ها آماده‌اند' });
+  onProgress({
+    phase: 'accounts',
+    current: 1,
+    total: 1,
+    message:
+      newAccounts > 0
+        ? `${newAccounts} حساب جدید ساخته شد`
+        : 'حساب‌ها آماده‌اند',
+  });
 
   // Step 2: Resolve every row to an account
-  onProgress({ phase: 'resolving', current: 0, total: rows.length, message: 'در حال شناسایی حساب‌ها...' });
+  onProgress({
+    phase: 'resolving',
+    current: 0,
+    total: rows.length,
+    message: 'در حال شناسایی حساب‌ها...',
+  });
   const allAccounts = [...accountMap.values()];
   const resolved: Array<{
     row: SocialMetricImportRow;
@@ -185,7 +215,11 @@ export async function importSocialMetricsRows(
       const found = allAccounts.find((a) => a.id === row.resolvedAccountId);
       if (!found) return { row, account: null, error: 'Account پیدا نشد.' };
       if (found.platform !== row.platform) {
-        return { row, account: null, error: 'حساب انتخاب‌شده متعلق به این پلتفرم نیست.' };
+        return {
+          row,
+          account: null,
+          error: 'حساب انتخاب‌شده متعلق به این پلتفرم نیست.',
+        };
       }
       return { row, account: found, error: null };
     }
@@ -209,12 +243,20 @@ export async function importSocialMetricsRows(
     return { row, account: null, error: errorMsg };
   });
 
-  onProgress({ phase: 'resolving', current: rows.length, total: rows.length, message: 'شناسایی حساب‌ها تکمیل شد' });
+  onProgress({
+    phase: 'resolving',
+    current: rows.length,
+    total: rows.length,
+    message: 'شناسایی حساب‌ها تکمیل شد',
+  });
 
   const rejected: Array<{ rowNumber: number; message: string }> = [];
   for (const r of resolved) {
     if (!r.account || r.error) {
-      rejected.push({ rowNumber: r.row.rowNumber, message: r.error ?? 'حساب یافت نشد.' });
+      rejected.push({
+        rowNumber: r.row.rowNumber,
+        message: r.error ?? 'حساب یافت نشد.',
+      });
       continue;
     }
     for (const err of r.row.errors) {
@@ -267,7 +309,12 @@ export async function importSocialMetricsRows(
   let rowsProcessed = 0;
   const totalMetricRows = toCommit.length;
 
-  onProgress({ phase: 'metrics', current: 0, total: totalMetricRows, message: 'در حال ثبت آمار...' });
+  onProgress({
+    phase: 'metrics',
+    current: 0,
+    total: totalMetricRows,
+    message: 'در حال ثبت آمار...',
+  });
 
   for (const [groupKey, groupRows] of groups) {
     const sep = groupKey.indexOf('|');
@@ -278,7 +325,10 @@ export async function importSocialMetricsRows(
     const range =
       period === 'weekly'
         ? weeklyRangeForDate(date)
-        : periodRangeForLabel(period as 'daily' | 'weekly' | 'monthly', periodLabel);
+        : periodRangeForLabel(
+            period as 'daily' | 'weekly' | 'monthly',
+            periodLabel,
+          );
 
     const upsertRows: Array<Record<string, number | string | null>> = [];
 
@@ -319,7 +369,11 @@ export async function importSocialMetricsRows(
       .upsert(upsertRows, { onConflict: 'account_id,period,period_label' });
 
     if (upsertError) {
-      console.warn('[social-import] Batch upsert failed for group', groupKey, upsertError);
+      console.warn(
+        '[social-import] Batch upsert failed for group',
+        groupKey,
+        upsertError,
+      );
       for (const { row: r } of groupRows) {
         errors.push({ rowNumber: r.rowNumber, message: 'ثبت آمار انجام نشد.' });
       }
