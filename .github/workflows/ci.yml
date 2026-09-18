@@ -28,8 +28,13 @@ jobs:
 
       # Build script runs `prisma generate`; typecheck/lint/tests import the
       # generated client, so generate it up front.
+      # prisma.config.ts requires DATABASE_URL to be present (env() throws when
+      # missing) even though `generate` never connects to the database — a
+      # syntactically valid placeholder keeps CI green.
       - name: Generate Prisma client
         run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
 
       - name: Typecheck
         run: npm run typecheck
