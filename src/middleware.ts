@@ -1,6 +1,11 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import {
+  isGuestModeEnabled,
+  isGuestPageBlocked,
+  isWriteMethod,
+} from '@/lib/guest-mode';
 
 /**
  * Route protection middleware.
@@ -76,32 +81,54 @@ export async function middleware(request: NextRequest) {
   // Auth mode — validate the real Supabase session.
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    supabaseUrl!,
-    supabaseAnonKey!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
-        },
+  const supabase = createServerClient(supabaseUrl!, supabaseAnonKey!, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value),
+        );
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options),
+        );
       },
     },
-  );
+  });
 
   // IMPORTANT: nothing should run between createServerClient and getUser() —
   // otherwise the client may refresh the session and set cookies mid-request.
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Guest mode (explicit GUEST_MODE_ENABLED=true): requests without a valid
+  // session are served as the synthetic guest instead of being bounced.
+  // Reads pass here; the real enforcement happens in the DB (RLS as anon) and
+  // again in route-auth (deny-by-default API allowlist). Mutations are 403'd
+  // right here — defense in depth alongside route-auth.
+  if (!user && isGuestModeEnabled()) {
+    if (pathname.startsWith('/api/')) {
+      if (isWriteMethod(request.method)) {
+        return NextResponse.json(
+          { ok: false, error: 'کاربر مهمان اجازهٔ تغییر داده ندارد.' },
+          { status: 403 },
+        );
+      }
+      return NextResponse.next();
+    }
+    // Pages that render data through legacy anon-readable services must not
+    // be served to guests — bounce to /login like the default behavior.
+    if (isGuestPageBlocked(pathname)) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.searchParams.set('next', pathname);
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
 
   // Page routes: redirect to /login when there is no valid session.
   if (!pathname.startsWith('/api/')) {

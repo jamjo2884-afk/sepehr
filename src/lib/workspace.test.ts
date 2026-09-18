@@ -138,4 +138,37 @@ describe('Workspace Resolver', () => {
     const result = await isOwnedByWorkspace('ws-any');
     expect(result).toBe(false);
   });
+
+  it('10. guest user gets the dedicated demo workspace with guest role', async () => {
+    mockAuthUser = { id: 'guest-user-000', email: 'guest@mediadeck.local' };
+    const { getCurrentWorkspace } = await import('@/lib/workspace');
+    const ctx = await getCurrentWorkspace();
+
+    expect(ctx).not.toBeNull();
+    expect(ctx!.userId).toBe('guest-user-000');
+    expect(ctx!.workspaceId).toBe('demo-workspace-000');
+    expect(ctx!.role).toBe('guest');
+    expect(ctx!.workspaceUuid).toBe('deb00d00-0000-4000-8000-deb00d000001');
+  });
+
+  it('11. guest context never returns a real membership row lookup', async () => {
+    mockSelect.mockClear();
+    mockAuthUser = { id: 'guest-user-000', email: 'guest@mediadeck.local' };
+    const { getCurrentWorkspace } = await import('@/lib/workspace');
+    await getCurrentWorkspace();
+
+    // The guest branch must short-circuit before the workspace_members query.
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+
+  it('12. workspaceUuid stays undefined for regular workspaces', async () => {
+    mockAuthUser = { id: 'user-123', email: 'user@test.com' };
+    mockSingle.mockResolvedValue({
+      data: { workspace_id: 'ws-abc', role: 'owner' },
+      error: null,
+    });
+    const { getCurrentWorkspace } = await import('@/lib/workspace');
+    const ctx = await getCurrentWorkspace();
+    expect(ctx!.workspaceUuid).toBeUndefined();
+  });
 });

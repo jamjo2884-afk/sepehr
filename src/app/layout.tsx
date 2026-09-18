@@ -4,6 +4,9 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { RouteGuard } from '@/components/common/route-guard';
+import { GuestBanner } from '@/components/common/guest-banner';
+import { getAuthUser } from '@/lib/auth';
+import { isGuestUser } from '@/lib/guest-mode';
 
 const vazirmatn = localFont({
   src: '../../node_modules/vazirmatn/fonts/variable/Vazirmatn[wght].ttf',
@@ -27,15 +30,25 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Server-side guest detection: the banner renders only when the request
+  // itself resolves to the synthetic guest identity (never client-claimed).
+  let isGuest = false;
+  try {
+    isGuest = isGuestUser(await getAuthUser());
+  } catch {
+    isGuest = false;
+  }
+
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <body className={`${vazirmatn.variable} ${inter.variable} font-sans`}>
         <Providers>
+          <GuestBanner isGuest={isGuest} />
           <RouteGuard>{children}</RouteGuard>
         </Providers>
       </body>

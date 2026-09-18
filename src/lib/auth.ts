@@ -7,6 +7,12 @@
  */
 
 import { NextResponse } from 'next/server';
+import {
+  GUEST_USER_ID,
+  getGuestContext,
+  isGuestModeEnabled,
+  isWriteMethod,
+} from '@/lib/guest-mode';
 
 export interface AuthUser {
   id: string;
@@ -54,7 +60,8 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   try {
     // Server client reads the sb-*-auth-token cookie from the request so
     // the authenticated Supabase user is resolved server-side (RLS-aware).
-    const { createSupabaseServerClient } = await import('@/lib/supabase-server');
+    const { createSupabaseServerClient } =
+      await import('@/lib/supabase-server');
     const supabase = await createSupabaseServerClient();
     const {
       data: { user },
@@ -63,6 +70,14 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     if (!user) {
       // Supabase is configured but no valid session → unauthorized.
       // Do NOT fall back to DEMO_USER.
+      //
+      // Guest mode (explicit runtime opt-in): an unauthenticated visitor gets
+      // the synthetic guest identity instead of null. Reads then run as
+      // Supabase `anon` under RLS, which only exposes the seeded demo
+      // workspace. Writes are rejected separately (route-auth + middleware).
+      if (isGuestModeEnabled()) {
+        return getGuestContext();
+      }
       return null;
     }
 
@@ -75,24 +90,32 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     return null;
   }
 }
-
 /**
  * Require authentication — returns user or sends 401 NextResponse.
  *
  * Usage:
- *   const auth = await requireAuth();
- *   if ('error' in auth) return auth.error;
+ *   const auth = await requireAuth(req);   // legacy call sites: pass req to
+ *   if ('error' in auth) return auth.error; // also block guest mutations
  *   // auth is AuthUser
  */
-export async function requireAuth(): Promise<
-  AuthUser | { error: NextResponse }
-> {
+
+export async function requireAuth(
+  req?: Request,
+): Promise<AuthUser | { error: NextResponse }> {
   const user = await getAuthUser();
   if (!user) {
     return {
       error: NextResponse.json(
         { ok: false, error: 'احراز هویت لازم است.' },
         { status: 401 },
+      ),
+    };
+  }
+  if (req && user.id === GUEST_USER_ID && isWriteMethod(req.method)) {
+    return {
+      error: NextResponse.json(
+        { ok: false, error: 'کاربر مهمان اجازهٔ تغییر داده ندارد.' },
+        { status: 403 },
       ),
     };
   }

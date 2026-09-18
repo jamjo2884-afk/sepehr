@@ -5,12 +5,12 @@
  * In demo mode (which is Media Deck's current mode), returns a synthetic user
  * and ensures the required workspace exists in the FlowBoard database.
  */
-import { prisma as flowPrisma } from "./db";
+import { prisma as flowPrisma } from './db';
 
-const DEMO_USER_ID = "demo-user-000";
-const DEMO_WORKSPACE_ID = "demo-workspace-000";
-const DEMO_USER_EMAIL = "demo@mediadeck.local";
-const DEMO_USER_NAME = "Developer";
+const DEMO_USER_ID = 'demo-user-000';
+const DEMO_WORKSPACE_ID = 'demo-workspace-000';
+const DEMO_USER_EMAIL = 'demo@mediadeck.local';
+const DEMO_USER_NAME = 'Developer';
 
 export interface FlowBoardUser {
   id: string;
@@ -27,15 +27,21 @@ export interface FlowBoardUser {
 export async function getCurrentUser(): Promise<FlowBoardUser | null> {
   try {
     // Import Media Deck's auth system
-    const { getAuthUser, isDemoMode } = await import("@/lib/auth");
+    const { getAuthUser, isDemoMode } = await import('@/lib/auth');
     const mdUser = await getAuthUser();
-    
+
     if (!mdUser) return null;
+
+    // Guest mode: the synthetic guest never gets a FlowBoard identity or DB
+    // rows. FlowBoard reads/writes its own Postgres via Prisma (no RLS), so a
+    // guest must not reach any of it — reads included.
+    const { isGuestUser } = await import('@/lib/guest-mode');
+    if (isGuestUser(mdUser)) return null;
 
     // In demo mode, use the demo user
     const userId = isDemoMode() ? DEMO_USER_ID : mdUser.id;
     const email = isDemoMode() ? DEMO_USER_EMAIL : mdUser.email;
-    const name = isDemoMode() ? DEMO_USER_NAME : mdUser.email.split("@")[0];
+    const name = isDemoMode() ? DEMO_USER_NAME : mdUser.email.split('@')[0];
 
     // Ensure user exists in FlowBoard database
     let user = await flowPrisma.flowUser.findUnique({ where: { id: userId } });
@@ -45,7 +51,7 @@ export async function getCurrentUser(): Promise<FlowBoardUser | null> {
           id: userId,
           email,
           name,
-          passwordHash: "",
+          passwordHash: '',
         },
       });
     }
@@ -66,7 +72,7 @@ export async function getCurrentUser(): Promise<FlowBoardUser | null> {
     // via the `if (!mdUser) return null;` guard). Every other failure — an
     // unreachable database, a provisioning error — must surface as a server
     // error instead of being masked as 401.
-    console.warn("[flowboard/auth] Error resolving current user:", err);
+    console.warn('[flowboard/auth] Error resolving current user:', err);
     throw err;
   }
 }
@@ -77,7 +83,7 @@ export async function getCurrentUser(): Promise<FlowBoardUser | null> {
 export async function requireAuth(): Promise<FlowBoardUser> {
   const user = await getCurrentUser();
   if (!user) {
-    throw new Error("Unauthorized");
+    throw new Error('Unauthorized');
   }
   return user;
 }
@@ -93,8 +99,8 @@ async function devEnsureWorkspace(userId: string) {
     ws = await flowPrisma.flowWorkspace.create({
       data: {
         id: DEMO_WORKSPACE_ID,
-        name: "Default Workspace",
-        slug: "default",
+        name: 'Default Workspace',
+        slug: 'default',
         ownerId: userId,
       },
     });
@@ -113,7 +119,7 @@ async function devEnsureWorkspace(userId: string) {
       data: {
         workspaceId: DEMO_WORKSPACE_ID,
         userId,
-        role: "OWNER",
+        role: 'OWNER',
       },
     });
   }
@@ -134,26 +140,35 @@ export async function getWorkspaceMember(workspaceId: string, userId: string) {
   });
 }
 
-export async function requireWorkspaceMember(workspaceId: string, userId: string) {
+export async function requireWorkspaceMember(
+  workspaceId: string,
+  userId: string,
+) {
   const member = await getWorkspaceMember(workspaceId, userId);
   if (!member) {
-    throw new Error("Not a member of this workspace");
+    throw new Error('Not a member of this workspace');
   }
   return member;
 }
 
-export async function requireWorkspaceAdmin(workspaceId: string, userId: string) {
+export async function requireWorkspaceAdmin(
+  workspaceId: string,
+  userId: string,
+) {
   const member = await requireWorkspaceMember(workspaceId, userId);
-  if (member.role !== "OWNER" && member.role !== "ADMIN") {
-    throw new Error("Insufficient permissions");
+  if (member.role !== 'OWNER' && member.role !== 'ADMIN') {
+    throw new Error('Insufficient permissions');
   }
   return member;
 }
 
-export async function requireWorkspaceOwner(workspaceId: string, userId: string) {
+export async function requireWorkspaceOwner(
+  workspaceId: string,
+  userId: string,
+) {
   const member = await requireWorkspaceMember(workspaceId, userId);
-  if (member.role !== "OWNER") {
-    throw new Error("Only the workspace owner can perform this action");
+  if (member.role !== 'OWNER') {
+    throw new Error('Only the workspace owner can perform this action');
   }
   return member;
 }
@@ -198,7 +213,7 @@ export async function getBoardMember(boardId: string, userId: string) {
 export async function requireBoardAccess(boardId: string, userId: string) {
   const member = await getBoardMember(boardId, userId);
   if (!member) {
-    throw new Error("No access to this board");
+    throw new Error('No access to this board');
   }
   return member;
 }

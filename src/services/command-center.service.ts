@@ -217,9 +217,7 @@ export async function getWeekAhead(
     }
   }
 
-  return items
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(0, 10);
+  return items.sort((a, b) => a.date.localeCompare(b.date)).slice(0, 10);
 }
 
 export interface CommandCenterData {
@@ -251,6 +249,48 @@ export async function getCommandCenterData(input: {
   userId: string | null;
 }): Promise<CommandCenterData> {
   const { workspaceId, userId } = input;
+
+  // Guest mode: return an honest empty dashboard WITHOUT touching sources
+  // whose data path is not RLS-scoped to the guest workspace (finance_* are
+  // brand-text-scoped, social_* tables carry legacy anon-readable tenant
+  // rows, FlowBoard has no RLS). Guests get brands/contents via the allowlist
+  // routes instead.
+  const { isGuestUser } = await import('@/lib/guest-mode');
+  const { getAuthUser } = await import('@/lib/auth');
+  if (isGuestUser(await getAuthUser())) {
+    const { CONTENT_STATUS_LABELS: labels } = await import('@/types/content');
+    const ALL: ContentStatus[] = [
+      'draft',
+      'review',
+      'approved',
+      'scheduled',
+      'published',
+      'rejected',
+      'cancelled',
+      'failed',
+    ];
+    return {
+      kpis: {
+        brandCount: 0,
+        contentCount: 0,
+        totalBudget: 0,
+        totalSpent: 0,
+        remainingBudget: 0,
+        budgetUsagePercent: 0,
+        totalFollowers: 0,
+        totalAccounts: 0,
+      },
+      tasks: ZERO_TASKS,
+      pipeline: ALL.map((status) => ({
+        status,
+        label: labels[status],
+        count: 0,
+      })),
+      attention: [],
+      weekAhead: [],
+      recentActivity: [],
+    };
+  }
 
   const [brands, contents, finance, auditLogs, unread, notifications] =
     await Promise.all([

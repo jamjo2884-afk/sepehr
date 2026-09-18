@@ -8,10 +8,48 @@
 
 import { NextResponse } from 'next/server';
 import { getAuthUser, type AuthUser } from '@/lib/auth';
+import { getCurrentWorkspace, type WorkspaceContext } from '@/lib/workspace';
 import {
-  getCurrentWorkspace,
-  type WorkspaceContext,
-} from '@/lib/workspace';
+  isGuestApiReadAllowed,
+  isGuestUser,
+  isWriteMethod,
+} from '@/lib/guest-mode';
+
+/** Extract the API path from a request for guest-mode matching. */
+function guestApiPath(req: Request): string {
+  try {
+    return new URL(req.url).pathname;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Uniform 403 for any guest request this wrapper will not serve (mutation or
+ * non-allowlisted read). Guests must pass BOTH gates; the middleware gate is
+ * the outer layer, this one is the inner — a route cannot opt out.
+ */
+function guestDeniedResponse(): NextResponse {
+  return NextResponse.json(
+    { ok: false, error: 'کاربر مهمان به این بخش دسترسی ندارد.' },
+    { status: 403 },
+  );
+}
+
+/**
+ * Guest gate shared by every wrapper below. Returns a 403 response when the
+ * caller is the guest user and the request is not an allowed read, else null
+ * to proceed.
+ */
+async function guestGate(
+  user: AuthUser,
+  req: Request,
+): Promise<NextResponse | null> {
+  if (!isGuestUser(user)) return null;
+  if (isWriteMethod(req.method)) return guestDeniedResponse();
+  if (!isGuestApiReadAllowed(guestApiPath(req))) return guestDeniedResponse();
+  return null;
+}
 
 export type AuthenticatedRequest = {
   user: AuthUser;
@@ -41,6 +79,8 @@ export function requireAuth(handler: AuthOnlyHandler) {
         { status: 401 },
       );
     }
+    const denied = await guestGate(user, req);
+    if (denied) return denied;
     return handler(req, { user });
   };
 }
@@ -54,6 +94,8 @@ export function withAuth(handler: RouteHandler) {
         { status: 401 },
       );
     }
+    const denied = await guestGate(user, req);
+    if (denied) return denied;
 
     const workspace = await getCurrentWorkspace();
     if (!workspace) {

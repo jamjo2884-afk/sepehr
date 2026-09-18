@@ -15,6 +15,11 @@ export interface WorkspaceContext {
   workspaceId: string;
   /** The user's role in this workspace. */
   role: string;
+  /**
+   * The actual uuid row id when workspaceId is a canonical label rather than a
+   * uuid (guest mode). Regular workspaces use the uuid as workspaceId itself.
+   */
+  workspaceUuid?: string;
 }
 
 const DEMO_WORKSPACE_ID = 'demo-workspace-000';
@@ -31,6 +36,25 @@ export async function getCurrentWorkspace(): Promise<WorkspaceContext | null> {
   const user = await getAuthUser();
   if (!user) return null;
 
+  // Guest mode: return the dedicated demo workspace without any DB lookup —
+  // the guest has no workspace_members row. Data scoping happens in the DB
+  // via the anon-RLS policies on the seeded demo workspace uuid.
+  const {
+    isGuestUser,
+    GUEST_ROLE,
+    GUEST_USER_ID,
+    GUEST_WORKSPACE_ID,
+    GUEST_WORKSPACE_UUID,
+  } = await import('@/lib/guest-mode');
+  if (isGuestUser(user)) {
+    return {
+      userId: GUEST_USER_ID,
+      workspaceId: GUEST_WORKSPACE_ID,
+      role: GUEST_ROLE,
+      workspaceUuid: GUEST_WORKSPACE_UUID,
+    };
+  }
+
   // Demo mode: return synthetic workspace
   if (user.id === 'demo-user-000') {
     return {
@@ -42,7 +66,8 @@ export async function getCurrentWorkspace(): Promise<WorkspaceContext | null> {
 
   // Real mode: look up workspace membership
   try {
-    const { createSupabaseServerClient } = await import('@/lib/supabase-server');
+    const { createSupabaseServerClient } =
+      await import('@/lib/supabase-server');
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from('workspace_members')
@@ -52,7 +77,10 @@ export async function getCurrentWorkspace(): Promise<WorkspaceContext | null> {
       .single();
 
     if (error || !data) {
-      console.warn('[workspace] No workspace membership found for user:', user.id);
+      console.warn(
+        '[workspace] No workspace membership found for user:',
+        user.id,
+      );
       return null;
     }
 
