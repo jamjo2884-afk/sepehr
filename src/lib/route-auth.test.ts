@@ -117,7 +117,7 @@ describe('guest gating in route-auth wrappers', () => {
     mockAuthUser = guestUser();
     mockWorkspace = {
       userId: 'guest-user-000',
-      workspaceId: 'demo-workspace-000',
+      workspaceId: 'deb00d00-0000-4000-8000-deb00d000001',
       role: 'guest',
     };
     const handler = await makeWithAuthHandler();
@@ -132,7 +132,7 @@ describe('guest gating in route-auth wrappers', () => {
     mockAuthUser = guestUser();
     mockWorkspace = {
       userId: 'guest-user-000',
-      workspaceId: 'demo-workspace-000',
+      workspaceId: 'deb00d00-0000-4000-8000-deb00d000001',
       role: 'guest',
     };
     const handler = await makeWithAuthHandler();
@@ -146,7 +146,7 @@ describe('guest gating in route-auth wrappers', () => {
     mockAuthUser = guestUser();
     mockWorkspace = {
       userId: 'guest-user-000',
-      workspaceId: 'demo-workspace-000',
+      workspaceId: 'deb00d00-0000-4000-8000-deb00d000001',
       role: 'guest',
     };
     const handler = await makeWithAuthHandler();
@@ -155,11 +155,39 @@ describe('guest gating in route-auth wrappers', () => {
     expect((await res.json()).touched).toBe(true);
   });
 
+  it('3b. guest read on /api/brands/summary is denied (unscoped Prisma path)', async () => {
+    mockAuthUser = guestUser();
+    mockWorkspace = {
+      userId: 'guest-user-000',
+      workspaceId: 'deb00d00-0000-4000-8000-deb00d000001',
+      role: 'guest',
+    };
+    const handler = await makeWithAuthHandler();
+    const res = await handler(
+      new Request('http://localhost/api/brands/summary'),
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('3c. guest read on a deep brands path is denied (not on allowlist)', async () => {
+    mockAuthUser = guestUser();
+    mockWorkspace = {
+      userId: 'guest-user-000',
+      workspaceId: 'deb00d00-0000-4000-8000-deb00d000001',
+      role: 'guest',
+    };
+    const handler = await makeWithAuthHandler();
+    const res = await handler(
+      new Request('http://localhost/api/brands/abc-123/performance'),
+    );
+    expect(res.status).toBe(403);
+  });
+
   it('4. guest GET on /api/content/tasks-count is denied (Prisma path)', async () => {
     mockAuthUser = guestUser();
     mockWorkspace = {
       userId: 'guest-user-000',
-      workspaceId: 'demo-workspace-000',
+      workspaceId: 'deb00d00-0000-4000-8000-deb00d000001',
       role: 'guest',
     };
     const handler = await makeWithAuthHandler();
@@ -173,7 +201,7 @@ describe('guest gating in route-auth wrappers', () => {
     mockAuthUser = guestUser();
     mockWorkspace = {
       userId: 'guest-user-000',
-      workspaceId: 'demo-workspace-000',
+      workspaceId: 'deb00d00-0000-4000-8000-deb00d000001',
       role: 'guest',
     };
     const handler = await makeWithAuthHandler();

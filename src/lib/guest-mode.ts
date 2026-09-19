@@ -22,15 +22,20 @@
 export const GUEST_USER_ID = 'guest-user-000';
 
 /**
- * Canonical guest workspace id as exposed by the API/workspace resolver.
- * NOTE: `workspaces.id` / `brands.workspace_id` / `contents.workspace_id` are
- * `uuid` columns, so the canonical string above cannot be a row id. The seeded
- * demo workspace row uses the fixed uuid below; the guest WorkspaceContext
- * carries both (workspaceId = canonical, workspaceUuid = DB value).
+ * Canonical demo-workspace SLUG (the seeded workspace row's slug in the DB).
+ * NOTE: this label is NOT a uuid and is never used for data scoping — every
+ * `.eq('workspace_id', …)` filter for guests uses GUEST_WORKSPACE_UUID below.
+ * It exists only as the human-readable canonical name of the demo workspace.
  */
 export const GUEST_WORKSPACE_ID = 'demo-workspace-000';
 
-/** Fixed uuid of the seeded demo workspace row (see the guest seed migration). */
+/**
+ * Fixed uuid of the seeded demo workspace row (see the guest seed migration).
+ * This is THE guest scoping id: WorkspaceContext.workspaceId for the guest is
+ * this uuid, so every service-level workspace filter targets exactly the
+ * seeded demo rows — matching the anon RLS policies. No request parameter can
+ * ever override it (it is a compile-time constant, not request-derived).
+ */
 export const GUEST_WORKSPACE_UUID = 'deb00d00-0000-4000-8000-deb00d000001';
 
 /** Synthetic email for the guest identity (never used to log in). */
@@ -71,19 +76,27 @@ export function isGuestUser(user: { id: string } | null | undefined): boolean {
  * Only routes whose full data path is either RLS-scoped to the guest
  * workspace uuid or provably empty for anon are allowed. Explicitly excluded
  * despite matching a shape below:
+ * - /api/brands/summary      → its handler contains an UNSCOPED FlowBoard
+ *   Prisma block (prisma.flowCard.findMany with no workspace filter; FlowBoard
+ *   tables have no RLS) — excluded inside the [id] pattern via lookahead.
  * - /api/content/tasks-count  → reads FlowBoard cards via Prisma (no RLS)
  * - /api/brands/[id]/performance|related|status → social/finance/Prisma paths
- * - everything under /api/social/*, /api/intelligence, /api/command-center is
- *   handled separately (command-center has a guest branch; social/intelligence
- *   read legacy anon-readable tenant tables and must stay blocked).
+ *   (also unreachable: the [id] pattern matches exactly ONE extra segment,
+ *   never deeper paths — enforced at middleware too, defense in depth)
+ * - everything under /api/social/*, /api/intelligence — they read legacy
+ *   anon-readable tenant tables and must stay blocked (command-center has an
+ *   explicit guest branch that returns zeros without touching those tables).
  * ========================================================================= */
 
 const GUEST_API_READ_DENYLIST: RegExp[] = [/^\/api\/content\/tasks-count\/?$/];
 
 const GUEST_API_READ_ALLOWLIST: RegExp[] = [
   /^\/api\/brands\/?$/,
-  /^\/api\/brands\/summary\/?$/,
-  /^\/api\/brands\/[^/]+\/?$/,
+  // Exactly ONE extra segment (a brand-id lookup). `summary` is excluded here
+  // — not via the denylist — so the allowlist itself stays the single source
+  // of truth for which routes are guest-safe: its handler contains an
+  // UNSCOPED FlowBoard Prisma block (no workspace filter, no RLS).
+  /^\/api\/brands\/(?!summary\/?$)[^/]+\/?$/,
   /^\/api\/content\/?$/,
   /^\/api\/content\/[^/]+\/?$/,
   /^\/api\/command-center\/?$/,

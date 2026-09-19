@@ -58,10 +58,14 @@ export default function BrandsPage() {
   useEffect(() => {
     let active = true;
     Promise.all([
-      fetch('/api/social/analytics').then((r) => r.json()),
-      fetch('/api/brands/summary').then((r) => r.json()),
+      fetch('/api/social/analytics')
+        .then((r) => (r.ok ? r.json() : { ok: false }))
+        .catch(() => ({ ok: false })),
+      fetch('/api/brands/summary')
+        .then((r) => (r.ok ? r.json() : { ok: false }))
+        .catch(() => ({ ok: false })),
     ])
-      .then(([analyticsData, summaryData]) => {
+      .then(async ([analyticsData, summaryData]) => {
         if (!active) return;
         if (analyticsData.ok) {
           setAccounts(analyticsData.accounts);
@@ -69,6 +73,41 @@ export default function BrandsPage() {
         }
         if (summaryData.ok) {
           setSummary(summaryData.summary ?? {});
+        }
+        // Degraded viewers (e.g. the read-only guest): /api/social/analytics is
+        // workspace-member-only. Fall back to the guest-safe /api/brands allowlist
+        // route so the demo still shows the workspace's brands (zeroed metrics).
+        if (!analyticsData.ok) {
+          try {
+            const res = await fetch('/api/brands');
+            if (res.ok) {
+              const data = await res.json();
+              setAccounts(
+                (data.brands ?? []).map(
+                  (b: {
+                    id: string;
+                    name: string;
+                    slug: string;
+                    status: string;
+                  }) => ({
+                    id: b.id,
+                    brand: b.name,
+                    brandId: b.id,
+                    platform: 'instagram',
+                    username: b.slug ?? b.name,
+                    displayName: b.name,
+                    url: null,
+                    externalId: null,
+                    status: b.status === 'inactive' ? 'inactive' : 'active',
+                    createdAt: '',
+                    updatedAt: '',
+                  }),
+                ),
+              );
+            }
+          } catch {
+            // Keep the honest empty state when even the fallback is unavailable.
+          }
         }
         setLoading(false);
       })

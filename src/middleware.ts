@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import {
+  isGuestApiReadAllowed,
   isGuestModeEnabled,
   isGuestPageBlocked,
   isWriteMethod,
@@ -114,6 +115,16 @@ export async function middleware(request: NextRequest) {
       if (isWriteMethod(request.method)) {
         return NextResponse.json(
           { ok: false, error: 'کاربر مهمان اجازهٔ تغییر داده ندارد.' },
+          { status: 403 },
+        );
+      }
+      // Deny-by-default allowlist at the middleware layer too — deep paths
+      // like /api/brands/[id]/performance (which route through the legacy
+      // requireAuth wrapper without an allowlist check) get 403 here and
+      // never reach their handlers.
+      if (!isGuestApiReadAllowed(pathname)) {
+        return NextResponse.json(
+          { ok: false, error: 'کاربر مهمان به این بخش دسترسی ندارد.' },
           { status: 403 },
         );
       }

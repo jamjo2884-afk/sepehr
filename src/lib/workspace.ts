@@ -11,15 +11,15 @@
 export interface WorkspaceContext {
   /** The current user's ID (auth.uid or demo user). */
   userId: string;
-  /** The active workspace ID. */
+  /**
+   * The active workspace ID. For the guest this is the fixed demo-workspace
+   * UUID (GUEST_WORKSPACE_UUID) — the actual row id used by every
+   * `.eq('workspace_id', …)` filter, matching the anon RLS policies. Regular
+   * workspaces use their uuid membership row directly.
+   */
   workspaceId: string;
   /** The user's role in this workspace. */
   role: string;
-  /**
-   * The actual uuid row id when workspaceId is a canonical label rather than a
-   * uuid (guest mode). Regular workspaces use the uuid as workspaceId itself.
-   */
-  workspaceUuid?: string;
 }
 
 const DEMO_WORKSPACE_ID = 'demo-workspace-000';
@@ -37,21 +37,21 @@ export async function getCurrentWorkspace(): Promise<WorkspaceContext | null> {
   if (!user) return null;
 
   // Guest mode: return the dedicated demo workspace without any DB lookup —
-  // the guest has no workspace_members row. Data scoping happens in the DB
-  // via the anon-RLS policies on the seeded demo workspace uuid.
+  // the guest has no workspace_members row. workspaceId is the fixed demo
+  // workspace UUID (GUEST_WORKSPACE_UUID), so every service-level
+  // `.eq('workspace_id', …)` filter targets exactly the seeded demo rows and
+  // matches the anon RLS policies. No request input can influence it.
   const {
     isGuestUser,
     GUEST_ROLE,
     GUEST_USER_ID,
-    GUEST_WORKSPACE_ID,
     GUEST_WORKSPACE_UUID,
   } = await import('@/lib/guest-mode');
   if (isGuestUser(user)) {
     return {
       userId: GUEST_USER_ID,
-      workspaceId: GUEST_WORKSPACE_ID,
+      workspaceId: GUEST_WORKSPACE_UUID,
       role: GUEST_ROLE,
-      workspaceUuid: GUEST_WORKSPACE_UUID,
     };
   }
 

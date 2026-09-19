@@ -146,9 +146,8 @@ describe('Workspace Resolver', () => {
 
     expect(ctx).not.toBeNull();
     expect(ctx!.userId).toBe('guest-user-000');
-    expect(ctx!.workspaceId).toBe('demo-workspace-000');
+    expect(ctx!.workspaceId).toBe('deb00d00-0000-4000-8000-deb00d000001');
     expect(ctx!.role).toBe('guest');
-    expect(ctx!.workspaceUuid).toBe('deb00d00-0000-4000-8000-deb00d000001');
   });
 
   it('11. guest context never returns a real membership row lookup', async () => {
@@ -161,7 +160,7 @@ describe('Workspace Resolver', () => {
     expect(mockSelect).not.toHaveBeenCalled();
   });
 
-  it('12. workspaceUuid stays undefined for regular workspaces', async () => {
+  it('12. regular workspaces return their membership uuid directly', async () => {
     mockAuthUser = { id: 'user-123', email: 'user@test.com' };
     mockSingle.mockResolvedValue({
       data: { workspace_id: 'ws-abc', role: 'owner' },
@@ -169,6 +168,6 @@ describe('Workspace Resolver', () => {
     });
     const { getCurrentWorkspace } = await import('@/lib/workspace');
     const ctx = await getCurrentWorkspace();
-    expect(ctx!.workspaceUuid).toBeUndefined();
+    expect(ctx!.workspaceId).toBe('ws-abc');
   });
 });

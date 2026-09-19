@@ -79,9 +79,11 @@ describe('write blocking', () => {
 });
 
 describe('deny-by-default API allowlist', () => {
-  it('allows exactly the guest read routes', () => {
+  it('allows exactly the five guest read routes (summary NOT among them)', () => {
     expect(isGuestApiReadAllowed('/api/brands')).toBe(true);
-    expect(isGuestApiReadAllowed('/api/brands/summary')).toBe(true);
+    // summary carries an unscoped FlowBoard Prisma block — never guest-safe:
+    expect(isGuestApiReadAllowed('/api/brands/summary')).toBe(false);
+    expect(isGuestApiReadAllowed('/api/brands/summary/extra')).toBe(false);
     expect(isGuestApiReadAllowed('/api/brands/abc-123')).toBe(true);
     expect(isGuestApiReadAllowed('/api/content')).toBe(true);
     expect(isGuestApiReadAllowed('/api/content/xyz')).toBe(true);
