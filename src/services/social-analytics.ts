@@ -144,6 +144,16 @@ export function metricsInMonthRange(
  * Keep only the accounts matching the selected brands / platforms.
  * An empty brands array means "all brands"; same for platforms.
  */
+/**
+ * Filter accounts by brand and platform selections.
+ *
+ * Brand matching is TOLERANT: the selection may carry the resolved brand
+ * NAME (what every filter chip displays) or the brandId (UUID) — both match.
+ * The legacy `a.brand || a.brandId || ''` comparison broke every brand selection
+ * once brand_id was backfilled (migration 20260916120000): the UI sends the
+ * displayed NAME while the UUID-first key compared it against the id, so
+ * zero accounts matched and all KPIs silently showed 0.
+ */
 export function filterAccounts(
   accounts: SocialAccount[],
   brands: string[],
@@ -151,7 +161,9 @@ export function filterAccounts(
 ): SocialAccount[] {
   return accounts.filter(
     (a) =>
-      (brands.length === 0 || brands.includes(a.brandId ?? a.brand)) &&
+      (brands.length === 0 ||
+        (a.brandId != null && brands.includes(a.brandId)) ||
+        brands.includes(a.brand)) &&
       (platforms.length === 0 || platforms.includes(a.platform)),
   );
 }
@@ -303,10 +315,10 @@ export function buildBrandTrends(
   metrics: SocialMetric[],
   range: SocialMonthRange,
 ): SocialBrandTrend[] {
-  const brands = [...new Set(accounts.map((a) => a.brandId ?? a.brand))];
+  const brands = [...new Set(accounts.map((a) => a.brand || a.brandId || ''))];
   const idsByBrand = new Map<string, Set<string>>();
   for (const a of accounts) {
-    const key = a.brandId ?? a.brand;
+    const key = a.brand || a.brandId || '';
     const set = idsByBrand.get(key) ?? new Set<string>();
     set.add(a.id);
     idsByBrand.set(key, set);
@@ -411,34 +423,36 @@ export function buildEngagementTrends(
   metrics: SocialMetric[],
   range: SocialMonthRange,
 ): SocialEngagementTrend[] {
-  const brands = [...new Set(accounts.map((a) => a.brandId ?? a.brand))];
+  const brands = [...new Set(accounts.map((a) => a.brand || a.brandId || ''))];
   const idsByBrand = new Map<string, Set<string>>();
   for (const a of accounts) {
-    const key = a.brandId ?? a.brand;
+    const key = a.brand || a.brandId || '';
     const set = idsByBrand.get(key) ?? new Set<string>();
     set.add(a.id);
     idsByBrand.set(key, set);
   }
   const inRange = metricsInMonthRange(metrics, range);
-  return brands.map((brandId) => {
-    const ids = idsByBrand.get(brandId) ?? new Set<string>();
-    const byMonth = new Map<string, number>();
-    for (const m of inRange) {
-      if (!ids.has(m.accountId)) continue;
-      const eng = totalEngagement(m);
-      if (eng > 0) {
-        byMonth.set(m.periodLabel, (byMonth.get(m.periodLabel) ?? 0) + eng);
+  return brands
+    .map((brandId) => {
+      const ids = idsByBrand.get(brandId) ?? new Set<string>();
+      const byMonth = new Map<string, number>();
+      for (const m of inRange) {
+        if (!ids.has(m.accountId)) continue;
+        const eng = totalEngagement(m);
+        if (eng > 0) {
+          byMonth.set(m.periodLabel, (byMonth.get(m.periodLabel) ?? 0) + eng);
+        }
       }
-    }
-    const points = [...byMonth.entries()]
-      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-      .map(([month, engagement]) => ({
-        month,
-        monthLabel: jalaliMonthName(month),
-        engagement,
-      }));
-    return { brand: brandId, points };
-  }).filter((t) => t.points.length > 0);
+      const points = [...byMonth.entries()]
+        .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+        .map(([month, engagement]) => ({
+          month,
+          monthLabel: jalaliMonthName(month),
+          engagement,
+        }));
+      return { brand: brandId, points };
+    })
+    .filter((t) => t.points.length > 0);
 }
 
 /* =========================================================================
@@ -461,7 +475,9 @@ export function buildBrandTrendSeries(
   metric: SocialBrandTrendMetric,
 ): Array<{ month: string; monthLabel: string; value: number | null }> {
   const ids = new Set(
-    accounts.filter((a) => (a.brandId ?? a.brand) === brand).map((a) => a.id),
+    accounts
+      .filter((a) => (a.brand || a.brandId || '') === brand)
+      .map((a) => a.id),
   );
   const inBrand = metrics.filter((m) => ids.has(m.accountId));
   const byMonth = new Map<string, SocialMetric[]>();
@@ -586,7 +602,9 @@ export function buildBrandOverview(
   metrics: SocialMetric[],
   brand: string,
 ): SocialBrandOverview {
-  const brandAccounts = accounts.filter((a) => (a.brandId ?? a.brand) === brand);
+  const brandAccounts = accounts.filter(
+    (a) => (a.brand || a.brandId || '') === brand,
+  );
   const brandMetrics = metrics.filter((m) =>
     brandAccounts.some((a) => a.id === m.accountId),
   );
@@ -643,7 +661,9 @@ export function buildBrandPlatformPerformance(
   metrics: SocialMetric[],
   brand: string,
 ): SocialBrandPlatformRow[] {
-  const brandAccounts = accounts.filter((a) => (a.brandId ?? a.brand) === brand);
+  const brandAccounts = accounts.filter(
+    (a) => (a.brand || a.brandId || '') === brand,
+  );
   const platforms = [...new Set(brandAccounts.map((a) => a.platform))];
 
   return platforms
@@ -703,9 +723,9 @@ export function buildBrandPeerComparison(
   metrics: SocialMetric[],
   brand: string,
 ): SocialPeerComparisonItem[] {
-  const brands = [...new Set(accounts.map((a) => a.brandId ?? a.brand))].filter(
-    (b) => b !== brand,
-  );
+  const brands = [
+    ...new Set(accounts.map((a) => a.brand || a.brandId || '')),
+  ].filter((b) => b !== brand);
   const labels: Array<{ key: SocialKpiKey; label: string }> = [
     { key: 'followers', label: 'دنبال‌کنندگان' },
     { key: 'views', label: 'بازدید' },
@@ -756,7 +776,7 @@ export function buildBrandRankings(
   metrics: SocialMetric[],
   brand: string,
 ): SocialBrandRanking[] {
-  const brands = [...new Set(accounts.map((a) => a.brandId ?? a.brand))];
+  const brands = [...new Set(accounts.map((a) => a.brand || a.brandId || ''))];
   const labels: Array<{ key: SocialKpiKey; label: string }> = [
     { key: 'followers', label: 'دنبال‌کنندگان' },
     { key: 'views', label: 'بازدید' },
@@ -799,7 +819,9 @@ export function buildBrandPlatformTimeline(
   metrics: SocialMetric[],
   brand: string,
 ): SocialBrandPlatformTimelineRow[] {
-  const brandAccounts = accounts.filter((a) => (a.brandId ?? a.brand) === brand);
+  const brandAccounts = accounts.filter(
+    (a) => (a.brand || a.brandId || '') === brand,
+  );
   const platforms = [...new Set(brandAccounts.map((a) => a.platform))];
   const now = new Date();
 
@@ -921,7 +943,9 @@ export function latestBrandPeriods(
   brand: string,
 ): { latest: string | null; previous: string | null } {
   const ids = new Set(
-    accounts.filter((a) => (a.brandId ?? a.brand) === brand).map((a) => a.id),
+    accounts
+      .filter((a) => (a.brand || a.brandId || '') === brand)
+      .map((a) => a.id),
   );
   const brandMetrics = metrics.filter((m) => ids.has(m.accountId));
   return latestTwoPeriods(brandMetrics);
@@ -940,7 +964,9 @@ export function compareBrandPeriods(
   brand: string,
 ): SocialMetricValueComparison[] {
   const ids = new Set(
-    accounts.filter((a) => (a.brandId ?? a.brand) === brand).map((a) => a.id),
+    accounts
+      .filter((a) => (a.brand || a.brandId || '') === brand)
+      .map((a) => a.id),
   );
   const brandMetrics = metrics.filter((m) => ids.has(m.accountId));
   const { latest, previous } = latestTwoPeriods(brandMetrics);
@@ -1050,10 +1076,12 @@ export function buildBrandStats(
   current: SocialMonthRange,
   previous: SocialMonthRange,
 ): SocialBrandStat[] {
-  const brands = [...new Set(accounts.map((a) => a.brandId ?? a.brand))];
+  const brands = [...new Set(accounts.map((a) => a.brand || a.brandId || ''))];
   return brands
     .map((brand) => {
-      const brandAccounts = accounts.filter((a) => (a.brandId ?? a.brand) === brand);
+      const brandAccounts = accounts.filter(
+        (a) => (a.brand || a.brandId || '') === brand,
+      );
       const kpis = computeKpisForAccounts(brandAccounts, metrics, current);
       const prevKpis = computeKpisForAccounts(brandAccounts, metrics, previous);
       return { brand, ...toEntityStat(kpis, prevKpis) };
