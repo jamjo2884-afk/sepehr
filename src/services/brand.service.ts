@@ -242,36 +242,37 @@ export async function getBrandById(id: string): Promise<Brand | null> {
   try {
     const supabase = await getSupabase();
     if (await isTableAvailable('brands')) {
-      const { data, error } = await supabase
-        .from('brands')
-        .select('*')
-        .eq('id', id)
-        .single();
-      if (error) throw error;
-      if (data) return brandFromRow(data as unknown as BrandRow);
-      // Not found by id — the brands list derives its cards from
-      // social_accounts.brand (name strings) and links cards by name, so a
-      // brand can exist in Social before any `brands` row is created. Fall
-      // back to a name lookup so those brands resolve instead of 404ing.
-      // Only attempted for non-UUID ids (a UUID never collides with a name).
-      if (!UUID_RE.test(id)) {
-        const { data: byName } = await supabase
+      // UUID-shaped segment → id lookup ONLY. A non-UUID segment (legacy
+      // name link) must NEVER hit the id column: PostgREST rejects it with
+      // 22P02 and that throw used to SKIP the name fallback below, breaking
+      // every name-linked brand detail page.
+      if (UUID_RE.test(id)) {
+        const { data, error } = await supabase
           .from('brands')
           .select('*')
-          .eq('name', id)
+          .eq('id', id)
+          .single();
+        if (error) throw error;
+        return data ? brandFromRow(data as unknown as BrandRow) : null;
+      }
+      // Name segment (legacy link / social-only brand): resolve by name,
+      // then by the decoded segment for double-encoded clients.
+      const { data: byName } = await supabase
+        .from('brands')
+        .select('*')
+        .eq('name', id)
+        .maybeSingle();
+      if (byName) return brandFromRow(byName as unknown as BrandRow);
+      // Some clients hit the API with the segment still percent-encoded
+      // (double encoding). One more decode lets the name match.
+      const decoded = decodeRouteId(id);
+      if (decoded !== id) {
+        const { data: byDecoded } = await supabase
+          .from('brands')
+          .select('*')
+          .eq('name', decoded)
           .maybeSingle();
-        if (byName) return brandFromRow(byName as unknown as BrandRow);
-        // Some clients hit the API with the segment still percent-encoded
-        // (double encoding). One more decode lets the name match.
-        const decoded = decodeRouteId(id);
-        if (decoded !== id) {
-          const { data: byDecoded } = await supabase
-            .from('brands')
-            .select('*')
-            .eq('name', decoded)
-            .maybeSingle();
-          if (byDecoded) return brandFromRow(byDecoded as unknown as BrandRow);
-        }
+        if (byDecoded) return brandFromRow(byDecoded as unknown as BrandRow);
       }
       return null;
     }

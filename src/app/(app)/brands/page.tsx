@@ -21,6 +21,7 @@ import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { BrandLogo } from '@/components/common/brand-logo';
 import { getBrandColor, isBrandIgnored } from '@/constants/brand-colors';
 import { formatNumber, toPersianDigits } from '@/utils/persian';
+import { brandDetailHref } from '@/utils/brand-link';
 import { BrandManagement } from '@/components/brands/brand-management';
 import { Progress } from '@/components/ui/progress';
 
@@ -52,6 +53,10 @@ export default function BrandsPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [metrics, setMetrics] = useState<SocialMetric[]>([]);
   const [summary, setSummary] = useState<Record<string, BrandSummary>>({});
+  // Brand NAME → brands-row UUID (from the RLS-scoped /api/brands) so every
+  // card links by UUID; legacy cards whose accounts were never backfilled
+  // have no brand_id on the account itself.
+  const [brandIds, setBrandIds] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [showManagement, setShowManagement] = useState(false);
 
@@ -64,8 +69,13 @@ export default function BrandsPage() {
       fetch('/api/brands/summary')
         .then((r) => (r.ok ? r.json() : { ok: false }))
         .catch(() => ({ ok: false })),
+      // Always fetched: drives the UUID-based detail links for EVERY card
+      // (not only the guest fallback), and doubles as the guest fallback.
+      fetch('/api/brands')
+        .then((r) => (r.ok ? r.json() : { ok: false }))
+        .catch(() => ({ ok: false })),
     ])
-      .then(async ([analyticsData, summaryData]) => {
+      .then(async ([analyticsData, summaryData, brandsData]) => {
         if (!active) return;
         if (analyticsData.ok) {
           setAccounts(analyticsData.accounts);
@@ -74,40 +84,51 @@ export default function BrandsPage() {
         if (summaryData.ok) {
           setSummary(summaryData.summary ?? {});
         }
+        if (brandsData.ok) {
+          const map = new Map<string, string>();
+          for (const b of (brandsData.brands ?? []) as Array<{
+            id: string;
+            name: string;
+          }>) {
+            // Workspace RLS keeps names unique; first-wins is just a guard.
+            if (!map.has(b.name)) map.set(b.name, b.id);
+          }
+          setBrandIds(map);
+        }
         // Degraded viewers (e.g. the read-only guest): /api/social/analytics is
         // workspace-member-only. Fall back to the guest-safe /api/brands allowlist
         // route so the demo still shows the workspace's brands (zeroed metrics).
         if (!analyticsData.ok) {
-          try {
-            const res = await fetch('/api/brands');
-            if (res.ok) {
-              const data = await res.json();
-              setAccounts(
-                (data.brands ?? []).map(
-                  (b: {
-                    id: string;
-                    name: string;
-                    slug: string;
-                    status: string;
-                  }) => ({
-                    id: b.id,
-                    brand: b.name,
-                    brandId: b.id,
-                    platform: 'instagram',
-                    username: b.slug ?? b.name,
-                    displayName: b.name,
-                    url: null,
-                    externalId: null,
-                    status: b.status === 'inactive' ? 'inactive' : 'active',
-                    createdAt: '',
-                    updatedAt: '',
-                  }),
-                ),
-              );
-            }
-          } catch {
-            // Keep the honest empty state when even the fallback is unavailable.
+          const rows = (
+            brandsData.ok ? (brandsData.brands ?? []) : []
+          ) as Array<{
+            id: string;
+            name: string;
+            slug: string;
+            status: string;
+          }>;
+          if (rows.length > 0) {
+            setAccounts(
+              rows.map((b) => ({
+                id: b.id,
+                brand: b.name,
+                brandId: b.id,
+                platform: 'instagram',
+                username: b.slug ?? b.name,
+                displayName: b.name,
+                url: null,
+                externalId: null,
+                status: b.status === 'inactive' ? 'inactive' : 'active',
+                connectionStatus: 'connected',
+                lastSyncAt: null,
+                lastSyncStatus: null,
+                lastSuccessfulSyncAt: null,
+                createdAt: '',
+                updatedAt: '',
+              })),
+            );
           }
+          // Keep the honest empty state when even the fallback is unavailable.
         }
         setLoading(false);
       })
@@ -254,7 +275,12 @@ export default function BrandsPage() {
               transition={{ duration: 0.3, delay: i * 0.04 }}
             >
               <Link
-                href={`/brands/${brand.accounts[0]?.brandId ?? encodeURIComponent(brand.name)}`}
+                href={brandDetailHref(
+                  brand.name,
+                  brandIds.get(brand.name) ??
+                    brand.accounts[0]?.brandId ??
+                    null,
+                )}
                 className="group block rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
                 style={{
                   background: `linear-gradient(135deg, ${bc.light}, transparent)`,

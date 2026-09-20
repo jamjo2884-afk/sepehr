@@ -83,7 +83,10 @@ export async function GET(
     }
 
     const [profile, accounts, metrics] = await Promise.all([
-      getBrandStatusProfile(params.id),
+      // NOTE: the resolved brand.id — NOT the raw URL segment. The segment may
+      // be a legacy name link (resolved by getBrandById's name fallback);
+      // feeding a name into the brand_id query throws 22P02 → 500.
+      getBrandStatusProfile(brand.id),
       getSocialAccounts(),
       getSocialMetrics(undefined, 'monthly'),
     ]);
@@ -93,7 +96,9 @@ export async function GET(
       (a) => (a.brandId && a.brandId === brand.id) || a.brand === brand.name,
     );
     const brandAccountIds = new Set(brandAccounts.map((a) => a.id));
-    const brandMetrics = metrics.filter((m) => brandAccountIds.has(m.accountId));
+    const brandMetrics = metrics.filter((m) =>
+      brandAccountIds.has(m.accountId),
+    );
 
     const { socialPlatforms, socialSummary } = buildBrandSocialStatus(
       brandAccounts,
@@ -158,7 +163,8 @@ export async function PUT(
 
   const parsed = putBodySchema.safeParse(body);
   if (!parsed.success) {
-    const message = parsed.error.issues[0]?.message ?? 'داده ارسالی نامعتبر است.';
+    const message =
+      parsed.error.issues[0]?.message ?? 'داده ارسالی نامعتبر است.';
     return NextResponse.json({ ok: false, error: message }, { status: 400 });
   }
   if (Object.keys(parsed.data).length === 0) {

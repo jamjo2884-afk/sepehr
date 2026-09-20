@@ -25,6 +25,36 @@ import {
   getBrandById,
 } from '@/services/brand.service';
 
+describe('getBrandById identity resolution (regression 2026-09-20)', () => {
+  it('resolves a NON-UUID segment by brand name (legacy name link)', async () => {
+    // Unique name — in-memory duplicates resolve to the first match.
+    await createBrand({ name: 'کبریت-لینک-۹' });
+    // The detail page may receive the raw NAME segment (legacy cards).
+    // getBrandById must resolve it instead of 404ing/erroring.
+    const found = await getBrandById('کبریت-لینک-۹');
+    expect(found).not.toBeNull();
+    expect(found!.name).toBe('کبریت-لینک-۹');
+  });
+
+  it('resolves a double-encoded name segment', async () => {
+    await createBrand({ name: 'سینه-فیلیا-لینک-۹' });
+    const encoded = encodeURIComponent(encodeURIComponent('سینه-فیلیا-لینک-۹'));
+    const found = await getBrandById(encoded);
+    expect(found).not.toBeNull();
+    expect(found!.name).toBe('سینه-فیلیا-لینک-۹');
+  });
+
+  it('returns null for an unknown UUID without name fallback', async () => {
+    const found = await getBrandById('00000000-0000-4000-8000-000000000000');
+    expect(found).toBeNull();
+  });
+
+  it('returns null for an unknown name segment', async () => {
+    const found = await getBrandById('برند-ناموجود-۹۹');
+    expect(found).toBeNull();
+  });
+});
+
 describe('Brand Service (in-memory)', () => {
   beforeEach(async () => {
     // Clear in-memory store by reading all and nothing — the store is module-level
