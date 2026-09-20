@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { isSyntheticUser, requireAuth } from '@/lib/auth';
 import {
   getBrandSocialAnalytics,
   getSocialAccounts,
@@ -20,6 +20,16 @@ export async function GET(
 ): Promise<NextResponse> {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+
+  // Same gate as /api/social/analytics: a synthetic identity (session-less
+  // demo user / guest) reads ZERO tenant rows after the RLS lockdown, so
+  // return an explicit 401 instead of a silently-empty payload.
+  if (isSyntheticUser(auth)) {
+    return NextResponse.json(
+      { ok: false, error: 'برای مشاهدهٔ داده‌ها وارد حساب شوید.' },
+      { status: 401 },
+    );
+  }
 
   try {
     const brand = decodeURIComponent(params.brand);

@@ -10,6 +10,7 @@ import {
   GitCompareArrows,
   Heart,
   Inbox,
+  LogIn,
   PieChart,
   Plus,
   RotateCcw,
@@ -85,6 +86,7 @@ export default function SocialPage() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
+  const [authRequired, setAuthRequired] = useState(false);
 
   // Analytical filters.
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
@@ -113,26 +115,42 @@ export default function SocialPage() {
     let active = true;
     setLoading(true);
     fetch('/api/social/analytics')
-      .then((r) => r.json())
+      .then(async (r) => ({ status: r.status, data: await r.json() }))
       .then(
-        (data: {
-          ok: boolean;
-          accounts: SocialAccount[];
-          metrics: SocialMetric[];
+        ({
+          status,
+          data,
+        }: {
+          status: number;
+          data: {
+            ok: boolean;
+            accounts?: SocialAccount[];
+            metrics?: SocialMetric[];
+          };
         }) => {
-          if (active) {
-            if (data.ok) {
-              setRaw({ accounts: data.accounts, metrics: data.metrics });
-            } else {
-              setRaw(null);
-            }
-            setLoading(false);
+          if (!active) return;
+          if (data.ok) {
+            setRaw({
+              accounts: data.accounts ?? [],
+              metrics: data.metrics ?? [],
+            });
+            setAuthRequired(false);
+          } else if (status === 401) {
+            // Session-less reader (RLS closed for anon) — the data exists but
+            // requires login. Never render this as an empty dashboard.
+            setRaw(null);
+            setAuthRequired(true);
+          } else {
+            setRaw(null);
+            setAuthRequired(false);
           }
+          setLoading(false);
         },
       )
       .catch(() => {
         if (active) {
           setRaw(null);
+          setAuthRequired(false);
           setLoading(false);
         }
       });
@@ -415,6 +433,23 @@ export default function SocialPage() {
 
   if (loading) {
     return <SocialDashboardSkeleton />;
+  }
+
+  if (authRequired) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 rounded-xl border border-border bg-surface/60 p-10 text-center">
+        <LogIn className="h-8 w-8 text-muted-foreground" />
+        <p className="text-sm font-medium text-foreground">
+          برای مشاهدهٔ آمار شبکه‌های اجتماعی وارد حساب خود شوید.
+        </p>
+        <p className="max-w-md text-xs text-muted-foreground">
+          داده‌های این بخش فقط برای کاربران واردشده در دسترس است.
+        </p>
+        <Button asChild>
+          <Link href="/login">ورود به حساب</Link>
+        </Button>
+      </div>
+    );
   }
 
   if (!raw) {

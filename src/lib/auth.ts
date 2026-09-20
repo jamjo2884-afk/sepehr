@@ -24,7 +24,12 @@ const DEMO_USER: AuthUser = {
   email: 'demo@mediadeck.local',
 };
 
-function hasSupabaseConfig(): boolean {
+/**
+ * True when Supabase IS configured (real backend present).
+ * Exported for route handlers that must distinguish "no data yet" from
+ * "session-less reader that can no longer see tenant rows".
+ */
+export function hasSupabaseConfig(): boolean {
   return (
     !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
     !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
@@ -39,6 +44,21 @@ function hasSupabaseConfig(): boolean {
  */
 export function isDemoMode(): boolean {
   return !hasSupabaseConfig() || process.env.DEMO_MODE === 'true';
+}
+
+/**
+ * True for the synthetic in-app identities (legacy demo user and the guest).
+ * A request authenticated as one of them has NO real Supabase session — after
+ * the 2026-09-19 security fix such readers see zero tenant rows, so routes
+ * should signal 401 (login required) instead of returning an empty payload
+ * that the UI would silently render as "no data".
+ */
+export function isSyntheticUser(
+  user: { id: string } | null | undefined,
+): boolean {
+  return (
+    !!user && (user.id === 'demo-user-000' || user.id === 'guest-user-000')
+  );
 }
 
 /**
