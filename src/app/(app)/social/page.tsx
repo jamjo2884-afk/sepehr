@@ -665,10 +665,19 @@ export default function SocialPage() {
             </div>
           </section>
 
-          {/* Server-aggregated time-series (5 charts, shared filters) —
-              mounted inside the analytics flow, between the monthly growth
-              and platform breakdown sections */}
-          <SocialTrendsSection />
+          {/* Server-aggregated time-series (5 charts) — driven by the SAME
+              page-level filter state (single source of truth: brand,
+              platform and month range come from AnalyticsFilterBar above;
+              the section renders no second filter bar). */}
+          <SocialTrendsSection
+            sharedFilter={{
+              selectedBrands,
+              selectedPlatforms,
+              onToggleBrand: handleToggleBrand,
+              onTogglePlatform: handleTogglePlatform,
+              range,
+            }}
+          />
 
           {/* Platform breakdown */}
           <section>

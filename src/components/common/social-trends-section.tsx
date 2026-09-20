@@ -18,6 +18,7 @@ import type {
   SocialTrendsPayload,
   SocialTrendSeries,
 } from '@/services/social-trends.service';
+import type { SocialMonthRange } from '@/types/social';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
 import type { SocialPlatform } from '@/types/domain';
 
@@ -56,15 +57,44 @@ type TimePreset = (typeof TIME_PRESETS)[number]['value'];
  * - Filter chips = the same FilterChip styling as AnalyticsFilterBar, so the
  *   trends block reads as part of the page, not a foreign widget.
  */
-export function SocialTrendsSection({ className }: { className?: string }) {
+/**
+ * Page-level filter shared into this section (the /social page bar and this
+ * block's own filter merged into ONE selection). When provided, the internal
+ * filter UI is hidden and the page's single brand/platform/time selection
+ * drives the 5 charts. The component stays fully standalone without it
+ * (/command-center keeps its own independent internal state).
+ */
+export interface SharedSocialTrendsFilter {
+  selectedBrands: string[];
+  selectedPlatforms: SocialPlatform[];
+  onToggleBrand: (brand: string) => void;
+  onTogglePlatform: (platform: SocialPlatform | '__all__') => void;
+  /** Resolved page Jalali month range; null → full payload history. */
+  range: SocialMonthRange | null;
+}
+
+export function SocialTrendsSection({
+  className,
+  sharedFilter,
+}: {
+  className?: string;
+  sharedFilter?: SharedSocialTrendsFilter;
+}) {
   const [data, setData] = useState<SocialTrendsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<SocialPlatform[]>(
-    [],
-  );
-  const [timePreset, setTimePreset] = useState<TimePreset>('12m');
+  const [localBrands, setLocalBrands] = useState<string[]>([]);
+  const [localPlatforms, setLocalPlatforms] = useState<SocialPlatform[]>([]);
+  const [localTimePreset, setLocalTimePreset] = useState<TimePreset>('12m');
+
+  // Effective selection: the shared page filter wins when present; internal
+  // state is the standalone fallback (/command-center).
+  const selectedBrands = sharedFilter
+    ? sharedFilter.selectedBrands
+    : localBrands;
+  const selectedPlatforms = sharedFilter
+    ? sharedFilter.selectedPlatforms
+    : localPlatforms;
 
   /**
    * ONE fetch of the whole workspace aggregation. Brand narrowing is
@@ -102,10 +132,10 @@ export function SocialTrendsSection({ className }: { className?: string }) {
    * workspace's platforms changed) so chips never reference stale keys.
    */
   useEffect(() => {
-    if (!data) return;
+    if (!data || sharedFilter) return;
     const known = new Set(data.platforms);
-    setSelectedPlatforms((prev) => prev.filter((p) => known.has(p)));
-  }, [data]);
+    setLocalPlatforms((prev) => prev.filter((p) => known.has(p)));
+  }, [data, sharedFilter]);
 
   /** Client-side narrowing of the workspace-scoped series (the payload is
    * the full workspace; the brand chips slice it instantly, no round trip). */
@@ -133,9 +163,24 @@ export function SocialTrendsSection({ className }: { className?: string }) {
 
   const cutByWindow = useCallback(
     (series: SocialTrendSeries[]): SocialTrendSeries[] => {
-      const preset = TIME_PRESETS.find((p) => p.value === timePreset)!;
-      if (!data || data.months.length === 0 || preset.months === 0)
-        return series;
+      if (!data || data.months.length === 0) return series;
+      // Shared page filter: cut by the resolved Jalali [start, end] window —
+      // the SAME range the page's KPI cards and other charts use (custom
+      // ranges included). Jalali 'YYYY-MM' labels compare correctly as strings.
+      if (sharedFilter) {
+        const range = sharedFilter.range;
+        if (!range) return series;
+        return series
+          .map((s) => ({
+            ...s,
+            points: s.points.filter(
+              (p) => p.month >= range.start && p.month <= range.end,
+            ),
+          }))
+          .filter((s) => s.points.length > 0);
+      }
+      const preset = TIME_PRESETS.find((p) => p.value === localTimePreset)!;
+      if (preset.months === 0) return series;
       const months = data.months;
       const startIdx = Math.max(0, months.length - preset.months);
       const window = new Set(months.slice(startIdx));
@@ -146,7 +191,7 @@ export function SocialTrendsSection({ className }: { className?: string }) {
         }))
         .filter((s) => s.points.length > 0);
     },
-    [data, timePreset],
+    [data, sharedFilter, localTimePreset],
   );
 
   const totalReach = useMemo(
@@ -184,7 +229,7 @@ export function SocialTrendsSection({ className }: { className?: string }) {
    * language of AnalyticsFilterBar while keeping the affordance visible.
    */
   const brandMonths = useMemo(() => {
-    if (!data) return [] as string[];
+    if (!data || sharedFilter) return [] as string[];
     if (selectedBrands.length === 0) return data.months;
     const keep = new Set(selectedBrands);
     const months = new Set<string>();
@@ -193,7 +238,7 @@ export function SocialTrendsSection({ className }: { className?: string }) {
       for (const p of s.points) months.add(p.month);
     }
     return [...months].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  }, [data, selectedBrands]);
+  }, [data, selectedBrands, sharedFilter]);
 
   const presetAvailable = useCallback(
     (months: number) => {
@@ -210,11 +255,13 @@ export function SocialTrendsSection({ className }: { className?: string }) {
   );
 
   // Auto-recover from a now-empty preset (brand narrowed into a window
-  // without data): fall back to the widest available view.
+  // without data): fall back to the widest available view. Internal mode
+  // only — the shared page filter has no preset chips to recover.
   useEffect(() => {
-    const preset = TIME_PRESETS.find((p) => p.value === timePreset)!;
+    if (sharedFilter) return;
+    const preset = TIME_PRESETS.find((p) => p.value === localTimePreset)!;
     if (!presetAvailable(preset.months)) {
-      setTimePreset('all');
+      setLocalTimePreset('all');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brandMonths]);
@@ -242,91 +289,100 @@ export function SocialTrendsSection({ className }: { className?: string }) {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {/* Shared filters — one state drives all 5 charts */}
-          <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface/60 p-4">
-            <FilterRow
-              label={`برند (${selectedBrands.length === 0 ? 'همه' : `${formatNumber(selectedBrands.length)} انتخابشده`})`}
-            >
-              <FilterChip
-                active={selectedBrands.length === 0}
-                onClick={() => setSelectedBrands([])}
-                label="همه برندها"
-              />
-              {(data?.brands ?? []).map((brand) => (
+          {/* Internal filters — one state drives all 5 charts (standalone
+              mode only; /social passes sharedFilter and hides this block so
+              the page bar above is the single filter). */}
+          {!sharedFilter ? (
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface/60 p-4">
+              <FilterRow
+                label={`برند (${selectedBrands.length === 0 ? 'همه' : `${formatNumber(selectedBrands.length)} انتخابشده`})`}
+              >
                 <FilterChip
-                  key={brand}
-                  active={selectedBrands.includes(brand)}
-                  onClick={() =>
-                    setSelectedBrands((prev) =>
-                      prev.includes(brand)
-                        ? prev.filter((b) => b !== brand)
-                        : [...prev, brand],
-                    )
-                  }
-                  icon={
-                    <BrandLogo
-                      brand={brand}
-                      className="h-6 w-6 rounded-full"
-                      iconClassName="text-[11px]"
-                    />
-                  }
-                  label={brand}
+                  active={selectedBrands.length === 0}
+                  onClick={() => setLocalBrands([])}
+                  label="همه برندها"
                 />
-              ))}
-            </FilterRow>
-
-            {/* Platform multi-select — built dynamically from the API payload
-                (DISTINCT platform of real accounts); never hardcoded. */}
-            <FilterRow
-              label={`شبکه اجتماعی (${selectedPlatforms.length === 0 ? 'همه' : `${formatNumber(selectedPlatforms.length)} انتخابشده`})`}
-            >
-              <FilterChip
-                active={selectedPlatforms.length === 0}
-                onClick={() => setSelectedPlatforms([])}
-                label="همه شبکه‌ها"
-              />
-              {(data?.platforms ?? []).map((platform) => (
-                <FilterChip
-                  key={platform}
-                  active={selectedPlatforms.includes(platform)}
-                  onClick={() =>
-                    setSelectedPlatforms((prev) =>
-                      prev.includes(platform)
-                        ? prev.filter((p) => p !== platform)
-                        : [...prev, platform],
-                    )
-                  }
-                  icon={
-                    <SocialPlatformIcon
-                      platform={platform}
-                      className="h-4 w-4 rounded-full"
-                      iconClassName="h-2.5 w-2.5"
-                    />
-                  }
-                  label={platformLabel(platform)}
-                />
-              ))}
-            </FilterRow>
-
-            <FilterRow label="بازه زمانی">
-              {TIME_PRESETS.map((p) => {
-                const available = presetAvailable(p.months);
-                return (
+                {(data?.brands ?? []).map((brand) => (
                   <FilterChip
-                    key={p.value}
-                    active={timePreset === p.value}
-                    disabled={!available}
-                    onClick={() => setTimePreset(p.value)}
-                    label={p.label}
+                    key={brand}
+                    active={selectedBrands.includes(brand)}
+                    onClick={() =>
+                      setLocalBrands((prev) =>
+                        prev.includes(brand)
+                          ? prev.filter((b) => b !== brand)
+                          : [...prev, brand],
+                      )
+                    }
+                    icon={
+                      <BrandLogo
+                        brand={brand}
+                        className="h-6 w-6 rounded-full"
+                        iconClassName="text-[11px]"
+                      />
+                    }
+                    label={brand}
                   />
-                );
-              })}
-            </FilterRow>
-            <span className="text-[11px] text-muted-foreground">
-              واحد زمان نمودارها «ماه» است (تقویم جلالی) — دیتای متریک ماهانه
-              ثبت می‌شود؛ بازه‌های بدون داده برای برندهای انتخابی غیرفعال‌اند.
-            </span>
-          </div>
+                ))}
+              </FilterRow>
+
+              {/* Platform multi-select — built dynamically from the API payload
+                (DISTINCT platform of real accounts); never hardcoded. */}
+              <FilterRow
+                label={`شبکه اجتماعی (${selectedPlatforms.length === 0 ? 'همه' : `${formatNumber(selectedPlatforms.length)} انتخابشده`})`}
+              >
+                <FilterChip
+                  active={selectedPlatforms.length === 0}
+                  onClick={() => setLocalPlatforms([])}
+                  label="همه شبکه‌ها"
+                />
+                {(data?.platforms ?? []).map((platform) => (
+                  <FilterChip
+                    key={platform}
+                    active={selectedPlatforms.includes(platform)}
+                    onClick={() =>
+                      setLocalPlatforms((prev) =>
+                        prev.includes(platform)
+                          ? prev.filter((p) => p !== platform)
+                          : [...prev, platform],
+                      )
+                    }
+                    icon={
+                      <SocialPlatformIcon
+                        platform={platform}
+                        className="h-4 w-4 rounded-full"
+                        iconClassName="h-2.5 w-2.5"
+                      />
+                    }
+                    label={platformLabel(platform)}
+                  />
+                ))}
+              </FilterRow>
+
+              <FilterRow label="بازه زمانی">
+                {TIME_PRESETS.map((p) => {
+                  const available = presetAvailable(p.months);
+                  return (
+                    <FilterChip
+                      key={p.value}
+                      active={localTimePreset === p.value}
+                      disabled={!available}
+                      onClick={() => setLocalTimePreset(p.value)}
+                      label={p.label}
+                    />
+                  );
+                })}
+              </FilterRow>
+              <span className="text-[11px] text-muted-foreground">
+                واحد زمان نمودارها «ماه» است (تقویم جلالی) — دیتای متریک ماهانه
+                ثبت می‌شود؛ بازه‌های بدون داده برای برندهای انتخابی غیرفعال‌اند.
+              </span>
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              این نمودارها از فیلترهای بالای صفحه پیروی می‌کنند (برند، شبکه و
+              بازهٔ زمانی مشترک).
+            </p>
+          )}
 
           {/* NOTE: no total-followers chart here — the page's own
               FollowersTrendChart (روند کل دنبال‌کنندگان) already shows the
