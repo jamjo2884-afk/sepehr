@@ -198,9 +198,19 @@ const ChartTooltipContent = React.forwardRef<
                   indicator === 'dot' && 'items-center',
                 )}
               >
-                {formatter && item?.value !== undefined && item.name ? (
-                  formatter(item.value, item.name, item, index, item.payload)
-                ) : (
+          {formatter && item?.value !== undefined && item.name ? (
+            formatter(
+              item.value,
+              // Custom formatters receive the human label resolved from
+              // chartConfig instead of the raw recharts name (data key).
+              typeof itemConfig?.label === 'string'
+                ? itemConfig.label
+                : item.name,
+              item,
+              index,
+              item.payload,
+            )
+          ) : (
                   <>
                     {itemConfig?.icon ? (
                       <itemConfig.icon />

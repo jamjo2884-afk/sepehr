@@ -139,11 +139,13 @@ export function TrendLineChart({
           <ChartTooltip
             content={
               <ChartTooltipContent
-                formatter={(value, _name, payload) => {
-                  const idx = series.findIndex((_s, i) => `s${i}` === _name);
+                formatter={(value, name, item, _index, payload) => {
+                  const idx = series.findIndex(
+                    (_s, i) => `s${i}` === String(item?.dataKey),
+                  );
                   const row =
                     payload && typeof payload === 'object'
-                      ? (payload as Record<string, unknown>)
+                      ? (payload as unknown as Record<string, unknown>)
                       : undefined;
                   const breakdown =
                     tooltipBreakdown && idx >= 0
@@ -154,7 +156,7 @@ export function TrendLineChart({
                     <div className="flex w-full flex-col gap-1 text-xs">
                       <div className="flex w-full items-center justify-between gap-3">
                         <span className="text-muted-foreground">
-                          {String(_name)}
+                          {name}
                         </span>
                         <span className="font-semibold text-foreground">
                           {value === undefined || value === null
