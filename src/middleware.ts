@@ -110,7 +110,7 @@ export async function middleware(request: NextRequest) {
   // Reads pass here; the real enforcement happens in the DB (RLS as anon) and
   // again in route-auth (deny-by-default API allowlist). Mutations are 403'd
   // right here — defense in depth alongside route-auth.
-  if (!user && isGuestModeEnabled()) {
+  if (!user && (await isGuestModeEnabled())) {
     if (pathname.startsWith('/api/')) {
       if (isWriteMethod(request.method)) {
         return NextResponse.json(

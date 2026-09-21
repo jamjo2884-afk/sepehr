@@ -1,6 +1,15 @@
 'use client';
 
-import { Settings, Palette, Share2, Bell, Server, User, ChevronLeft } from 'lucide-react';
+import {
+  Settings,
+  Palette,
+  Share2,
+  Bell,
+  Server,
+  User,
+  UserCheck,
+  ChevronLeft,
+} from 'lucide-react';
 import type { SettingsCategory } from '@/types/settings';
 import { SETTINGS_CATEGORIES } from '@/types/settings';
 import { cn } from '@/lib/utils';
@@ -8,6 +17,7 @@ import { cn } from '@/lib/utils';
 const CATEGORY_ICONS: Record<SettingsCategory, React.ElementType> = {
   account: User,
   general: Settings,
+  guestMode: UserCheck,
   appearance: Palette,
   social: Share2,
   notifications: Bell,

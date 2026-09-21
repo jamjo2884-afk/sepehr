@@ -3,9 +3,9 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 /**
  * Guest Mode unit tests.
  *
- * Covers: runtime flag on/off, guest identity, write-method blocking,
- * deny-by-default API allowlist, blocked pages, and the getAuthUser() guest
- * fallback in real-auth mode.
+ * Covers: runtime flag (DB-backed with TTL cache + env fallback), guest
+ * identity, write-method blocking, deny-by-default API allowlist, blocked
+ * pages, and the getAuthUser() guest fallback in real-auth mode.
  */
 
 import {
@@ -13,34 +13,113 @@ import {
   GUEST_WORKSPACE_ID,
   GUEST_WORKSPACE_UUID,
   GUEST_ROLE,
+  GUEST_MODE_TTL_MS,
   getGuestContext,
   isGuestModeEnabled,
+  resetGuestModeCacheForTests,
   isGuestUser,
   isGuestApiReadAllowed,
   isGuestPageBlocked,
   isWriteMethod,
 } from '@/lib/guest-mode';
 
-describe('guest mode flag', () => {
+/* ===========================================================================
+ * DB-fetch stub helpers (lightweight anon REST fetch of app_settings)
+ * ========================================================================= */
+
+function stubDbRow(row: { guest_mode_enabled: boolean } | null) {
+  const fetchMock = vi.fn(
+    async () => new Response(JSON.stringify(row ? [row] : []), { status: 200 }),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+function stubDbFailure() {
+  const fetchMock = vi.fn(async () => {
+    throw new Error('network down');
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+describe('guest mode flag (DB-backed with TTL cache + env fallback)', () => {
   const ORIGINAL = process.env.GUEST_MODE_ENABLED;
 
+  beforeEach(() => {
+    resetGuestModeCacheForTests();
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://test.supabase.co');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'test-key');
+  });
+
   afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     if (ORIGINAL === undefined) delete process.env.GUEST_MODE_ENABLED;
     else process.env.GUEST_MODE_ENABLED = ORIGINAL;
+    resetGuestModeCacheForTests();
   });
 
-  it('is disabled by default (unset)', () => {
+  it('is disabled by default (no row, no env)', async () => {
     delete process.env.GUEST_MODE_ENABLED;
-    expect(isGuestModeEnabled()).toBe(false);
+    const fetchMock = stubDbRow(null);
+    await expect(isGuestModeEnabled()).resolves.toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('requires the exact value "true"', () => {
+  it('reads enabled=true from the app_settings row', async () => {
+    delete process.env.GUEST_MODE_ENABLED;
+    stubDbRow({ guest_mode_enabled: true });
+    await expect(isGuestModeEnabled()).resolves.toBe(true);
+  });
+
+  it('DB row wins over the env var (DB is the source of truth)', async () => {
     process.env.GUEST_MODE_ENABLED = 'true';
-    expect(isGuestModeEnabled()).toBe(true);
-    process.env.GUEST_MODE_ENABLED = 'True';
-    expect(isGuestModeEnabled()).toBe(false);
-    process.env.GUEST_MODE_ENABLED = '1';
-    expect(isGuestModeEnabled()).toBe(false);
+    stubDbRow({ guest_mode_enabled: false });
+    await expect(isGuestModeEnabled()).resolves.toBe(false);
+  });
+
+  it('falls back to the env var when the row is absent', async () => {
+    process.env.GUEST_MODE_ENABLED = 'true';
+    stubDbRow(null);
+    await expect(isGuestModeEnabled()).resolves.toBe(true);
+  });
+
+  it('falls back to the env var when the fetch fails', async () => {
+    process.env.GUEST_MODE_ENABLED = 'true';
+    stubDbFailure();
+    await expect(isGuestModeEnabled()).resolves.toBe(true);
+  });
+
+  it('defaults OFF when everything fails (fail closed)', async () => {
+    delete process.env.GUEST_MODE_ENABLED;
+    stubDbFailure();
+    await expect(isGuestModeEnabled()).resolves.toBe(false);
+  });
+
+  it('uses the env fallback without any fetch when Supabase is not configured', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://placeholder.supabase.co');
+    process.env.GUEST_MODE_ENABLED = 'true';
+    const fetchMock = stubDbRow({ guest_mode_enabled: true });
+    await expect(isGuestModeEnabled()).resolves.toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('caches the DB value and re-fetches only after the TTL', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = stubDbRow({ guest_mode_enabled: true });
+      await expect(isGuestModeEnabled()).resolves.toBe(true);
+      await expect(isGuestModeEnabled()).resolves.toBe(true); // cached
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // Advance past the TTL → next call re-fetches.
+      vi.setSystemTime(Date.now() + GUEST_MODE_TTL_MS + 1);
+      await expect(isGuestModeEnabled()).resolves.toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -95,6 +174,7 @@ describe('deny-by-default API allowlist', () => {
     expect(isGuestApiReadAllowed('/api/social/brand/acme')).toBe(false);
     expect(isGuestApiReadAllowed('/api/intelligence')).toBe(false);
     expect(isGuestApiReadAllowed('/api/settings')).toBe(false);
+    expect(isGuestApiReadAllowed('/api/settings/guest-mode')).toBe(false);
     expect(isGuestApiReadAllowed('/api/finance/expenses')).toBe(false);
     expect(isGuestApiReadAllowed('/api/notifications')).toBe(false);
     expect(isGuestApiReadAllowed('/api/team/workload')).toBe(false);
@@ -143,10 +223,17 @@ describe('getAuthUser guest fallback (real-auth mode)', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    // The flag resolver probes app_settings over REST; stub it to a 404 so
+    // these tests exercise the env-var fallback path quickly and offline.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('not found', { status: 404 })),
+    );
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 

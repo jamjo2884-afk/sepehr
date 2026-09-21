@@ -8,6 +8,7 @@
 export type SettingsCategory =
   | 'account'
   | 'general'
+  | 'guestMode'
   | 'appearance'
   | 'social'
   | 'notifications'
@@ -31,6 +32,12 @@ export const SETTINGS_CATEGORIES: SettingsCategoryInfo[] = [
     id: 'general',
     label: 'عمومی',
     description: 'تنظیمات پایه سیستم و فضای کاری',
+    enabled: true,
+  },
+  {
+    id: 'guestMode',
+    label: 'حالت مهمان',
+    description: 'دسترسی مهمان فقط‌خواندنی به داده‌های دمو',
     enabled: true,
   },
   {

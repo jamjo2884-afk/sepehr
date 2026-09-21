@@ -113,7 +113,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
       // the synthetic guest identity instead of null. Reads then run as
       // Supabase `anon` under RLS, which only exposes the seeded demo
       // workspace. Writes are rejected separately (route-auth + middleware).
-      if (isGuestModeEnabled()) {
+      if (await isGuestModeEnabled()) {
         return getGuestContext();
       }
       return null;

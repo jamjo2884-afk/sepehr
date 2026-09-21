@@ -2,9 +2,12 @@
  * Guest Mode — read-only demo access for unauthenticated visitors.
  *
  * Design (decided 2026-09-19, see guest demo migration header for the full
- * rationale):
- * - Opt-in at runtime ONLY via GUEST_MODE_ENABLED=true. Never derived from
- *   client input. Default is OFF everywhere.
+ * rationale; DB-backed toggle added 2026-09-21):
+ * - Opt-in at runtime via the DB-backed singleton `app_settings` row
+ *   (guest_mode_enabled), toggled ONLY through the SECURITY DEFINER
+ *   set_guest_mode() RPC. GUEST_MODE_ENABLED=true remains a fallback when
+ *   the row is missing/unreachable. Never derived from client input. Default
+ *   is OFF everywhere.
  * - Guests resolve through the normal server client with NO session, so every
  *   Supabase query runs as `anon` under RLS. Tenant tables have no anon
  *   policies → unreachable. The seed migration grants anon SELECT only on the
@@ -44,9 +47,96 @@ export const GUEST_EMAIL = 'guest@mediadeck.local';
 /** Role label stored on the guest WorkspaceContext. */
 export const GUEST_ROLE = 'guest';
 
-/** Runtime opt-in flag. Default OFF; requires explicit GUEST_MODE_ENABLED=true. */
-export function isGuestModeEnabled(): boolean {
-  return process.env.GUEST_MODE_ENABLED === 'true';
+/* ===========================================================================
+ * Runtime flag — DB-backed with TTL cache + env fallback
+ * ========================================================================= */
+
+/**
+ * Cache TTL for the DB-backed flag (milliseconds). Callers may show a
+ * "تغییر تا ۱۰ ثانیه دیگر اعمال می‌شود" notice — this constant is the source
+ * of that number.
+ */
+export const GUEST_MODE_TTL_MS = 10_000;
+
+interface FlagCache {
+  value: boolean;
+  fetchedAt: number;
+}
+
+// In-process cache. Serverless: per-instance, hence the short TTL.
+let _flagCache: FlagCache | null = null;
+let _inflight: Promise<boolean> | null = null;
+
+/**
+ * Lightweight, session-less REST fetch of the singleton app_settings row.
+ * Uses the anon key directly (NOT the cookie-backed SSR client): the flag
+ * must be readable without a session — middleware runs before any auth.
+ * The anon SELECT policy on app_settings exposes only this one row.
+ */
+async function fetchGuestFlagFromDb(): Promise<boolean | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey || url === 'https://placeholder.supabase.co') {
+    return null; // No backend → env fallback path.
+  }
+
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/app_settings?id=eq.1&select=guest_mode_enabled`,
+      {
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(2_000),
+      },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as { guest_mode_enabled?: boolean }[];
+    if (!Array.isArray(rows) || rows.length === 0) return null; // row absent
+    return rows[0].guest_mode_enabled === true;
+  } catch {
+    return null; // Network/timeout → env fallback path.
+  }
+}
+
+/**
+ * Resolve the runtime guest-mode flag:
+ * 1. fresh in-process cache (< GUEST_MODE_TTL_MS old) → cached value;
+ * 2. DB singleton row (lightweight anon REST fetch, coalesced in-flight);
+ * 3. fallback: legacy GUEST_MODE_ENABLED env var;
+ * 4. default OFF.
+ *
+ * Failure semantics: any DB problem degrades to the env var / OFF — the flag
+ * can never be flipped ON by an error.
+ */
+export async function isGuestModeEnabled(): Promise<boolean> {
+  const now = Date.now();
+
+  if (_flagCache && now - _flagCache.fetchedAt < GUEST_MODE_TTL_MS) {
+    return _flagCache.value;
+  }
+
+  // Coalesce concurrent misses into a single fetch.
+  if (!_inflight) {
+    _inflight = (async () => {
+      const fromDb = await fetchGuestFlagFromDb();
+      const value = fromDb ?? process.env.GUEST_MODE_ENABLED === 'true';
+      _flagCache = { value, fetchedAt: Date.now() };
+      return value;
+    })().finally(() => {
+      _inflight = null;
+    });
+  }
+
+  return _inflight;
+}
+
+/** Clear the flag cache (tests only). */
+export function resetGuestModeCacheForTests(): void {
+  _flagCache = null;
+  _inflight = null;
 }
 
 /** True for HTTP methods that mutate state. GET/HEAD/OPTIONS are reads. */
