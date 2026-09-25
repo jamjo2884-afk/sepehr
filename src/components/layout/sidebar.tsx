@@ -9,6 +9,7 @@ import {
   getVisibleNavItems,
   isActivePath,
 } from '@/lib/sidebar-sections';
+import { sectionTintVar } from '@/config/navigation.config';
 import { Logo } from '@/components/common/logo';
 import { useUIStore } from '@/stores/ui.store';
 import { useIsMobile } from '@/hooks/use-media-query';
@@ -119,7 +120,13 @@ export function Sidebar() {
                     {active ? (
                       <motion.span
                         layoutId="sidebar-active"
-                        className="absolute inset-0 -z-10 rounded-lg border border-primary/25 bg-primary/10"
+                        className="absolute inset-0 -z-10 rounded-lg border bg-[color-mix(in_srgb,var(--tint)_16%,transparent)]"
+                        style={{
+                          // v2: active nav glows in the section's own hue.
+                          ['--tint' as string]: sectionTintVar[item.section],
+                          borderColor:
+                            'color-mix(in srgb, var(--tint) 30%, transparent)',
+                        }}
                         transition={{
                           type: 'spring',
                           stiffness: 380,
@@ -127,14 +134,24 @@ export function Sidebar() {
                         }}
                       />
                     ) : null}
-                    <Icon
+                    <span
                       className={cn(
-                        'h-5 w-5 shrink-0 transition-colors duration-200',
-                        active
-                          ? 'text-primary'
-                          : 'text-muted-foreground group-hover:text-foreground',
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200',
+                        active ? 'icon-chip' : 'bg-transparent',
                       )}
-                    />
+                      style={{
+                        ['--tint' as string]: sectionTintVar[item.section],
+                      }}
+                    >
+                      <Icon
+                        className={cn(
+                          'h-5 w-5 shrink-0 transition-colors duration-200',
+                          active
+                            ? ''
+                            : 'text-muted-foreground group-hover:text-foreground',
+                        )}
+                      />
+                    </span>
                     {!collapsed ? <span>{item.label}</span> : null}
                   </Link>
                 </li>

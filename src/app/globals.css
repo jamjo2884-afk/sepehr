@@ -5,20 +5,23 @@
 @layer base {
   :root {
     /* ============================================================
-       MEDIA DECK — Design Tokens
-       Light theme (default). Dark theme lives in `.dark`.
-       Primary   #1677FF   Electric Cyan #16C7D9   Deep Navy #071426
+       MEDIA DECK — Design Tokens v2 («Vivid Dashboard»)
+       Light theme. Dark theme lives in `.dark` (DEFAULT THEME).
+       Primary #1677FF · Cyan #16C7D9 · Deep Navy #071426
+       v2 direction: saturation UP (state colors, section accents,
+       gradient cards, tinted icon chips) while keeping WCAG
+       contrast. RTL + Jalali unchanged.
        ============================================================ */
 
     /* ---- Brand (hex, for direct CSS use) ---- */
     --brand-primary: #1677ff;
     --brand-cyan: #16c7d9;
-    --brand-purple: #6366f1;
+    --brand-purple: #7c5cfc;
     --brand-navy: #071426;
     --brand-navy-surface: #0d1b2e;
     --brand-blue-surface: #102544;
 
-    --bg-main: #f4f7fb;
+    --bg-main: #f1f5fa;
     --bg-surface: #ffffff;
     --bg-surface-2: #eef2f8;
 
@@ -27,59 +30,76 @@
 
     --border-color: #d9dfe9;
 
-    --success: #16a34a;
-    --warning: #d97706;
-    --danger: #dc2626;
+    /* State colors — v2 raises saturation/brightness for at-a-glance
+       status (v1: #16A34A / #D97706 / #DC2626). */
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
 
     /* ---- Surfaces ---- */
-    --background: 220 25% 97%; /* #F4F7FB */
+    --background: 220 25% 96%; /* #F1F5FA */
     --foreground: 219 55% 10%; /* #0B1424 */
 
     --surface: 0 0% 100%; /* #FFFFFF */
-    --surface-raised: 0 0% 100%; /* #FFFFFF */
+    --surface-raised: 216 60% 98%; /* #F3F7FE — faint blue tint */
     --surface-foreground: 219 55% 10%;
 
-    --card: 0 0% 100%; /* #FFFFFF */
+    --card: 0 0% 100%;
     --card-foreground: 219 55% 10%;
 
-    --popover: 0 0% 100%; /* #FFFFFF */
+    --popover: 0 0% 100%;
     --popover-foreground: 219 55% 10%;
 
     /* ---- Brand ---- */
     --primary: 216 100% 54%; /* #1677FF */
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 220 18% 93%; /* #E9EDF4 */
-    --secondary-foreground: 219 55% 10%;
+    --secondary: 217 82% 96%; /* #EAF3FE — blue-tinted neutral */
+    --secondary-foreground: 216 70% 30%;
 
-    --muted: 220 18% 93%;
-    --muted-foreground: 215 20% 42%; /* #64748B */
+    --muted: 220 25% 94%;
+    --muted-foreground: 215 22% 42%; /* #64748B */
 
-    --accent: 186 72% 47%; /* #16C7D9 */
+    --accent: 186 82% 45%; /* #16C7D9 boosted */
     --accent-foreground: 219 55% 10%;
 
-    --cyan: 186 72% 47%; /* #16C7D9 */
-    --purple: 239 84% 67%; /* #6366F1 */
+    --cyan: 186 82% 45%;
+    --purple: 254 90% 66%; /* #7C5CFC */
 
-    --destructive: 0 72% 51%; /* #E11D48-ish red */
+    --destructive: 0 84% 56%; /* #EF4444 */
     --destructive-foreground: 210 40% 98%;
 
-    --success: 142 58% 42%; /* #16A34A */
+    --success: 152 76% 39%; /* #10B981 */
     --success-foreground: 210 40% 98%;
 
-    --warning: 38 92% 45%; /* #D97706 */
+    --warning: 38 94% 48%; /* #F59E0B */
     --warning-foreground: 38 100% 8%;
 
-    --border: 220 18% 88%; /* #DCE1EA */
-    --input: 220 18% 88%;
+    --info: 217 91% 60%; /* #3B82F6 */
+
+    --border: 220 20% 87%;
+    --input: 220 20% 87%;
     --ring: 216 100% 54%;
+
+    /* ---- Section identity palette (هر بخش رنگ خودش) ----
+       Used for icon chips, section headers and gradient tints so
+       the user knows at a glance where they are in the system. */
+    --section-command: 216 100% 54%; /* مرکز فرمان — آبی برند */
+    --section-brands: 40 96% 50%; /* برندها — کهربایی/طلایی */
+    --section-social: 186 82% 45%; /* شبکه‌های اجتماعی — فیروزه‌ای */
+    --section-finance: 152 70% 40%; /* مالی — سبز زمردی */
+    --section-tasks: 254 90% 64%; /* کارها — بنفش */
+    --section-content: 330 84% 56%; /* محتوا — سرخابی */
+    --section-analytics: 280 70% 58%; /* تحلیل — ارغوانی */
 
     /* ---- Chart palette (single shared language) ---- */
     --chart-1: 216 100% 54%; /* #1677FF */
-    --chart-2: 186 72% 47%; /* #16C7D9 */
-    --chart-3: 239 84% 67%; /* #6366F1 */
-    --chart-4: 142 58% 45%; /* #22C55E */
-    --chart-5: 38 92% 50%; /* #F59E0B */
+    --chart-2: 186 82% 45%; /* #16C7D9 */
+    --chart-3: 254 90% 66%; /* #7C5CFC */
+    --chart-4: 152 70% 45%; /* #2DD4A7 */
+    --chart-5: 38 94% 55%; /* #F59E0B */
+    --chart-6: 330 84% 60%; /* #EC4899 */
+    --chart-7: 280 70% 62%; /* #A855F7 */
 
     /* ===== Brand Ramp (Blue, #1677FF at 500) ===== */
     --brand-50: 216 100% 97%;
@@ -88,99 +108,114 @@
     --brand-300: 216 87% 69%;
     --brand-400: 216 82% 61%;
     --brand-500: 216 100% 54%;
-    --brand-600: 215 86% 46%;
-    --brand-700: 217 76% 38%;
-    --brand-800: 218 66% 30%;
-    --brand-900: 219 56% 22%;
+    --brand-600: 215 90% 48%; /* vivid bump (v1: 215 86% 46%) */
+    --brand-700: 217 82% 40%;
+    --brand-800: 218 72% 32%;
+    --brand-900: 219 62% 24%;
 
-    /* ===== Radius (8 / 12 / 16 / 20 / 24) ===== */
+    /* ===== Radius — dashboard feel ===== */
     --radius-sm: 0.5rem;
     --radius-md: 0.75rem;
     --radius-lg: 1rem;
     --radius-xl: 1.25rem;
     --radius-2xl: 1.5rem;
 
-    /* ===== Shadows (very subtle, light-theme) ===== */
-    --shadow-xs: 0 1px 2px 0 rgb(7 20 38 / 0.05);
+    /* ===== Shadows — deeper, navy-tinted for visible depth ===== */
+    --shadow-xs: 0 1px 2px 0 rgb(7 20 38 / 0.06);
     --shadow-sm:
-      0 1px 3px 0 rgb(7 20 38 / 0.08), 0 1px 2px -1px rgb(7 20 38 / 0.06);
+      0 1px 3px 0 rgb(7 20 38 / 0.1), 0 1px 2px -1px rgb(7 20 38 / 0.08);
     --shadow-md:
-      0 4px 6px -1px rgb(7 20 38 / 0.07), 0 2px 4px -2px rgb(7 20 38 / 0.05);
+      0 6px 14px -4px rgb(7 20 38 / 0.12), 0 2px 6px -2px rgb(7 20 38 / 0.07);
     --shadow-lg:
-      0 10px 15px -3px rgb(7 20 38 / 0.08), 0 4px 6px -4px rgb(7 20 38 / 0.05);
+      0 14px 28px -8px rgb(7 20 38 / 0.14), 0 6px 12px -6px rgb(7 20 38 / 0.08);
     --shadow-xl:
-      0 20px 25px -5px rgb(7 20 38 / 0.1), 0 8px 10px -6px rgb(7 20 38 / 0.06);
+      0 24px 40px -8px rgb(7 20 38 / 0.16), 0 10px 16px -8px rgb(7 20 38 / 0.09);
     --shadow-glow:
-      0 0 0 1px rgb(22 119 255 / 0.18), 0 0 24px -6px rgb(22 119 255 / 0.25);
+      0 0 0 1px rgb(22 119 255 / 0.22), 0 0 28px -6px rgb(22 119 255 / 0.32);
   }
 
   .dark {
     /* ============================================================
-       Dark Data Dashboard — Deep Navy
+       Dark Data Dashboard — Deep Navy (DEFAULT)
+       v2 keeps the navy identity but makes data POP: more chroma in
+       state colors & section accents, gradient cards, glow.
        ============================================================ */
 
-    --bg-main: #071426;
-    --bg-surface: #0d1b2e;
-    --bg-surface-2: #102544;
+    --bg-main: #060f1e;
+    --bg-surface: #0c1727;
+    --bg-surface-2: #13223a;
 
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
 
-    --border-color: #1e293b;
+    --border-color: #1a2a44;
 
-    --success: #22c55e;
+    --success: #2fd071;
     --warning: #f59e0b;
-    --danger: #ef4444;
+    --danger: #f43f5e;
 
     /* ---- Surfaces ---- */
-    --background: 215 7% 9%; /* #071426 */
-    --foreground: 210 40% 98%; /* #F8FAFC */
+    --background: 216 65% 6%; /* #060F1E — deeper than v1 for contrast */
+    --foreground: 210 40% 98%;
 
-    --surface: 215 7% 12%; /* #0D1B2E */
-    --surface-raised: 216 12% 16%; /* #102544 */
+    --surface: 215 60% 10%; /* #0C1727 */
+    --surface-raised: 215 55% 14%; /* #13223A */
     --surface-foreground: 210 40% 98%;
 
-    --card: 215 7% 12%; /* #0D1B2E */
+    --card: 215 60% 10%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 216 14% 13%; /* slightly raised popover surface */
+    --popover: 216 55% 12%; /* #101E33 */
     --popover-foreground: 210 40% 98%;
 
     /* ---- Brand ---- */
-    --primary: 216 100% 54%; /* #1677FF */
+    --primary: 216 100% 58%; /* #2E8BFF — brighter for dark bg */
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 216 12% 16%; /* #102544 */
+    --secondary: 216 50% 15%; /* #13223A */
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 216 12% 16%;
-    --muted-foreground: 215 20% 65%; /* #94A3B8 */
+    --muted: 216 50% 15%;
+    --muted-foreground: 215 25% 67%; /* #8DA2BC */
 
-    --accent: 186 72% 47%; /* #16C7D9 */
-    --accent-foreground: 210 40% 98%;
+    --accent: 186 85% 50%; /* #16C7D9 boosted */
+    --accent-foreground: 216 65% 8%;
 
-    --cyan: 186 72% 47%; /* #16C7D9 */
-    --purple: 239 84% 67%; /* #6366F1 */
+    --cyan: 186 85% 50%;
+    --purple: 254 90% 70%; /* #8B78FF */
 
-    --destructive: 0 84% 60%; /* #EF4444 */
+    --destructive: 350 89% 60%; /* #F43F5E */
     --destructive-foreground: 210 40% 98%;
 
-    --success: 142 58% 45%; /* #22C55E */
-    --success-foreground: 210 40% 98%;
+    --success: 152 69% 48%; /* #2FD071 */
+    --success-foreground: 216 65% 8%;
 
-    --warning: 38 92% 50%; /* #F59E0B */
+    --warning: 38 95% 55%;
     --warning-foreground: 38 100% 8%;
 
-    --border: 217 33% 17%; /* #1E293B */
-    --input: 217 33% 17%;
-    --ring: 216 100% 54%;
+    --info: 217 91% 62%; /* #4C8DFF */
+
+    --border: 216 45% 18%; /* #1A2A44 */
+    --input: 216 45% 18%;
+    --ring: 216 100% 58%;
+
+    /* ---- Section identity palette (dark: same hues, +lightness) ---- */
+    --section-command: 216 100% 58%;
+    --section-brands: 40 96% 56%; /* #FBBF24 */
+    --section-social: 186 85% 50%;
+    --section-finance: 152 69% 48%;
+    --section-tasks: 254 90% 70%;
+    --section-content: 330 84% 62%;
+    --section-analytics: 280 70% 64%;
 
     /* ---- Chart palette ---- */
-    --chart-1: 216 100% 54%;
-    --chart-2: 186 72% 47%;
-    --chart-3: 239 84% 67%;
-    --chart-4: 142 58% 45%;
-    --chart-5: 38 92% 50%;
+    --chart-1: 216 100% 58%;
+    --chart-2: 186 85% 50%;
+    --chart-3: 254 90% 70%;
+    --chart-4: 152 69% 48%;
+    --chart-5: 38 95% 55%;
+    --chart-6: 330 84% 62%;
+    --chart-7: 280 70% 64%;
 
     /* ===== Brand Ramp ===== */
     --brand-50: 216 100% 97%;
@@ -189,23 +224,23 @@
     --brand-300: 216 87% 69%;
     --brand-400: 216 82% 61%;
     --brand-500: 216 100% 54%;
-    --brand-600: 215 86% 46%;
-    --brand-700: 217 76% 38%;
-    --brand-800: 218 66% 30%;
-    --brand-900: 219 56% 22%;
+    --brand-600: 215 90% 48%;
+    --brand-700: 217 82% 40%;
+    --brand-800: 218 72% 32%;
+    --brand-900: 219 62% 24%;
 
-    /* ===== Shadows (very subtle, navy-tinted) ===== */
-    --shadow-xs: 0 1px 2px 0 rgb(7 20 38 / 0.35);
+    /* ===== Shadows (navy-tinted, deeper than v1) ===== */
+    --shadow-xs: 0 1px 2px 0 rgb(2 8 20 / 0.5);
     --shadow-sm:
-      0 1px 3px 0 rgb(7 20 38 / 0.4), 0 1px 2px -1px rgb(7 20 38 / 0.4);
+      0 1px 3px 0 rgb(2 8 20 / 0.55), 0 1px 2px -1px rgb(2 8 20 / 0.5);
     --shadow-md:
-      0 4px 6px -1px rgb(7 20 38 / 0.45), 0 2px 4px -2px rgb(7 20 38 / 0.4);
+      0 6px 14px -4px rgb(2 8 20 / 0.6), 0 2px 6px -2px rgb(2 8 20 / 0.5);
     --shadow-lg:
-      0 10px 15px -3px rgb(7 20 38 / 0.5), 0 4px 6px -4px rgb(7 20 38 / 0.45);
+      0 14px 28px -8px rgb(2 8 20 / 0.65), 0 6px 12px -6px rgb(2 8 20 / 0.55);
     --shadow-xl:
-      0 20px 25px -5px rgb(7 20 38 / 0.55), 0 8px 10px -6px rgb(7 20 38 / 0.5);
+      0 24px 40px -8px rgb(2 8 20 / 0.7), 0 10px 16px -8px rgb(2 8 20 / 0.6);
     --shadow-glow:
-      0 0 0 1px rgb(22 119 255 / 0.2), 0 0 24px -6px rgb(22 119 255 / 0.4);
+      0 0 0 1px rgb(46 139 255 / 0.28), 0 0 32px -6px rgb(46 139 255 / 0.45);
   }
 
   * {
@@ -273,9 +308,206 @@
     background:
       radial-gradient(
         60% 120% at 50% 0%,
-        rgb(22 119 255 / 0.08) 0%,
+        rgb(22 119 255 / 0.1) 0%,
         transparent 60%
       ),
       hsl(var(--surface));
+  }
+
+  /* ============================================================
+     v2 — Vivid Dashboard utilities
+     ============================================================ */
+
+  /* Page header with a vivid brand gradient wash + tinted border */
+  .page-header-gradient {
+    background:
+      linear-gradient(
+        135deg,
+        rgb(22 119 255 / 0.16) 0%,
+        rgb(22 199 217 / 0.1) 45%,
+        rgb(124 92 252 / 0.1) 100%
+      ),
+      hsl(var(--surface));
+    border-color: hsl(var(--primary) / 0.25);
+  }
+
+  /* Card gradient tints — one accent per section, floating on the
+     dark navy card color. `--tint` is set inline per section. */
+  .card-tint {
+    background:
+      linear-gradient(
+        160deg,
+        hsl(var(--tint, var(--primary)) / 0.14) 0%,
+        hsl(var(--tint, var(--primary)) / 0.04) 38%,
+        transparent 65%
+      ),
+      hsl(var(--card));
+    border-color: hsl(var(--tint, var(--primary)) / 0.28);
+  }
+
+  /* Hero KPI card — stronger tinted gradient + inner highlight */
+  .kpi-card-gradient {
+    background:
+      linear-gradient(
+        150deg,
+        hsl(var(--tint, var(--primary)) / 0.22) 0%,
+        hsl(var(--tint, var(--primary)) / 0.06) 42%,
+        transparent 70%
+      ),
+      hsl(var(--card));
+    border-color: hsl(var(--tint, var(--primary)) / 0.35);
+  }
+
+  /* ============================================================
+     v2 — Forms, modals & tables (phase 3)
+     Same `--tint` mechanism: a form/dialog/table renders in the
+     color of its section (finance = emerald, tasks = purple, …).
+     ============================================================ */
+
+  /* Modal/dialog surface tinted by the owning section */
+  .form-dialog {
+    background:
+      linear-gradient(
+        170deg,
+        hsl(var(--tint, var(--primary)) / 0.1) 0%,
+        hsl(var(--tint, var(--primary)) / 0.03) 30%,
+        transparent 55%
+      ),
+      hsl(var(--card));
+    border-color: hsl(var(--tint, var(--primary)) / 0.3);
+    box-shadow:
+      0 24px 60px -18px rgb(0 0 0 / 0.55),
+      0 6px 22px -10px hsl(var(--tint, var(--primary)) / 0.4);
+  }
+
+  /* Input / select focus — tinted ring instead of the global blue */
+  .input-tinted {
+    border-color: hsl(var(--tint, var(--primary)) / 0.35);
+  }
+
+  .input-tinted:focus-visible,
+  .input-tinted:focus {
+    outline: none;
+    border-color: hsl(var(--tint, var(--primary)) / 0.7);
+    box-shadow:
+      0 0 0 3px hsl(var(--tint, var(--primary)) / 0.18),
+      0 0 0 1px hsl(var(--tint, var(--primary)) / 0.35);
+  }
+
+  /* Data-table header row — subtle section gradient */
+  .table-head-tinted {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--tint, var(--primary)) / 0.14),
+      hsl(var(--tint, var(--primary)) / 0.05)
+    );
+  }
+
+  .table-head-tinted th {
+    color: hsl(var(--foreground) / 0.85);
+    font-weight: 700;
+  }
+
+  /* ============================================================
+     v2 — FlowBoard board detail (phase 3)
+     List columns and ghost buttons on a colored board background,
+     tinted by `--tint` (set to the tasks section color per page).
+     ============================================================ */
+
+  /* Translucent list column floating on the colored board bg */
+  .v2-list-panel {
+    background:
+      linear-gradient(
+        160deg,
+        hsl(var(--tint, var(--primary)) / 0.14) 0%,
+        hsl(var(--tint, var(--primary)) / 0.05) 38%,
+        transparent 62%
+      ),
+      hsl(var(--surface) / 0.93);
+    backdrop-filter: blur(10px) saturate(130%);
+    -webkit-backdrop-filter: blur(10px) saturate(130%);
+    border: 1px solid hsl(var(--tint, var(--primary)) / 0.22);
+  }
+
+  /* «Add list» ghost button tinted by the section color */
+  .v2-add-list-btn {
+    background: hsl(var(--tint, var(--primary)) / 0.32);
+  }
+
+  .v2-add-list-btn:hover {
+    background: hsl(var(--tint, var(--primary)) / 0.45);
+  }
+
+  /* Cover swatch card in the board background picker */
+  .v2-cover-card {
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 4px 14px -6px rgb(0 0 0 / 0.45);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .v2-cover-card:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 10px 24px -8px rgb(0 0 0 / 0.55);
+  }
+
+  /* Vivid icon chip — tinted square behind an icon (KPI cards,
+     section headers, quick access). Pairs with .icon-chip-fg. */
+  .icon-chip {
+    background: hsl(var(--tint, var(--primary)) / 0.16);
+    color: hsl(var(--tint, var(--primary)));
+    border: 1px solid hsl(var(--tint, var(--primary)) / 0.25);
+  }
+
+  /* Gradient-filled icon chip (primary actions / hero icons) */
+  .icon-chip-solid {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--tint, var(--primary)) / 0.9),
+      hsl(var(--tint, var(--primary)) / 0.65)
+    );
+    color: hsl(0 0% 100%);
+    box-shadow: 0 4px 14px -4px hsl(var(--tint, var(--primary)) / 0.55);
+  }
+
+  /* Thin vivid progress bar / pipeline bar */
+  .vivid-bar {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--tint, var(--primary)) / 0.55),
+      hsl(var(--tint, var(--primary)))
+    );
+  }
+
+  /* ============================================================
+     v2 — Typography scale (وزیرمتن variable, weights 100–900)
+     Clearer hierarchy: page title / section title / body / meta.
+     ============================================================ */
+
+  /* Page hero title — «مرکز فرمان» level (36px / 800) */
+  .text-page-title {
+    @apply text-3xl font-extrabold tracking-tight lg:text-4xl lg:font-black;
+    line-height: 1.25;
+  }
+
+  /* Card section heading with icon (14px / 700) */
+  .text-section-title {
+    @apply text-sm font-bold tracking-tight;
+  }
+
+  /* KPI value — big dashboard numbers (32px / 800, Persian digits) */
+  .text-kpi-value {
+    @apply text-3xl font-extrabold tracking-tight;
+    font-feature-settings: 'ss01';
+    line-height: 1.2;
+  }
+
+  /* Body emphasis (14px / 600) */
+  .text-body-strong {
+    @apply text-sm font-semibold;
+  }
+
+  /* Meta / caption (12px, muted) */
+  .text-meta {
+    @apply text-xs;
   }
 }

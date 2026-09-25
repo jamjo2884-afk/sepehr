@@ -61,3 +61,5 @@ scripts/cascade-sim.mjs
 scripts/count-brand-series.mjs
 scripts/diagnose-brand-links.mjs
 scripts/trends-audit.mjs
+test-results/
+.freebuff/

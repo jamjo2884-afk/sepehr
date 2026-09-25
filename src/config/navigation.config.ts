@@ -24,6 +24,30 @@ export type NavItem = {
   href: string;
   icon: LucideIcon;
   description: string;
+  /**
+   * Section identity color (v2 design system). One hue per main area so
+   * the user knows at a glance where they are. Values are the names of
+   * the `--section-*` design tokens (see globals.css / docs/design-tokens.md).
+   */
+  section:
+    | 'command'
+    | 'tasks'
+    | 'content'
+    | 'brands'
+    | 'social'
+    | 'finance'
+    | 'analytics';
+};
+
+/** Map a section token name to its CSS custom property. */
+export const sectionTintVar: Record<NavItem['section'], string> = {
+  command: 'var(--section-command)',
+  tasks: 'var(--section-tasks)',
+  content: 'var(--section-content)',
+  brands: 'var(--section-brands)',
+  social: 'var(--section-social)',
+  finance: 'var(--section-finance)',
+  analytics: 'var(--section-analytics)',
 };
 
 export const navItems: NavItem[] = [
@@ -33,6 +57,7 @@ export const navItems: NavItem[] = [
     href: '/command-center',
     icon: LayoutDashboard,
     description: 'نمای کلی عملیات رسانه‌ای و نقطه شروع روزانه شما',
+    section: 'command',
   },
   {
     id: 'tasks',
@@ -40,6 +65,7 @@ export const navItems: NavItem[] = [
     href: '/tasks',
     icon: ListTodo,
     description: 'مدیریت وظایف، پروژه‌ها و عملیات',
+    section: 'tasks',
   },
   {
     id: 'content',
@@ -47,6 +73,7 @@ export const navItems: NavItem[] = [
     href: '/content',
     icon: ClipboardList,
     description: 'چرخه تولید محتوا: پیش‌نویس تا انتشار',
+    section: 'content',
   },
   {
     id: 'assets',
@@ -54,6 +81,7 @@ export const navItems: NavItem[] = [
     href: '/assets',
     icon: Package,
     description: 'آرشیو و مدیریت فایل‌ها و دارایی‌های رسانه‌ای',
+    section: 'content',
   },
   {
     id: 'brands',
@@ -61,6 +89,7 @@ export const navItems: NavItem[] = [
     href: '/brands',
     icon: Award,
     description: 'مشاهده و مدیریت تمام برندها به صورت موزاییکی',
+    section: 'brands',
   },
   {
     id: 'distribution',
@@ -68,6 +97,7 @@ export const navItems: NavItem[] = [
     href: '/distribution',
     icon: Rocket,
     description: 'انتشار محتوا در کانال‌ها و پلتفرم‌های مختلف',
+    section: 'social',
   },
   {
     id: 'social',
@@ -75,6 +105,7 @@ export const navItems: NavItem[] = [
     href: '/social',
     icon: Share2,
     description: 'مدیریت و آمار اکانت‌های شبکه‌های اجتماعی',
+    section: 'social',
   },
   {
     id: 'campaigns',
@@ -82,6 +113,7 @@ export const navItems: NavItem[] = [
     href: '/campaigns',
     icon: Megaphone,
     description: 'برنامه‌ریزی و اجرای کمپین‌های رسانه‌ای',
+    section: 'brands',
   },
   {
     id: 'audience',
@@ -89,6 +121,7 @@ export const navItems: NavItem[] = [
     href: '/audience',
     icon: Users,
     description: 'بخش‌بندی مخاطبان و شناخت رفتار آن‌ها',
+    section: 'social',
   },
   {
     id: 'finance',
@@ -96,6 +129,7 @@ export const navItems: NavItem[] = [
     href: '/finance',
     icon: Wallet,
     description: 'مدیریت بودجه، هزینه و بازدهی برندها',
+    section: 'finance',
   },
   {
     id: 'analytics',
@@ -103,6 +137,7 @@ export const navItems: NavItem[] = [
     href: '/analytics',
     icon: BarChart3,
     description: 'تحلیل عملکرد و گزارش‌های رسانه‌ای',
+    section: 'analytics',
   },
   {
     id: 'intelligence',
@@ -110,6 +145,7 @@ export const navItems: NavItem[] = [
     href: '/intelligence',
     icon: BrainCircuit,
     description: 'بینش‌های هوشمند و تحلیل محیط رسانه‌ای',
+    section: 'analytics',
   },
   {
     id: 'automation',
@@ -117,6 +153,7 @@ export const navItems: NavItem[] = [
     href: '/automation',
     icon: Bot,
     description: 'اتوماسیون فرایندها و جریان‌های کاری',
+    section: 'analytics',
   },
   {
     id: 'knowledge',
@@ -124,6 +161,7 @@ export const navItems: NavItem[] = [
     href: '/knowledge',
     icon: BookOpen,
     description: 'مقالات، راهنماها و دانش سازمانی',
+    section: 'content',
   },
   {
     id: 'notifications',
@@ -131,6 +169,7 @@ export const navItems: NavItem[] = [
     href: '/notifications',
     icon: Bell,
     description: 'اعلان‌ها و هشدارهای سیستم',
+    section: 'command',
   },
   {
     id: 'settings',
@@ -138,6 +177,7 @@ export const navItems: NavItem[] = [
     href: '/settings',
     icon: Settings,
     description: 'پیکربندی سیستم و حساب کاربری',
+    section: 'command',
   },
 ];
 

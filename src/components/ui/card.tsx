@@ -9,7 +9,9 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'rounded-lg border bg-card text-card-foreground shadow-sm',
+      // v2 "Vivid Dashboard" card: more depth than v1 flat card —
+      // medium shadow, radius-xl, hairline top highlight, hover lift.
+      'rounded-xl border border-border/70 bg-card text-card-foreground shadow-[0_1px_0_0_rgb(255_255_255/0.04)_inset,0_6px_14px_-4px_rgb(7_20_38/0.12)] transition-[box-shadow,transform,border-color] duration-200 hover:shadow-lg hover:border-border',
       className,
     )}
     {...props}
@@ -36,7 +38,8 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      'text-2xl font-semibold leading-none tracking-tight',
+      // v2: heavier title weight for clearer hierarchy (Vazirmatn 700–800).
+      'text-xl font-bold leading-none tracking-tight',
       className,
     )}
     {...props}

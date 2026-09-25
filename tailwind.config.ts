@@ -72,6 +72,10 @@ const config: Config = {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
+        info: {
+          DEFAULT: 'hsl(var(--info))',
+          foreground: 'hsl(var(--primary-foreground))',
+        },
         success: {
           DEFAULT: 'hsl(var(--success))',
           foreground: 'hsl(var(--success-foreground))',
@@ -92,6 +96,16 @@ const config: Config = {
           DEFAULT: 'hsl(var(--background))',
           surface: 'hsl(var(--surface))',
           'surface-2': 'hsl(var(--surface-raised))',
+        },
+        /* Section identity colors — one hue per main area */
+        section: {
+          command: 'hsl(var(--section-command))',
+          brands: 'hsl(var(--section-brands))',
+          social: 'hsl(var(--section-social))',
+          finance: 'hsl(var(--section-finance))',
+          tasks: 'hsl(var(--section-tasks))',
+          content: 'hsl(var(--section-content))',
+          analytics: 'hsl(var(--section-analytics))',
         },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
