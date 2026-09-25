@@ -17,20 +17,35 @@ export function formatSigned(value: number): string {
   return `${value > 0 ? '+' : value < 0 ? '-' : ''}${abs}`;
 }
 
-/** Section title used across the analytics dashboard. */
+/**
+ * Section title used across the analytics dashboard (v2: the icon sits in a
+ * vivid tint chip — default brand blue, or the section's own hue).
+ */
 export function SectionTitle({
   icon: Icon,
   title,
   extra,
+  tint,
 }: {
   icon?: LucideIcon;
   title: string;
   extra?: React.ReactNode;
+  /** CSS color value for the icon chip (e.g. sectionTintVar.social). */
+  tint?: string;
 }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-2">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-        {Icon ? <Icon className="h-4 w-4 text-primary" /> : null}
+      <h2 className="text-section-title flex items-center gap-2 text-foreground">
+        {Icon ? (
+          <span
+            className="icon-chip flex h-7 w-7 items-center justify-center rounded-lg"
+            style={
+              tint ? { ['--tint' as string]: tint } : undefined
+            }
+          >
+            <Icon className="h-4 w-4" />
+          </span>
+        ) : null}
         {title}
       </h2>
       {extra}

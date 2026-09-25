@@ -21,22 +21,24 @@ interface KpiCardProps {
   label: string;
   value: string;
   subtext?: string;
-  color?: string;
+  /** CSS color for the v2 tint (defaults to the finance emerald). */
+  tint?: string;
 }
 
-function KpiCard({ icon, label, value, subtext, color = 'text-primary' }: KpiCardProps) {
+function KpiCard({ icon, label, value, subtext, tint = 'var(--section-finance)' }: KpiCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-start gap-3 rounded-xl border border-border bg-surface/60 p-4"
+      className="kpi-card-gradient flex items-start gap-3 rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+      style={{ ['--tint' as string]: tint }}
     >
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 ${color}`}>
+      <div className="icon-chip flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="truncate text-lg font-bold text-foreground">{value}</p>
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="truncate text-lg font-extrabold text-foreground persian-nums">{value}</p>
         {subtext && (
           <p className="text-[11px] text-muted-foreground">{subtext}</p>
         )}
@@ -57,13 +59,13 @@ export function FinanceKpiCards({ kpis }: { kpis: FinanceOverviewKpis }) {
         icon={<Receipt className="h-5 w-5" />}
         label="هزینه‌شده"
         value={formatNumber(kpis.totalSpent)}
-        color="text-warning"
+        tint="var(--warning)"
       />
       <KpiCard
         icon={<TrendingUp className="h-5 w-5" />}
         label="مانده بودجه"
         value={formatNumber(kpis.remainingBudget)}
-        color="text-success"
+        tint="var(--success)"
       />
       <KpiCard
         icon={<PieChart className="h-5 w-5" />}
@@ -81,7 +83,7 @@ export function FinanceKpiCards({ kpis }: { kpis: FinanceOverviewKpis }) {
         label="باقی‌مانده"
         value={`${formatNumber(Math.round(100 - kpis.budgetUsagePercent))}%`}
         subtext="از بودجه کل"
-        color="text-cyan"
+        tint="var(--section-social)"
       />
     </div>
   );
@@ -268,10 +270,11 @@ export function FinanceSubNav() {
           <Link
             key={tab.href}
             href={tab.href}
+            style={{ ['--tint' as string]: 'var(--section-finance)' }}
             className={cn(
               'whitespace-nowrap rounded-t-lg px-4 py-2.5 text-sm font-medium transition-colors',
               active
-                ? 'border-b-2 border-primary bg-primary/5 text-foreground'
+                ? 'border-b-2 text-foreground [border-bottom-color:var(--tint)]'
                 : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
             )}
           >
@@ -318,9 +321,16 @@ export function BrandFilter({
           className={cn(
             'shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
             selected === brand
-              ? 'border-primary bg-primary/10 text-primary'
+              ? 'text-foreground [border-color:color-mix(in_srgb,var(--tint)_45%,transparent)]'
               : 'border-border text-muted-foreground hover:bg-secondary',
           )}
+          style={{
+            ['--tint' as string]: 'var(--section-brands)',
+            background:
+              selected === brand
+                ? 'color-mix(in srgb, var(--tint) 15%, transparent)'
+                : undefined,
+          }}
         >
           {brand}
         </button>

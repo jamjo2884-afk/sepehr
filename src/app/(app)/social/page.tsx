@@ -577,14 +577,12 @@ export default function SocialPage() {
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="flex flex-col gap-6"
     >
-      <header className="flex flex-col gap-1">
-        <p className="text-sm text-muted-foreground">
+      <header className="page-header-gradient flex flex-col gap-1 rounded-2xl border p-5 shadow-lg" style={{ ['--tint' as string]: 'var(--section-social)' }}>
+        <p className="text-meta font-medium text-muted-foreground">
           داشبورد تحلیل و مقایسه برندها و شبکه‌های اجتماعی
         </p>
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            شبکه‌های اجتماعی
-          </h1>
+          <h1 className="text-page-title text-foreground">شبکه‌های اجتماعی</h1>
           <div className="flex items-center gap-2">
             <Button
               size="sm"
@@ -656,8 +654,15 @@ export default function SocialPage() {
               chart of this page (growth-rate chart removed; the server
               trend section below reuses this same data shape) */}
           <section>
-            <SectionTitle icon={TrendingUp} title="روند کل دنبال‌کنندگان" />
-            <div className="rounded-xl border border-border bg-surface/60 p-4">
+            <SectionTitle
+              icon={TrendingUp}
+              title="روند کل دنبال‌کنندگان"
+              tint="var(--section-social)"
+            />
+            <div
+              className="card-tint rounded-2xl border p-4 shadow-md"
+              style={{ ['--tint' as string]: 'var(--section-social)' }}
+            >
               <FollowersTrendChart
                 series={trendSeries}
                 overLimitNote={overLimitNote}
@@ -681,8 +686,15 @@ export default function SocialPage() {
 
           {/* Platform breakdown */}
           <section>
-            <SectionTitle icon={PieChart} title="عملکرد شبکه‌ها" />
-            <div className="rounded-xl border border-border bg-surface/60 p-4">
+            <SectionTitle
+              icon={PieChart}
+              title="عملکرد شبکه‌ها"
+              tint="var(--chart-1)"
+            />
+            <div
+              className="card-tint rounded-2xl border p-4 shadow-md"
+              style={{ ['--tint' as string]: 'var(--chart-1)' }}
+            >
               <PlatformBreakdownChart stats={platformStats} />
             </div>
           </section>
@@ -692,6 +704,7 @@ export default function SocialPage() {
             <SectionTitle
               icon={Heart}
               title="روند تعامل برندها"
+              tint="var(--section-content)"
               extra={
                 <span className="text-[11px] text-muted-foreground">
                   مقایسه روند تعامل (لایک، کامنت، اشتراک) برندها در بازه زمانی
@@ -699,7 +712,10 @@ export default function SocialPage() {
                 </span>
               }
             />
-            <div className="rounded-xl border border-border bg-surface/60 p-4">
+            <div
+              className="card-tint rounded-2xl border p-4 shadow-md"
+              style={{ ['--tint' as string]: 'var(--section-content)' }}
+            >
               <EngagementTrendChart trends={engagementTrends} />
             </div>
           </section>
@@ -709,6 +725,7 @@ export default function SocialPage() {
             <SectionTitle
               icon={GitCompareArrows}
               title="مقایسه برندها"
+              tint="var(--section-brands)"
               extra={
                 <span className="text-[11px] text-muted-foreground">
                   برای مقایسه در نمودار، برندها را از ستون انتخاب علامت بزنید
@@ -725,8 +742,15 @@ export default function SocialPage() {
 
           {/* Platform comparison table (when one brand selected) */}
           <section>
-            <SectionTitle icon={Share2} title="مقایسه عملکرد شبکه‌ها" />
-            <div className="rounded-xl border border-border bg-surface/60 p-4">
+            <SectionTitle
+              icon={Share2}
+              title="مقایسه عملکرد شبکه‌ها"
+              tint="var(--chart-1)"
+            />
+            <div
+              className="card-tint rounded-2xl border p-4 shadow-md"
+              style={{ ['--tint' as string]: 'var(--chart-1)' }}
+            >
               <PlatformComparisonTable
                 stats={platformStats}
                 brand={singleBrand}
@@ -736,8 +760,15 @@ export default function SocialPage() {
 
           {/* Period comparison */}
           <section>
-            <SectionTitle icon={CalendarRange} title="مقایسه با دوره قبل" />
-            <div className="rounded-xl border border-border bg-surface/60 p-4">
+            <SectionTitle
+              icon={CalendarRange}
+              title="مقایسه با دوره قبل"
+              tint="var(--section-tasks)"
+            />
+            <div
+              className="card-tint rounded-2xl border p-4 shadow-md"
+              style={{ ['--tint' as string]: 'var(--section-tasks)' }}
+            >
               <PeriodComparison
                 items={kpiComparison}
                 rangeLabel={`${jalaliMonthName(range.start)} — ${jalaliMonthName(range.end)}`}
@@ -753,7 +784,7 @@ export default function SocialPage() {
       {/* Per-account cards, grouped by platform */}
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <SectionTitle icon={Users} title="اکانت‌ها" />
+          <SectionTitle icon={Users} title="اکانت‌ها" tint="var(--section-social)" />
           <Button
             variant="outline"
             size="sm"

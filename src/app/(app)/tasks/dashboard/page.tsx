@@ -58,13 +58,16 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="h-14 border-b border-border bg-card flex items-center px-4 gap-4">
-        <button onClick={() => router.push("/tasks/boards")} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <header 
+        className="page-header-gradient mb-6 flex h-14 items-center gap-4 border px-4 shadow-md"
+        style={{ ['--tint' as string]: 'var(--section-tasks)' }}
+      >
+        <button onClick={() => router.push("/tasks/boards")} className="icon-chip flex h-8 w-8 items-center justify-center rounded-lg">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={locale === "fa" ? "M9 5l7 7-7 7" : "M15 19l-7-7 7-7"} />
           </svg>
         </button>
-        <h1 className="font-semibold text-lg">{t("nav.dashboard")}</h1>
+        <h1 className="text-section-title text-foreground">{t("nav.dashboard")}</h1>
       </header>
 
       <div className="p-6 max-w-5xl">
@@ -74,17 +77,22 @@ export default function DashboardPage() {
           </div>
         ) : !data ? null : (
           <>
-            {/* KPI Cards */}
+            {/* KPI Cards — v2 per-stat tints (v1 used light pastel bg-* colors
+                that were unreadable on the dark theme) */}
             <div className="grid grid-cols-4 gap-4 mb-6">
               {[
-                { label: t("dashboard.totalCards"), value: data.stats.total, color: "text-foreground", bg: "bg-card" },
-                { label: t("dashboard.completedCards"), value: data.stats.completed, color: "text-emerald-600", bg: "bg-emerald-50" },
-                { label: t("dashboard.overdueCards"), value: data.stats.overdue, color: "text-red-600", bg: "bg-red-50" },
-                { label: t("dashboard.completionRate"), value: `${completionRate}%`, color: "text-blue-600", bg: "bg-blue-50" },
+                { label: t("dashboard.totalCards"), value: data.stats.total, tint: "var(--section-tasks)" },
+                { label: t("dashboard.completedCards"), value: data.stats.completed, tint: "var(--success)" },
+                { label: t("dashboard.overdueCards"), value: data.stats.overdue, tint: "var(--destructive)" },
+                { label: t("dashboard.completionRate"), value: `${completionRate}%`, tint: "var(--chart-1)" },
               ].map((kpi) => (
-                <div key={kpi.label} className={`${kpi.bg} rounded-xl border border-border p-4`}>
+                <div
+                  key={kpi.label}
+                  className="card-tint rounded-2xl border p-4 shadow-sm"
+                  style={{ ['--tint' as string]: kpi.tint }}
+                >
                   <p className="text-xs text-muted-foreground mb-1">{kpi.label}</p>
-                  <p className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</p>
+                  <p className="text-2xl font-extrabold text-foreground persian-nums">{kpi.value}</p>
                 </div>
               ))}
             </div>

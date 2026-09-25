@@ -231,10 +231,13 @@ export default function BrandsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
+      {/* Header — v2: amber (brands section) gradient hero */}
+      <div
+        className="page-header-gradient flex items-start justify-between gap-4 rounded-2xl border p-5 shadow-lg"
+        style={{ ['--tint' as string]: 'var(--section-brands)' }}
+      >
         <div>
-          <h1 className="text-lg font-bold text-foreground">برندها</h1>
+          <h1 className="text-page-title text-foreground">برندها</h1>
           <p className="text-sm text-muted-foreground">
             {toPersianDigits(String(brands.length))} برند — روی هر برند کلیک
             کنید تا جزئیات آن را ببینید.
@@ -243,7 +246,7 @@ export default function BrandsPage() {
         <button
           type="button"
           onClick={() => setShowManagement(!showManagement)}
-          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
         >
           <Settings className="h-3.5 w-3.5" />
           مدیریت برندها
@@ -281,10 +284,10 @@ export default function BrandsPage() {
                     brand.accounts[0]?.brandId ??
                     null,
                 )}
-                className="group block rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+                className="group block rounded-2xl border p-5 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
                 style={{
-                  background: `linear-gradient(135deg, ${bc.light}, transparent)`,
-                  borderColor: `${bc.primary}30`,
+                  background: `linear-gradient(135deg, ${bc.light}, transparent), hsl(var(--card))`,
+                  borderColor: `${bc.primary}38`,
                 }}
               >
                 {/* Brand name + follower count */}
@@ -313,14 +316,14 @@ export default function BrandsPage() {
 
                 {/* Total followers */}
                 <div className="mb-4">
-                  <p className="text-2xl font-bold tabular-nums text-foreground">
+                  <p className="text-kpi-value tabular-nums text-foreground">
                     {brand.totalFollowers > 0
                       ? toPersianDigits(
                           brand.totalFollowers.toLocaleString('en'),
                         )
                       : '—'}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs font-medium text-muted-foreground">
                     دنبال‌کننده کل
                   </p>
                 </div>

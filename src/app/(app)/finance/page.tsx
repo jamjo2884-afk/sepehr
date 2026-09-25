@@ -92,12 +92,13 @@ export default function FinancePage() {
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="flex flex-col gap-6"
     >
-      {/* Header */}
-      <header className="flex flex-col gap-1">
+      {/* Header — v2: emerald (finance section) gradient hero */}
+      <header
+        className="page-header-gradient flex flex-col gap-1 rounded-2xl border p-5 shadow-lg"
+        style={{ ['--tint' as string]: 'var(--section-finance)' }}
+      >
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            مدیریت مالی
-          </h1>
+          <h1 className="text-page-title text-foreground">مدیریت مالی</h1>
           <div className="flex items-center gap-2">
             <Button size="sm" className="gap-1.5 text-xs" asChild>
               <Link href="/finance/expenses">
@@ -135,13 +136,21 @@ export default function FinancePage() {
         <FinanceKpiCards kpis={overview} />
       </section>
 
-      {/* Charts grid */}
+      {/* Charts grid — v2 tinted chart containers */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Budget vs Actual */}
-        <section className="rounded-xl border border-border bg-surface/60 p-4">
+        <section
+          className="card-tint rounded-2xl border p-4 shadow-md"
+          style={{ ['--tint' as string]: 'var(--section-finance)' }}
+        >
           <div className="mb-4 flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">
+            <span
+              className="icon-chip flex h-7 w-7 items-center justify-center rounded-lg"
+              style={{ ['--tint' as string]: 'var(--section-finance)' }}
+            >
+              <BarChart3 className="h-4 w-4" />
+            </span>
+            <h2 className="text-section-title text-foreground">
               بودجه در مقابل هزینه واقعی
             </h2>
           </div>
@@ -149,10 +158,18 @@ export default function FinancePage() {
         </section>
 
         {/* Expense Breakdown */}
-        <section className="rounded-xl border border-border bg-surface/60 p-4">
+        <section
+          className="card-tint rounded-2xl border p-4 shadow-md"
+          style={{ ['--tint' as string]: 'var(--warning)' }}
+        >
           <div className="mb-4 flex items-center gap-2">
-            <PieChart className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">
+            <span
+              className="icon-chip flex h-7 w-7 items-center justify-center rounded-lg"
+              style={{ ['--tint' as string]: 'var(--warning)' }}
+            >
+              <PieChart className="h-4 w-4" />
+            </span>
+            <h2 className="text-section-title text-foreground">
               تفکیک هزینه‌ها
             </h2>
           </div>
@@ -161,10 +178,18 @@ export default function FinancePage() {
       </div>
 
       {/* Brand Cost Comparison */}
-      <section className="rounded-xl border border-border bg-surface/60 p-4">
+      <section
+        className="card-tint rounded-2xl border p-4 shadow-md"
+        style={{ ['--tint' as string]: 'var(--section-brands)' }}
+      >
         <div className="mb-4 flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">
+          <span
+            className="icon-chip flex h-7 w-7 items-center justify-center rounded-lg"
+            style={{ ['--tint' as string]: 'var(--section-brands)' }}
+          >
+            <Building2 className="h-4 w-4" />
+          </span>
+          <h2 className="text-section-title text-foreground">
             مقایسه هزینه برندها
           </h2>
         </div>

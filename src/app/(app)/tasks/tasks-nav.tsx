@@ -26,6 +26,7 @@ export function TasksNav() {
       dir="rtl"
       aria-label="مدیریت کارها"
       className="sticky top-16 z-10 flex gap-1 overflow-x-auto border-b border-border bg-card px-3 sm:px-6"
+      style={{ ['--tint' as string]: 'var(--section-tasks)' }}
     >
       {NAV_ITEMS.map((item) => {
         const active =
@@ -37,7 +38,7 @@ export function TasksNav() {
             aria-current={active ? 'page' : undefined}
             className={`flex h-11 shrink-0 items-center border-b-2 px-3 text-sm whitespace-nowrap transition-colors ${
               active
-                ? 'border-primary font-medium text-foreground'
+                ? 'font-medium text-foreground [border-bottom-color:var(--tint)]'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
