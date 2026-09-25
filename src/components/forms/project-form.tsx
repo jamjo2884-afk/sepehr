@@ -85,8 +85,11 @@ export function ProjectForm({
           <Plus className="h-4 w-4" />
           {triggerLabel}
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      </DialogTrigger>        {/* v2: dialog tinted with the tasks section color */}
+        <DialogContent
+          className="form-dialog sm:max-w-md"
+          style={{ ['--tint' as string]: 'var(--section-tasks)' }}
+        >
         <DialogHeader>
           <DialogTitle>پروژه جدید</DialogTitle>
           <DialogDescription>
@@ -100,6 +103,7 @@ export function ProjectForm({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="مثلاً: کمپین زمستانه"
+              className="input-tinted"
               autoFocus
             />
           </FormField>
@@ -109,6 +113,7 @@ export function ProjectForm({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="هدف و محدوده پروژه..."
+              className="input-tinted"
               rows={3}
             />
           </FormField>
@@ -117,7 +122,7 @@ export function ProjectForm({
               value={status}
               onValueChange={(v) => setStatus(v as ProjectStatus)}
             >
-              <SelectTrigger>
+              <SelectTrigger className="input-tinted">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

@@ -98,8 +98,11 @@ export function OperationForm({
           <Plus className="h-4 w-4" />
           {triggerLabel}
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      </DialogTrigger>        {/* v2: dialog tinted with the tasks section color */}
+        <DialogContent
+          className="form-dialog sm:max-w-md"
+          style={{ ['--tint' as string]: 'var(--section-tasks)' }}
+        >
         <DialogHeader>
           <DialogTitle>عملیات جدید</DialogTitle>
           <DialogDescription>
@@ -113,15 +116,16 @@ export function OperationForm({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="مثلاً: فیلم‌برداری تیزر"
+              className="input-tinted"
               autoFocus
             />
           </FormField>
-          <FormField label="توضیحات" htmlFor="op-description">
-            <Textarea
+          <FormField label="توضیحات" htmlFor="op-description">            <Textarea
               id="op-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="شرح کار..."
+              className="input-tinted"
               rows={2}
             />
           </FormField>
@@ -131,7 +135,7 @@ export function OperationForm({
                 value={type}
                 onValueChange={(v) => setType(v as OperationType)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="input-tinted">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -150,7 +154,7 @@ export function OperationForm({
                 value={status}
                 onValueChange={(v) => setStatus(v as OperationStatus)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="input-tinted">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

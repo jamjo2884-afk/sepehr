@@ -5,6 +5,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/i18n/flowboard/context";
+// v2: shared cover-gradient helpers (section-aligned board covers)
+import { DEFAULT_BOARD_COVER, coverBackground } from "@/lib/flowboard/cover";
 
 interface Workspace { id: string; name: string; slug: string; role: string; }
 interface Board { id: string; title: string; description?: string; backgroundColor?: string; backgroundImage?: string; position: number; isFavorited: boolean; listCount: number; memberCount: number; createdAt: string; updatedAt: string; }
@@ -128,14 +130,25 @@ function BoardsPageInner() {
 
   const favorites = boards.filter((b) => b.isFavorited);
   const recent = boards.filter((b) => !b.isFavorited).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  const getBg = (b: Board) => b.backgroundImage ? { backgroundImage: `url(${b.backgroundImage})`, backgroundSize: "cover" as const } : { backgroundColor: b.backgroundColor || "#0079bf" };
+  // v2: boards without a custom color/image get the purple tasks-section
+  // gradient (from the design tokens) instead of the flat Trello-blue default;
+  // custom colors still render through --tint so overlays stay consistent.
+  const getBg = (b: Board) =>
+    b.backgroundImage
+      ? { backgroundImage: `url(${b.backgroundImage})`, backgroundSize: "cover" as const }
+      : b.backgroundColor
+        ? { backgroundColor: b.backgroundColor }
+        : { backgroundImage: "linear-gradient(135deg, hsl(var(--section-tasks)), hsl(254 40% 22%))" };
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      {/* Header — v2: purple (tasks section) gradient hero */}
+      <header
+        className="page-header-gradient flex flex-col gap-3 rounded-2xl border p-5 shadow-lg sm:flex-row sm:items-end sm:justify-between"
+        style={{ ['--tint' as string]: 'var(--section-tasks)' }}
+      >
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          <h1 className="text-page-title text-foreground">
             {t("nav.boards")}
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -190,10 +203,10 @@ function BoardsPageInner() {
         <>
           {favorites.length > 0 && (
             <section className="mb-4">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">★ {t("boards.starredBoards")}</h3>
+              <h3 className="text-section-title mb-3 text-muted-foreground uppercase tracking-wider">★ {t("boards.starredBoards")}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {favorites.map((b) => (
-                  <Link key={b.id} href={`/tasks/boards/${b.id}`} className="h-32 rounded-xl p-4 text-white font-medium shadow-sm flex flex-col justify-between hover:opacity-90 transition-opacity" style={getBg(b)}>
+                  <Link key={b.id} href={`/tasks/boards/${b.id}`} className="h-32 rounded-xl p-4 text-white font-medium shadow-sm flex flex-col justify-between hover:shadow-lg hover:-translate-y-0.5 hover:brightness-110 transition-all" style={getBg(b)}>
                     <span className="text-lg">{b.title}</span>
                     <div className="text-white/70 text-xs">{b.listCount} {t("common.lists")} · {b.memberCount} {t("common.members")}</div>
                   </Link>
@@ -202,10 +215,10 @@ function BoardsPageInner() {
             </section>
           )}
           <section>
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{t("boards.yourBoards")}</h3>
+            <h3 className="text-section-title mb-3 text-muted-foreground uppercase tracking-wider">{t("boards.yourBoards")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {recent.map((b) => (
-                <Link key={b.id} href={`/tasks/boards/${b.id}`} className="h-32 rounded-xl p-4 text-white font-medium shadow-sm flex flex-col justify-between hover:opacity-90 transition-opacity" style={getBg(b)}>
+                <Link key={b.id} href={`/tasks/boards/${b.id}`} className="h-32 rounded-xl p-4 text-white font-medium shadow-sm flex flex-col justify-between hover:shadow-lg hover:-translate-y-0.5 hover:brightness-110 transition-all" style={getBg(b)}>
                   <span className="text-lg">{b.title}</span>
                   <div className="text-white/70 text-xs">{b.listCount} {t("common.lists")} · {b.memberCount} {t("common.members")}</div>
                 </Link>
@@ -234,7 +247,15 @@ function BoardsPageInner() {
                     {archivedBoards.map((b) => (
                       <div key={b.id} className="flex items-center justify-between p-3 bg-surface/40 rounded-lg border border-border">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-md" style={{ backgroundColor: b.backgroundColor || "#0079bf" }} />
+                          {/* v2: cover swatch uses the same gradient logic */}
+                          <div
+                            className="w-8 h-8 rounded-md"
+                            style={{
+                              background: b.backgroundColor
+                                ? coverBackground(b.backgroundColor)
+                                : DEFAULT_BOARD_COVER,
+                            }}
+                          />
                           <div>
                             <p className="text-sm font-medium">{b.title}</p>
                             <p className="text-xs text-muted-foreground">{new Date(b.updatedAt).toLocaleDateString()}</p>

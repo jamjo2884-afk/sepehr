@@ -7,6 +7,8 @@ import { CardDetailModal } from "./card-modal";
 import { useFlowToast } from "@/components/flowboard/toast";
 import { useLanguage } from "@/i18n/flowboard/context";
 import { formatDateShort } from "@/i18n/flowboard/dates";
+// v2: cover gradient helpers (section-aligned board covers)
+import { DEFAULT_BOARD_COVER, coverBackground } from "@/lib/flowboard/cover";
 
 interface User {
   id: string;
@@ -70,18 +72,19 @@ interface ArchivedData {
   cards: { id: string; title: string; listTitle: string; dueDate?: string; updatedAt: string }[];
 }
 
-const BACKGROUND_COLORS = [
-  { color: "#0079bf", label: "Blue" },
-  { color: "#d29034", label: "Orange" },
-  { color: "#519839", label: "Green" },
-  { color: "#b04632", label: "Red" },
-  { color: "#89609e", label: "Purple" },
-  { color: "#cd5a91", label: "Pink" },
-  { color: "#4bbf6b", label: "Lime" },
-  { color: "#00aecc", label: "Teal" },
-  { color: "#172b4d", label: "Dark" },
-  { color: "#344563", label: "Navy" },
+// v2 cover swatches — section identity gradients + classic Trello colors
+// (legacy palette kept flat so existing boards still render correctly).
+const COVER_SWATCHES: { color: string | null; label: string }[] = [
+  { color: null, label: "بنفش Tasks (پیش‌فرض)" },
+  { color: "#2E8BFF", label: "آبی Command Center" },
+  { color: "#F59E0B", label: "کهربایی Brands" },
+  { color: "#17BFC4", label: "فیروزه‌ای Social" },
+  { color: "#10B981", label: "زمردی Finance" },
+  { color: "#EC4899", label: "سرخابی Content" },
 ];
+
+/** Hex the API persists for the default purple gradient cover. */
+const DEFAULT_BOARD_COVER_HEX = "#7C5CFC";
 
 export default function BoardPage() {
   const router = useRouter();
@@ -584,11 +587,19 @@ export default function BoardPage() {
   const boardLabels = board?.labels.map((bl) => bl.label) ?? [];
   const boardMembers = board?.members.map((bm) => bm.user) ?? [];
 
+  /** Last custom (non-palette) color; null when on a palette swatch. */
+  const customCoverHex: string | null =
+    board?.backgroundColor &&
+    !COVER_SWATCHES.some((s) => s.color === board?.backgroundColor)
+      ? board.backgroundColor
+      : null;
+
+  // v2: cover renders as a section gradient; legacy colors stay flat.
   const getBoardStyle = () => {
     if (board?.backgroundImage)
       return { backgroundImage: `url(${board.backgroundImage})`, backgroundSize: "cover" as const };
-    if (board?.backgroundColor) return { backgroundColor: board.backgroundColor };
-    return { backgroundColor: "#0079bf" };
+    if (board?.backgroundColor) return { background: coverBackground(board.backgroundColor) };
+    return { background: DEFAULT_BOARD_COVER };
   };
 
   // Helper: get checklist completion for a card
@@ -893,7 +904,7 @@ export default function BoardPage() {
           {filteredLists.map((list) => (
             <div
               key={list.id}
-              className={`w-72 flex-shrink-0 bg-white/90 backdrop-blur-sm rounded-xl shadow-sm flex flex-col max-h-full ${
+              className={`v2-list-panel w-72 flex-shrink-0 rounded-xl shadow-lg flex flex-col max-h-full ${
                 dragOverListId === list.id && draggedList ? "ring-2 ring-white/50" : ""
               }`}
               draggable
@@ -1147,7 +1158,7 @@ export default function BoardPage() {
                 </form>
               </div>
             ) : (
-              <button onClick={() => setShowNewList(true)} className="w-full py-2.5 px-3 bg-white/30 hover:bg-white/40 text-white rounded-xl text-sm font-medium text-left flex items-center gap-1 transition-colors">
+              <button onClick={() => setShowNewList(true)} className="v2-add-list-btn w-full py-2.5 px-3 text-white rounded-xl text-sm font-medium text-left flex items-center gap-1 transition-colors">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
@@ -1173,20 +1184,51 @@ export default function BoardPage() {
       {/* Background picker modal */}
       {showBackgroundPicker && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowBackgroundPicker(false)}>
-          <div className="bg-white rounded-xl w-full max-w-md mx-4 p-6 animate-scale-in shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold mb-4">{t("boards.background")}</h3>
+          <div className="bg-card rounded-xl w-full max-w-md mx-4 p-6 animate-scale-in shadow-2xl border border-border" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-1">{t("boards.background")}</h3>
+            <p className="text-xs text-muted-foreground mb-4">{t("boards.backgroundDesc")}</p>
+            {/* v2: section-aligned gradient covers — replaces the flat
+                Trello-blue default found in the real-data review. */}
             <div className="grid grid-cols-5 gap-2">
-              {BACKGROUND_COLORS.map((bg) => (
-                <button
-                  key={bg.color}
-                  onClick={() => handleBoardBackground(bg.color)}
-                  className={`h-12 rounded-lg transition-all hover:scale-105 ${
-                    board?.backgroundColor === bg.color ? "ring-2 ring-offset-2 ring-primary" : ""
-                  }`}
-                  style={{ backgroundColor: bg.color }}
-                  title={bg.label}
-                />
-              ))}
+              {COVER_SWATCHES.map((bg) => {
+                const isActive =
+                  (bg.color === null && !board?.backgroundColor) ||
+                  board?.backgroundColor === bg.color;
+                return (
+                  <button
+                    key={bg.label}
+                    onClick={() =>
+                      bg.color === null
+                        ? handleBoardBackground(DEFAULT_BOARD_COVER_HEX)
+                        : handleBoardBackground(bg.color)
+                    }
+                    className={`v2-cover-card h-12 rounded-lg ${
+                      isActive
+                        ? "ring-2 ring-offset-2 ring-offset-card ring-[hsl(var(--section-tasks))]"
+                        : ""
+                    }`}
+                    style={{
+                      background: bg.color ? coverBackground(bg.color) : DEFAULT_BOARD_COVER,
+                    }}
+                    title={bg.label}
+                    aria-label={bg.label}
+                  />
+                );
+              })}
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="color"
+                value={customCoverHex ?? "#7C5CFC"}
+                onChange={(e) => handleBoardBackground(e.target.value)}
+                className="h-9 w-12 cursor-pointer rounded border border-border bg-transparent"
+                title="رنگ دلخواه"
+                aria-label="رنگ دلخواه کاور تخته"
+              />
+              <span className="text-xs text-muted-foreground">رنگ دلخواه</span>
+              {customCoverHex && (
+                <span className="text-xs font-medium text-foreground">{customCoverHex.toUpperCase()}</span>
+              )}
             </div>
             <button
               onClick={() => setShowBackgroundPicker(false)}

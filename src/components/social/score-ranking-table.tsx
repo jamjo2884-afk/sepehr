@@ -102,7 +102,7 @@ export function ScoreRankingTable({
       />
       <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full min-w-[680px] text-sm">
-          <thead>
+          <thead className="table-head-tinted" style={{ ['--tint' as string]: 'var(--section-social)' }}>
             <tr className="border-b border-border bg-surface/40">
               <th className="w-14 px-3 py-2.5 text-right font-medium text-muted-foreground">
                 رتبه

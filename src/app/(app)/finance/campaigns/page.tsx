@@ -283,7 +283,11 @@ export default function CampaignsPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        {/* v2: form dialog tinted with the finance section color */}
+        <DialogContent
+          className="form-dialog max-w-md max-h-[90vh] overflow-y-auto"
+          style={{ ['--tint' as string]: 'var(--section-finance)' }}
+        >
           <DialogHeader>
             <DialogTitle>
               {editingCampaign ? 'ویرایش کمپین' : 'کمپین جدید'}

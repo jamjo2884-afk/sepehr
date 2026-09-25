@@ -62,6 +62,7 @@ const en = {
   "boards.archiveBoard": "Archive board",
   "boards.restoreBoard": "Restore board",
   "boards.background": "Change background",
+  "boards.backgroundDesc": "Pick a section gradient or any custom color",
   "boards.starredBoards": "Starred boards",
   "boards.yourBoards": "Your boards",
   "boards.archivedBoards": "Archived boards",

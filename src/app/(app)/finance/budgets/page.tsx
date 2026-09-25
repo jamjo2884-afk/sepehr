@@ -246,7 +246,8 @@ export default function BudgetsPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
+        {/* v2: form dialog tinted with the finance section color */}
+        <DialogContent className="form-dialog max-w-md" style={{ ['--tint' as string]: 'var(--section-finance)' }}>
           <DialogHeader>
             <DialogTitle>
               {editingBudget ? 'ویرایش بودجه' : 'بودجه جدید'}

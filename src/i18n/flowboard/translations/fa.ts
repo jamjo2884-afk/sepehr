@@ -62,6 +62,7 @@ const fa: Record<string, string> = {
   "boards.archiveBoard": "بایگانی تخته",
   "boards.restoreBoard": "بازیابی تخته",
   "boards.background": "تغییر پس‌زمینه",
+  "boards.backgroundDesc": "یک گرادیان بخشی یا رنگ دلخواه انتخاب کنید",
   "boards.starredBoards": "تخته‌های ستاره‌دار",
   "boards.yourBoards": "تخته‌های شما",
   "boards.archivedBoards": "تخته‌های بایگانی شده",
