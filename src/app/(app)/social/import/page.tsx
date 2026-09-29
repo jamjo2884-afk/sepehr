@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ChevronLeft,
+  Download,
   FileSpreadsheet,
   History,
   Loader2,
@@ -135,6 +136,30 @@ export default function ImportReviewPage() {
 
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
+  // قالب استاندارد ورود داده — قبلاً داخل BulkImportDialog بود؛ بعد از
+  // حذف آن دیالوگ، همان دانلود به این صفحه منتقل شد (API دست‌نخورده).
+  const downloadTemplate = async (format: 'xlsx' | 'csv') => {
+    try {
+      const res = await fetch(`/api/social/import/template?format=${format}`);
+      if (!res.ok) throw new Error('template download failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download =
+        format === 'xlsx'
+          ? 'media-deck-import-template.xlsx'
+          : 'media-deck-import-template.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success('قالب دانلود شد.');
+    } catch {
+      toast.error('دانلود قالب انجام نشد.');
+    }
+  };
+
   const openSession = (id: string) => {
     setActiveSessionId(id);
     setView('review');
@@ -160,6 +185,14 @@ export default function ImportReviewPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => void downloadTemplate('xlsx')}>
+            <Download className="ml-2 h-4 w-4" />
+            قالب Excel
+          </Button>
+          <Button variant="outline" onClick={() => void downloadTemplate('csv')}>
+            <Download className="ml-2 h-4 w-4" />
+            قالب CSV
+          </Button>
           <Button
             onClick={() => document.getElementById('import-file-input')?.click()}
             disabled={uploading}
