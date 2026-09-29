@@ -251,8 +251,10 @@ export async function getSocialTrends(input: {
     }
 
     // Group rows by month for snapshot vs flow metric semantics.
-    // followers = snapshot → per month, take the account's value that month
-    // and sum across accounts (each monthly row IS that month's snapshot).
+    // followers = snapshot → carry-forward: an account that stopped reporting
+    // keeps its last known value instead of silently dropping out of the
+    // monthly total (same semantics as computeKpis / followerCarryForwardTrend
+    // in social-analytics.ts — the chart's last point matches the KPI card).
     // views / reach = flow → sum every non-null value in the month.
     const byMonth = new Map<string, MetricRowLite[]>();
     for (const r of rows) {
@@ -264,19 +266,33 @@ export async function getSocialTrends(input: {
       a < b ? -1 : a > b ? 1 : 0,
     );
 
-    // ---- Chart 1: total followers ----
-    const totalFollowers: SocialTrendSeriesPoint[] = months.map((month) => {
-      const list = byMonth.get(month) ?? [];
-      const latestPerAccount = new Map<string, number>();
-      for (const r of list) {
-        if (typeof r.followers === 'number') {
-          latestPerAccount.set(r.account_id, r.followers);
+    /**
+     * Carry-forward follower snapshot sum for a subset of accounts.
+     * Months before the subset's first record are not fabricated; after
+     * that, every grid month is emitted (carried values included).
+     */
+    const carryForwardSeries = (
+      include: (accountId: string) => boolean,
+    ): SocialTrendSeriesPoint[] => {
+      const lastKnown = new Map<string, number>();
+      const points: SocialTrendSeriesPoint[] = [];
+      for (const month of months) {
+        for (const r of byMonth.get(month) ?? []) {
+          if (include(r.account_id) && typeof r.followers === 'number') {
+            lastKnown.set(r.account_id, r.followers);
+          }
         }
+        if (lastKnown.size === 0) continue;
+        let sum = 0;
+        for (const v of lastKnown.values()) sum += v;
+        points.push({ month, monthLabel: jalaliMonthName(month), value: sum });
       }
-      let sum = 0;
-      for (const v of latestPerAccount.values()) sum += v;
-      return { month, monthLabel: jalaliMonthName(month), value: sum };
-    });
+      return points;
+    };
+
+    // ---- Chart 1: total followers (carry-forward snapshot) ----
+    const totalFollowers: SocialTrendSeriesPoint[] =
+      carryForwardSeries(() => true);
 
     // ---- Chart 4: followers by brand ----
     const followersByBrand: SocialTrendSeries[] = [];
@@ -290,26 +306,7 @@ export async function getSocialTrends(input: {
             .filter((a) => accountIdToBrandName.get(a.id) === bname)
             .map((a) => a.id),
         );
-        const points: SocialTrendSeriesPoint[] = [];
-        for (const month of months) {
-          const list = (byMonth.get(month) ?? []).filter((r) =>
-            ids.has(r.account_id),
-          );
-          let sum = 0;
-          let any = false;
-          for (const r of list) {
-            if (typeof r.followers === 'number') {
-              sum += r.followers;
-              any = true;
-            }
-          }
-          if (any)
-            points.push({
-              month,
-              monthLabel: jalaliMonthName(month),
-              value: sum,
-            });
-        }
+        const points = carryForwardSeries((id) => ids.has(id));
         if (points.length > 0) followersByBrand.push({ name: bname, points });
       }
     }
@@ -328,26 +325,7 @@ export async function getSocialTrends(input: {
           .filter((a) => a.platform === p)
           .map((a) => a.id);
         const ids = new Set(platformAccountIds);
-        const points: SocialTrendSeriesPoint[] = [];
-        for (const month of months) {
-          const list = (byMonth.get(month) ?? []).filter((r) =>
-            ids.has(r.account_id),
-          );
-          let sum = 0;
-          let any = false;
-          for (const r of list) {
-            if (typeof r.followers === 'number') {
-              sum += r.followers;
-              any = true;
-            }
-          }
-          if (any)
-            points.push({
-              month,
-              monthLabel: jalaliMonthName(month),
-              value: sum,
-            });
-        }
+        const points = carryForwardSeries((id) => ids.has(id));
         // Per-brand split of this platform (tooltip level 2).
         const brandNamesOnPlatform = [
           ...new Set(
@@ -363,26 +341,7 @@ export async function getSocialTrends(input: {
               (id) => accountIdToBrandName.get(id) === bname,
             ),
           );
-          const bPoints: SocialTrendSeriesPoint[] = [];
-          for (const month of months) {
-            const list = (byMonth.get(month) ?? []).filter((r) =>
-              bIds.has(r.account_id),
-            );
-            let sum = 0;
-            let any = false;
-            for (const r of list) {
-              if (typeof r.followers === 'number') {
-                sum += r.followers;
-                any = true;
-              }
-            }
-            if (any)
-              bPoints.push({
-                month,
-                monthLabel: jalaliMonthName(month),
-                value: sum,
-              });
-          }
+          const bPoints = carryForwardSeries((id) => bIds.has(id));
           if (bPoints.length > 0)
             byBrand.push({ name: bname, points: bPoints });
         }

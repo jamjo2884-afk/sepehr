@@ -359,9 +359,66 @@ export function computeKpiComparison(
  * ========================================================================= */
 
 /**
- * Aggregate follower trend across the selected accounts: one point per month
- * present in the data, summed across accounts. Months with no data are not
- * fabricated.
+ * Carry-forward follower snapshot trend for a fixed set of metric rows.
+ *
+ * Followers are a SNAPSHOT metric: each monthly row is that month's value.
+ * An account that stopped reporting keeps its last known value instead of
+ * silently dropping out of the monthly sum — exactly the semantics the KPI
+ * card's «مجموع دنبال‌کنندگان» uses for the final point (computeKpis sums
+ * the latest value per account). With this, the chart's LAST point always
+ * equals the KPI card for the same range/accounts.
+ *
+ * Months with data are still never fabricated (a month absent from every
+ * account's rows produces no point). Within one account-month, the latest
+ * row wins (by periodStart, then payload order) — mirroring latestOf() in
+ * computeKpis and the server-side aggregation.
+ */
+function followerCarryForwardTrend(rows: SocialMetric[]): SocialTrendPoint[] {
+  // accountId → month → that month's latest snapshot row.
+  const byAccount = new Map<string, Map<string, SocialMetric>>();
+  for (const m of rows) {
+    let months = byAccount.get(m.accountId);
+    if (!months) {
+      months = new Map<string, SocialMetric>();
+      byAccount.set(m.accountId, months);
+    }
+    const existing = months.get(m.periodLabel);
+    // Later payload row wins ties (same periodStart) — mirrors latestOf().
+    const newer =
+      existing === undefined ||
+      (m.periodStart ?? '') >= (existing.periodStart ?? '');
+    if (newer) {
+      months.set(m.periodLabel, m);
+    }
+  }
+
+  const monthSet = new Set<string>();
+  for (const months of byAccount.values()) {
+    for (const label of months.keys()) monthSet.add(label);
+  }
+  const sortedMonths = [...monthSet].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+
+  // Walk the month grid once, carrying each account's last known value.
+  const lastKnown = new Map<string, number>();
+  const points: SocialTrendPoint[] = [];
+  for (const month of sortedMonths) {
+    let followers = 0;
+    for (const [accountId, months] of byAccount) {
+      const fresh = months.get(month);
+      if (fresh) lastKnown.set(accountId, fresh.followers);
+      const known = lastKnown.get(accountId);
+      if (known !== undefined) followers += known;
+    }
+    points.push({ month, monthLabel: jalaliMonthName(month), followers });
+  }
+  return points;
+}
+
+/**
+ * Aggregate follower trend across the selected accounts: one point per
+ * month present in the data. Accounts without a fresh row in a month are
+ * carried forward at their last known value (see followerCarryForwardTrend),
+ * so the final point always matches the KPI card's follower total.
  */
 export function buildFollowersTrend(
   accounts: SocialAccount[],
@@ -372,17 +429,7 @@ export function buildFollowersTrend(
   const inRange = metricsInMonthRange(metrics, range).filter((m) =>
     ids.has(m.accountId),
   );
-  const byMonth = new Map<string, number>();
-  for (const m of inRange) {
-    byMonth.set(m.periodLabel, (byMonth.get(m.periodLabel) ?? 0) + m.followers);
-  }
-  return [...byMonth.entries()]
-    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-    .map(([month, followers]) => ({
-      month,
-      monthLabel: jalaliMonthName(month),
-      followers,
-    }));
+  return followerCarryForwardTrend(inRange);
 }
 
 /** One follower trend per brand (multi-brand comparison on one chart). */
@@ -402,22 +449,12 @@ export function buildBrandTrends(
   const inRange = metricsInMonthRange(metrics, range);
   return brands.map((brandId) => {
     const ids = idsByBrand.get(brandId) ?? new Set<string>();
-    const byMonth = new Map<string, number>();
-    for (const m of inRange) {
-      if (!ids.has(m.accountId)) continue;
-      byMonth.set(
-        m.periodLabel,
-        (byMonth.get(m.periodLabel) ?? 0) + m.followers,
-      );
-    }
-    const points: SocialTrendPoint[] = [...byMonth.entries()]
-      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-      .map(([month, followers]) => ({
-        month,
-        monthLabel: jalaliMonthName(month),
-        followers,
-      }));
-    return { brand: brandId, points };
+    const rows = inRange.filter((m) => ids.has(m.accountId));
+    // Same carry-forward semantics as the aggregate trend: a brand whose
+    // accounts stopped reporting keeps its audience instead of fake-dropping,
+    // and the brand lines of one chart stay consistent with each other and
+    // with the aggregate (sum of brand lines = aggregate line).
+    return { brand: brandId, points: followerCarryForwardTrend(rows) };
   });
 }
 
@@ -466,22 +503,9 @@ export function buildPlatformTrends(
   const inRange = metricsInMonthRange(metrics, range);
   return platformSet.map((platform) => {
     const ids = idsByPlatform.get(platform) ?? new Set<string>();
-    const byMonth = new Map<string, number>();
-    for (const m of inRange) {
-      if (!ids.has(m.accountId)) continue;
-      byMonth.set(
-        m.periodLabel,
-        (byMonth.get(m.periodLabel) ?? 0) + m.followers,
-      );
-    }
-    const points: SocialTrendPoint[] = [...byMonth.entries()]
-      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-      .map(([month, followers]) => ({
-        month,
-        monthLabel: jalaliMonthName(month),
-        followers,
-      }));
-    return { platform, points };
+    const rows = inRange.filter((m) => ids.has(m.accountId));
+    // Carry-forward like the aggregate/brand trends (see followerCarryForwardTrend).
+    return { platform, points: followerCarryForwardTrend(rows) };
   });
 }
 

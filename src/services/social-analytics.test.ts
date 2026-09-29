@@ -11,8 +11,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildBrandTrends,
+  buildFollowersTrend,
   comparisonCoverage,
   comparisonMonthRange,
+  computeKpisForAccounts,
   filterAccounts,
   hasComparisonData,
 } from '@/services/social-analytics';
@@ -240,5 +242,87 @@ describe('comparisonCoverage (پوشش بازه‌ی مبنا برای هشدا�
     expect(
       comparisonCoverage([decMetric], { start: '1403-12', end: '1403-12' }),
     ).toEqual({ covered: 1, total: 1 });
+  });
+});
+
+describe('buildFollowersTrend: carry-forward snapshot semantics', () => {
+  // Three accounts with sparse records + one decoy that must stay excluded.
+  const accA = makeAccount({ id: 'carry-a', username: 'a' });
+  const accB = makeAccount({ id: 'carry-b', username: 'b' });
+  const accC = makeAccount({ id: 'carry-c', username: 'c' });
+  const carryAccounts = [accA, accB, accC];
+  const carryMetrics: SocialMetric[] = [
+    // accA reports 1404-01 and 1404-02.
+    makeMetric({ id: 'ca-1', accountId: 'carry-a', periodLabel: '1404-01', followers: 100 }),
+    makeMetric({ id: 'ca-2', accountId: 'carry-a', periodLabel: '1404-02', followers: 110 }),
+    // accB only reports 1404-02.
+    makeMetric({ id: 'cb-1', accountId: 'carry-b', periodLabel: '1404-02', followers: 200 }),
+    // accC stopped after 1404-01 — must be CARRIED, not dropped.
+    makeMetric({ id: 'cc-1', accountId: 'carry-c', periodLabel: '1404-01', followers: 50 }),
+    // Decoy: an account NOT in the filter must never leak into the sum.
+    makeMetric({ id: 'decoy', accountId: 'ghost', periodLabel: '1404-02', followers: 999 }),
+  ];
+  const carryRange = { start: '1404-01', end: '1404-02' };
+
+  it('carries the last known value of an account that stopped reporting', () => {
+    const trend = buildFollowersTrend(carryAccounts, carryMetrics, carryRange);
+    expect(trend.map((p) => [p.month, p.followers])).toEqual([
+      ['1404-01', 150], // a=100 + c=50
+      ['1404-02', 360], // a=110 + b=200 + c=50 (carried)
+    ]);
+  });
+
+  it('the LAST point equals computeKpis followers for the same range/accounts', () => {
+    // The acceptance criterion: chart end == KPI card «مجموع دنبال‌کنندگان».
+    const trend = buildFollowersTrend(carryAccounts, carryMetrics, carryRange);
+    const kpi = computeKpisForAccounts(carryAccounts, carryMetrics, carryRange);
+    expect(trend.at(-1)?.followers).toBe(kpi.followers);
+    expect(kpi.followers).toBe(360);
+  });
+
+  it('re-syncs when a carried account reports again', () => {
+    const back = makeMetric({ id: 'cc-2', accountId: 'carry-c', periodLabel: '1404-03', followers: 80 });
+    const trend = buildFollowersTrend(
+      carryAccounts,
+      [...carryMetrics, back],
+      { start: '1404-01', end: '1404-03' },
+    );
+    expect(trend.map((p) => [p.month, p.followers])).toEqual([
+      ['1404-01', 150],
+      ['1404-02', 360],
+      ['1404-03', 390], // a=110 + b=200 (carried) + c=80 (fresh)
+    ]);
+  });
+
+  it('counts an account with multiple rows in one month once (latest wins)', () => {
+    const dup = [
+      makeMetric({ id: 'd-1', accountId: 'carry-a', periodLabel: '1404-05', followers: 100 }),
+      makeMetric({ id: 'd-2', accountId: 'carry-a', periodLabel: '1404-05', followers: 150 }),
+    ];
+    const trend = buildFollowersTrend([accA], dup, { start: '1404-05', end: '1404-05' });
+    expect(trend).toHaveLength(1);
+    expect(trend[0].followers).toBe(150);
+  });
+
+  it('does not fabricate months nobody reported and stays empty without data', () => {
+    // Gap month (1404-02 absent for everyone) → no point for it.
+    const gapped = [
+      makeMetric({ id: 'g-1', accountId: 'carry-a', periodLabel: '1404-01', followers: 100 }),
+      makeMetric({ id: 'g-2', accountId: 'carry-a', periodLabel: '1404-03', followers: 130 }),
+    ];
+    const trend = buildFollowersTrend([accA], gapped, { start: '1404-01', end: '1404-03' });
+    expect(trend.map((p) => p.month)).toEqual(['1404-01', '1404-03']);
+
+    expect(buildFollowersTrend(carryAccounts, [], carryRange)).toEqual([]);
+  });
+
+  it('keeps brand series consistent: sum of brand lines equals the aggregate', () => {
+    const agg = buildFollowersTrend(carryAccounts, carryMetrics, carryRange);
+    const brands = buildBrandTrends(carryAccounts, carryMetrics, carryRange);
+    const sum = brands.reduce(
+      (s, t) => s + (t.points.at(-1)?.followers ?? 0),
+      0,
+    );
+    expect(sum).toBe(agg.at(-1)?.followers);
   });
 });
