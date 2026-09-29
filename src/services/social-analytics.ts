@@ -18,6 +18,7 @@ import type {
   SocialBrandRanking,
   SocialBrandStat,
   SocialBrandTrend,
+  SocialComparisonBase,
   SocialDataFreshness,
   SocialEngagementTrend,
   SocialEntityStat,
@@ -124,6 +125,81 @@ export function previousMonthRange(range: SocialMonthRange): SocialMonthRange {
     start: jalaliAddMonths(range.start, -len),
     end: jalaliAddMonths(range.end, -len),
   };
+}
+
+/**
+ * The comparison window for a user-chosen basis (مبنای مقایسه).
+ *
+ * - 'previous-month' (default): only the single month right before the
+ *   end of the range — always meaningful even for a 24-month window.
+ * - 'previous-length': the legacy same-length window before the range.
+ * - 'same-month-last-year': the same months shifted back one Jalali year.
+ */
+export function comparisonMonthRange(
+  range: SocialMonthRange,
+  base: SocialComparisonBase,
+): SocialMonthRange {
+  switch (base) {
+    case 'previous-month': {
+      const month = jalaliAddMonths(range.end, -1);
+      return { start: month, end: month };
+    }
+    case 'previous-length':
+      return previousMonthRange(range);
+    case 'same-month-last-year':
+      return {
+        start: jalaliAddMonths(range.start, -12),
+        end: jalaliAddMonths(range.end, -12),
+      };
+  }
+}
+
+/**
+ * Whether ANY metric exists for the given accounts inside the comparison
+ * window. When false the UI must show «داده‌ی مقایسه موجود نیست» instead
+ * of a misleading 0% / «بدون تغییر» badge.
+ *
+ * An empty account filter (all accounts) always counts every row.
+ */
+export function hasComparisonData(
+  metrics: SocialMetric[],
+  range: SocialMonthRange,
+  accountFilter?: Set<string>,
+): boolean {
+  return metricsInMonthRange(metrics, range).some(
+    (m) => !accountFilter || accountFilter.has(m.accountId),
+  );
+}
+
+/**
+ * How much of the comparison window actually has data.
+ *
+ * A metric row covers one month (monthly period). When the basis window
+ * («همان ماه سال قبل» / «دوره‌ی قبلِ هم‌طول») reaches back before the
+ * first import, the period-over-period sum only covers part of it — and
+ * a growth percentage computed against that partial sum is misleading
+ * (it inflates or deflates the change). The UI therefore hides the
+ * percentage and shows «مقایسه با داده‌ی ناقص (x از y ماه)» whenever
+ * `covered` is > 0 but < `total`. When `covered` is 0 the existing
+ * «داده‌ی مقایسه موجود نیست» path (hasComparisonData = false) applies
+ * instead.
+ *
+ * Several rows in one month (different accounts) count once — the
+ * window coverage is about months, not rows. An empty account filter
+ * (all accounts) counts every row.
+ */
+export function comparisonCoverage(
+  metrics: SocialMetric[],
+  range: SocialMonthRange,
+  accountFilter?: Set<string>,
+): { covered: number; total: number } {
+  const total = monthsBetween(range.start, range.end) + 1;
+  const coveredMonths = new Set<string>();
+  for (const m of metricsInMonthRange(metrics, range)) {
+    if (accountFilter && !accountFilter.has(m.accountId)) continue;
+    coveredMonths.add(m.periodLabel);
+  }
+  return { covered: coveredMonths.size, total };
 }
 
 /* =========================================================================

@@ -180,6 +180,28 @@ export interface SocialMonthRange {
 export type SocialRangePreset =
   'current' | 'previous' | '3m' | '6m' | '12m' | '24m' | 'custom';
 
+/**
+ * Basis for the KPI period-over-period comparison (مبنای مقایسه).
+ * - 'previous-month' (پیش‌فرض): the single Jalali month right before the
+ *   end of the selected range.
+ * - 'previous-length': the window of the same length immediately before
+ *   the selected range (legacy behavior).
+ * - 'same-month-last-year': the same Jalali months one year earlier.
+ */
+export type SocialComparisonBase =
+  | 'previous-month'
+  | 'previous-length'
+  | 'same-month-last-year';
+
+export const SOCIAL_COMPARISON_BASE_LABELS: Record<
+  SocialComparisonBase,
+  string
+> = {
+  'previous-month': 'ماه قبل',
+  'previous-length': 'دوره‌ی قبلِ هم‌طول',
+  'same-month-last-year': 'همان ماه سال قبل',
+};
+
 export const SOCIAL_RANGE_PRESET_LABELS: Record<
   Exclude<SocialRangePreset, 'custom'>,
   string
