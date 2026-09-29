@@ -27,19 +27,22 @@ import {
   buildEngagementTrends,
   buildFollowersTrend,
   buildPlatformStats,
+  comparisonMonthRange,
   computeKpiComparison,
   computeKpisForAccounts,
   distinctMonths,
   filterAccounts,
+  comparisonCoverage,
+  hasComparisonData,
   jalaliMonthName,
   metricsInMonthRange,
   monthRangeOfPreset,
-  previousMonthRange,
 } from '@/services/social-analytics';
 import { rankBrandsByScore } from '@/services/social-score';
 import { SocialTrendsSection } from '@/components/common/social-trends-section';
 import type {
   SocialAccount,
+  SocialComparisonBase,
   SocialMetric,
   SocialMonthRange,
   SocialRangePreset,
@@ -56,8 +59,9 @@ import { EngagementTrendChart } from '@/components/social/analytics/engagement-t
 import { PeriodComparison } from '@/components/social/analytics/period-comparison';
 import { SectionTitle } from '@/components/social/analytics/shared';
 import { ScoreRankingTable } from '@/components/social/score-ranking-table';
-import { SocialAccountCard } from '@/components/social/account-card';
+import { encodeAccountKey } from '@/services/social.service';
 import { isBrandIgnored } from '@/constants/brand-colors';
+import { cn } from '@/lib/utils';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { useSocialBrandEdits } from '@/stores/social-brands.store';
 import { formatNumber } from '@/utils/persian';
@@ -72,12 +76,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
+import { Search } from 'lucide-react';
 
 export default function SocialPage() {
   const [raw, setRaw] = useState<{
@@ -95,6 +94,9 @@ export default function SocialPage() {
   );
   const [rangePreset, setRangePreset] = useState<SocialRangePreset>('24m');
   const [customRange, setCustomRange] = useState<SocialMonthRange | null>(null);
+  const [comparisonBase, setComparisonBase] = useState<SocialComparisonBase>(
+    'previous-month',
+  );
   const [brandWarning, setBrandWarning] = useState<string | null>(null);
 
   // Brand management dialog state.
@@ -213,7 +215,10 @@ export default function SocialPage() {
     return monthRangeOfPreset(rangePreset);
   }, [rangePreset, customRange, availableMonths]);
 
-  const prevRange = useMemo(() => previousMonthRange(range), [range]);
+  const prevRange = useMemo(
+    () => comparisonMonthRange(range, comparisonBase),
+    [range, comparisonBase],
+  );
 
   const filteredAccounts = useMemo(
     () => filterAccounts(accountsBase, selectedBrands, selectedPlatforms),
@@ -239,6 +244,31 @@ export default function SocialPage() {
   const kpiComparison = useMemo(
     () => computeKpiComparison(kpis, prevKpis),
     [kpis, prevKpis],
+  );
+
+  // مبنای مقایسه: آیا در بازه‌ی مقایسه اصلاً داده‌ای برای اکانت‌های
+  // فیلترشده هست؟ اگر نه، KPIها «داده‌ی مقایسه موجود نیست» نشان می‌دهند.
+  const filteredAccountIds = useMemo(
+    () => new Set(filteredAccounts.map((a) => a.id)),
+    [filteredAccounts],
+  );
+  const hasPrevData = useMemo(
+    () =>
+      hasComparisonData(metricsAll, prevRange, filteredAccountIds),
+    [metricsAll, prevRange, filteredAccountIds],
+  );
+  // پوشش بازه‌ی مبنا: اگر بازه‌ی مقایسه به قبل از اولین داده برسد،
+  // درصد رشد گمراه‌کننده است — برچسب «ناقص (x از y ماه)» جای آن را می‌گیرد.
+  const prevCoverage = useMemo(
+    () => comparisonCoverage(metricsAll, prevRange, filteredAccountIds),
+    [metricsAll, prevRange, filteredAccountIds],
+  );
+  const prevBasisLabel = useMemo(
+    () =>
+      comparisonBase === 'previous-month'
+        ? jalaliMonthName(prevRange.start)
+        : `${jalaliMonthName(prevRange.start)} — ${jalaliMonthName(prevRange.end)}`,
+    [comparisonBase, prevRange],
   );
 
   const brandTrends = useMemo(
@@ -312,24 +342,14 @@ export default function SocialPage() {
       });
   }, [accountRows, selectedBrands, selectedPlatforms, sortAscending]);
 
-  const groupedAccounts = useMemo(() => {
-    const byPlatform = new Map<SocialPlatform, SocialAccountRow[]>();
-    for (const account of visibleAccountRows) {
-      const list = byPlatform.get(account.platform) ?? [];
-      list.push(account);
-      byPlatform.set(account.platform, list);
+  /** rowKey (brand|platform|handle) → accountId، برای join جدول اکانت‌ها. */
+  const accountIdByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of accountsBase) {
+      map.set(`${a.brand}|${a.platform}|${a.username ?? ''}`, a.id);
     }
-    const totals = new Map<SocialPlatform, number>();
-    for (const [platform, list] of byPlatform) {
-      totals.set(
-        platform,
-        list.reduce((sum, a) => sum + (a.latest?.value ?? 0), 0),
-      );
-    }
-    return [...byPlatform.entries()].sort(
-      (a, b) => (totals.get(b[0]) ?? 0) - (totals.get(a[0]) ?? 0),
-    );
-  }, [visibleAccountRows]);
+    return map;
+  }, [accountsBase]);
 
   const hasRangeData = useMemo(
     () => metricsInMonthRange(metricsAll, range).length > 0,
@@ -627,6 +647,8 @@ export default function SocialPage() {
         onCustomRangeChange={handleCustomRangeChange}
         availableMonths={availableMonths}
         manageButton={manageDialog}
+        comparisonBase={comparisonBase}
+        onComparisonBaseChange={setComparisonBase}
       />
 
       {!hasRangeData ? (
@@ -647,7 +669,13 @@ export default function SocialPage() {
         <>
           {/* KPI cards */}
           <section>
-            <AnalyticsKpiCards kpis={kpis} comparison={kpiComparison} />
+            <AnalyticsKpiCards
+              kpis={kpis}
+              comparison={kpiComparison}
+              basisLabel={prevBasisLabel}
+              hasComparisonData={hasPrevData}
+              coverage={prevCoverage}
+            />
           </section>
 
           {/* Follower trend chart — the single absolute-total follower
@@ -781,72 +809,187 @@ export default function SocialPage() {
         </>
       )}
 
-      {/* Per-account cards, grouped by platform */}
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <SectionTitle icon={Users} title="اکانت‌ها" tint="var(--section-social)" />
+      {/* Accounts — compact searchable table (replaces the old
+          platform-accordion + three-number cards) */}
+      <AccountTable
+        rows={visibleAccountRows}
+        accountIdByKey={accountIdByKey}
+        sortAscending={sortAscending}
+        onToggleSort={() => setSortAscending((v) => !v)}
+        basisLabel={hasPrevData ? `نسبت به ${prevBasisLabel}` : undefined}
+        prevRange={prevRange}
+        metrics={metricsAll}
+      />
+    </motion.div>
+  );
+}
+
+/**
+ * حساب‌ها — جدول فشرده و قابل جستجو (برند، پلتفرم، فالوور، تغییر نسبت به
+ * ماه مبنا، وضعیت). جایگزین آکاردئونِ کارت‌های سه‌عددی شده است؛ لینک به
+ * صفحه‌ی جزئیات اکانت (/social/[id]) حفظ شده است.
+ */
+function AccountTable({
+  rows,
+  accountIdByKey,
+  sortAscending,
+  onToggleSort,
+  basisLabel,
+  prevRange,
+  metrics,
+}: {
+  rows: SocialAccountRow[];
+  /** rowKey (brand|platform|handle) → accountId. */
+  accountIdByKey: Map<string, string>;
+  sortAscending: boolean;
+  onToggleSort: () => void;
+  /** «نسبت به مرداد ۱۴۰۵» — undefined وقتی داده‌ی مقایسه نیست. */
+  basisLabel?: string;
+  prevRange: SocialMonthRange;
+  metrics: SocialMetric[];
+}) {
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(
+      (a) =>
+        a.brand.toLowerCase().includes(q) ||
+        (a.handle ?? '').toLowerCase().includes(q) ||
+        SOCIAL_PLATFORM_LABELS[a.platform].includes(q) ||
+        a.platform.includes(q),
+    );
+  }, [rows, query]);
+
+  /** فالوورِ آخرین رکوردِ هر اکانت داخل بازه‌ی مبنا (به accountId). */
+  const prevFollowersByAccount = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const m of metricsInMonthRange(metrics, prevRange)) {
+      // metricsInMonthRange preserves input order (chronological), so the
+      // LAST write wins = the latest value inside the comparison window.
+      map.set(m.accountId, m.followers ?? 0);
+    }
+    return map;
+  }, [metrics, prevRange]);
+
+  return (
+    <section>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <SectionTitle icon={Users} title="اکانت‌ها" tint="var(--section-social)" />
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="جستجوی برند، هندل یا پلتفرم…"
+              className="h-9 w-56 pr-8 text-xs"
+            />
+          </div>
           <Button
             variant="outline"
             size="sm"
             className="gap-1.5 text-xs"
-            onClick={() => setSortAscending((v) => !v)}
+            onClick={onToggleSort}
           >
             {sortAscending ? 'کمترین فالوور' : 'بیشترین فالوور'}
           </Button>
         </div>
+      </div>
 
-        {groupedAccounts.length === 0 ? (
-          <div className="rounded-xl border border-border bg-surface/60 p-4">
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              داده‌ای برای نمایش وجود ندارد.
-            </p>
-          </div>
-        ) : (
-          <Accordion
-            type="multiple"
-            defaultValue={[
-              groupedAccounts.find(([p]) => p === 'instagram')?.[0] ??
-                groupedAccounts[0]?.[0],
-            ]}
-            className="flex flex-col gap-3"
-          >
-            {groupedAccounts.map(([platform, accounts]) => (
-              <AccordionItem
-                key={platform}
-                value={platform}
-                className="overflow-hidden rounded-xl border border-border bg-surface/60"
-              >
-                <AccordionTrigger className="gap-2 px-4 py-3 hover:no-underline">
-                  <span className="flex items-center gap-2">
-                    <SocialPlatformIcon
-                      platform={platform}
-                      className="h-6 w-6 rounded-md"
-                      iconClassName="h-3.5 w-3.5"
-                    />
-                    <span className="text-xs font-semibold text-foreground">
-                      {SOCIAL_PLATFORM_LABELS[platform]}
-                    </span>
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {formatNumber(accounts.length)} اکانت
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4 pt-1">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {accounts.map((account, i) => (
-                      <SocialAccountCard
-                        key={`${account.brand}-${account.platform}-${account.handle}-${i}`}
-                        account={account}
-                      />
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        )}
-      </section>
-    </motion.div>
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead className="bg-surface-2/60">
+            <tr className="text-right text-xs text-muted-foreground">
+              <th className="px-4 py-2.5 font-medium">برند</th>
+              <th className="px-4 py-2.5 font-medium">پلتفرم</th>
+              <th className="px-4 py-2.5 font-medium">فالوور فعلی</th>
+              <th className="px-4 py-2.5 font-medium">
+                {basisLabel ? `تغییر ${basisLabel}` : 'تغییر'}</th>
+              <th className="px-4 py-2.5 font-medium">وضعیت داده</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  {query ? 'نتیجه‌ای برای جستجو پیدا نشد.' : 'داده‌ای برای نمایش وجود ندارد.'}
+                </td>
+              </tr>
+            ) : (
+              filtered.map((a) => {
+                const accountId = accountIdByKey.get(
+                  `${a.brand}|${a.platform}|${a.handle ?? ''}`,
+                );
+                const prev =
+                  accountId != null
+                    ? prevFollowersByAccount.get(accountId)
+                    : undefined;
+                const latest = a.latest?.value ?? 0;
+                const delta = prev !== undefined ? latest - prev : null;
+                const isFresh = (a.latest?.month ?? '') >= '1405-01';
+                return (
+                  <tr
+                    key={`${a.brand}|${a.platform}|${a.handle ?? ''}`}
+                    className="border-t border-border/60 transition-colors hover:bg-surface/60"
+                  >
+                    <td className="px-4 py-2.5 font-medium text-foreground">
+                      <Link href={`/social/${encodeAccountKey(a)}`} className="hover:text-primary hover:underline">
+                        {a.brand}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <SocialPlatformIcon
+                          platform={a.platform}
+                          className="h-4 w-4 rounded"
+                          iconClassName="h-2.5 w-2.5"
+                        />
+                        {SOCIAL_PLATFORM_LABELS[a.platform]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 tabular-nums text-foreground">
+                      {formatNumber(latest)}
+                    </td>
+                    <td className="px-4 py-2.5 tabular-nums">
+                      {basisLabel === undefined ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : delta === null ? (
+                        <span className="text-xs text-muted-foreground">داده‌ی مقایسه موجود نیست</span>
+                      ) : (
+                        <span
+                          className={cn(
+                            'font-semibold',
+                            delta > 0 ? 'text-success' : delta < 0 ? 'text-destructive' : 'text-muted-foreground',
+                          )}
+                          dir="ltr"
+                        >
+                          {delta > 0 ? '+' : delta < 0 ? '-' : ''}
+                          {formatNumber(Math.abs(delta))}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                          isFresh
+                            ? 'bg-success/10 text-success'
+                            : 'bg-muted text-muted-foreground',
+                        )}
+                      >
+                        {isFresh ? 'به‌روز' : 'قدیمی'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
