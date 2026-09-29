@@ -47,7 +47,6 @@ import { BrandLogo } from '@/components/common/brand-logo';
 import { MetricFormDialog } from '@/components/social/metric-form-dialog';
 import { BulkMetricFormDialog } from '@/components/social/bulk-metric-form-dialog';
 import { BulkEditDialog } from '@/components/social/bulk-edit-dialog';
-import { BulkImportDialog } from '@/components/social/bulk-import-dialog';
 import { AccountFormDialog } from '@/components/social/account-form-dialog';
 import { DataQualityPanel } from '@/components/social/data-quality/data-quality-panel';
 import { Button } from '@/components/ui/button';
@@ -88,7 +87,6 @@ export default function SocialAccountsPage() {
   );
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<SocialAccount | null>(
     null,
@@ -347,15 +345,16 @@ export default function SocialAccountsPage() {
               <PenLine className="h-3.5 w-3.5" />
               ویرایش انبوه
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0 gap-1.5 text-xs"
-              onClick={() => setImportOpen(true)}
+            {/* Single Excel upload path: the import/review center.
+                The old in-page bulk-import dialog was removed to avoid
+                maintaining two divergent upload UIs. */}
+            <Link
+              href="/social/import"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface"
             >
               <Upload className="h-3.5 w-3.5" />
-              ورود انبوه
-            </Button>
+              ورود اکسل
+            </Link>
             <Link
               href="/social/import"
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface"
@@ -687,13 +686,6 @@ export default function SocialAccountsPage() {
         accounts={accounts}
         metrics={metrics}
         onSaved={() => setReloadKey((k) => k + 1)}
-      />
-      <BulkImportDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImported={() => {
-          setReloadKey((k) => k + 1);
-        }}
       />
       <AccountFormDialog
         open={accountDialogOpen}

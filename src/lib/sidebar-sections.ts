@@ -12,13 +12,7 @@ import { navItems } from '@/config/navigation.config';
 export const EXTRA_SECTION_IDS = [
   'content',
   'assets',
-  'campaigns',
-  'distribution',
-  'audience',
-  'analytics',
   'intelligence',
-  'automation',
-  'knowledge',
   'notifications',
 ] as const;
 

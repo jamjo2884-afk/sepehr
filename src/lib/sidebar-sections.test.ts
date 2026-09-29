@@ -11,8 +11,13 @@ import { navItems } from '@/config/navigation.config';
 /**
  * Sidebar extra-sections regression tests.
  *
- * Feature 1: a single toggle hides/shows exactly ten secondary nav
+ * Feature 1: a single toggle hides/shows exactly the secondary nav
  * sections. Core nav items must never be filtered out.
+ *
+ * Trimmed 2026-09-28: the menu was consolidated — campaigns (redirects
+ * to finance), distribution/automation/knowledge (placeholders) and
+ * audience/analytics (overlapping dashboards) left the nav; the extra
+ * set is now four sections.
  */
 
 const ALWAYS_VISIBLE_IDS = [
@@ -25,17 +30,11 @@ const ALWAYS_VISIBLE_IDS = [
 ];
 
 describe('sidebar extra sections', () => {
-  it('declares exactly the ten agreed extra-section ids', () => {
+  it('declares exactly the four agreed extra-section ids', () => {
     expect(EXTRA_SECTION_IDS).toEqual([
       'content',
       'assets',
-      'campaigns',
-      'distribution',
-      'audience',
-      'analytics',
       'intelligence',
-      'automation',
-      'knowledge',
       'notifications',
     ]);
   });
@@ -44,7 +43,7 @@ describe('sidebar extra sections', () => {
     expect(EXTRA_SECTIONS_STORAGE_KEY).toBe('sidebar-extra-sections-visible');
   });
 
-  it('hides the ten extra sections by default (showExtra = false)', () => {
+  it('hides the extra sections by default (showExtra = false)', () => {
     const visible = getVisibleNavItems(false);
     const visibleIds = visible.map((item) => item.id);
 
@@ -81,11 +80,12 @@ describe('sidebar extra sections', () => {
   it('classifies ids with isExtraSection', () => {
     expect(isExtraSection('content')).toBe(true);
     expect(isExtraSection('assets')).toBe(true);
-    expect(isExtraSection('campaigns')).toBe(true);
-    expect(isExtraSection('distribution')).toBe(true);
+    expect(isExtraSection('intelligence')).toBe(true);
     expect(isExtraSection('notifications')).toBe(true);
     expect(isExtraSection('social')).toBe(false);
     expect(isExtraSection('settings')).toBe(false);
+    expect(isExtraSection('campaigns')).toBe(false);
+    expect(isExtraSection('analytics')).toBe(false);
     expect(isExtraSection('nonexistent')).toBe(false);
   });
 
@@ -97,37 +97,52 @@ describe('sidebar extra sections', () => {
     }
   });
 
+  it('removed sections (campaigns, analytics, …) are gone from the nav', () => {
+    const navIds = new Set(navItems.map((item) => item.id));
+
+    for (const removed of [
+      'campaigns',
+      'distribution',
+      'audience',
+      'analytics',
+      'automation',
+      'knowledge',
+    ]) {
+      expect(navIds.has(removed)).toBe(false);
+    }
+  });
+
   describe('isActivePath', () => {
     it('matches the section root itself', () => {
-      expect(isActivePath('/analytics', '/analytics')).toBe(true);
+      expect(isActivePath('/social', '/social')).toBe(true);
     });
 
     it('matches nested routes under the section', () => {
-      expect(isActivePath('/analytics/reports', '/analytics')).toBe(true);
-      expect(isActivePath('/campaigns/123/details', '/campaigns')).toBe(true);
+      expect(isActivePath('/social/accounts', '/social')).toBe(true);
+      expect(isActivePath('/tasks/boards/123', '/tasks')).toBe(true);
     });
 
     it('does not match unrelated prefixes or other sections', () => {
-      expect(isActivePath('/analytics-extra', '/analytics')).toBe(false);
-      expect(isActivePath('/finance', '/analytics')).toBe(false);
+      expect(isActivePath('/social-extra', '/social')).toBe(false);
+      expect(isActivePath('/finance', '/social')).toBe(false);
     });
 
     it('treats a missing pathname as never active', () => {
-      expect(isActivePath(undefined, '/analytics')).toBe(false);
-      expect(isActivePath(null, '/analytics')).toBe(false);
-      expect(isActivePath('', '/analytics')).toBe(false);
+      expect(isActivePath(undefined, '/social')).toBe(false);
+      expect(isActivePath(null, '/social')).toBe(false);
+      expect(isActivePath('', '/social')).toBe(false);
     });
   });
 
   describe('active extra-section pinning', () => {
     it('keeps the current page visible when its section is hidden', () => {
-      const visible = getVisibleNavItems(false, '/analytics/reports');
+      const visible = getVisibleNavItems(false, '/content');
       const visibleIds = visible.map((item) => item.id);
 
-      expect(visibleIds).toContain('analytics');
+      expect(visibleIds).toContain('content');
       // The other extra sections stay hidden.
-      expect(visibleIds).not.toContain('campaigns');
-      expect(visibleIds).not.toContain('automation');
+      expect(visibleIds).not.toContain('assets');
+      expect(visibleIds).not.toContain('intelligence');
     });
 
     it('does not reveal extra sections when the path matches nothing', () => {
@@ -137,13 +152,6 @@ describe('sidebar extra sections', () => {
       for (const id of EXTRA_SECTION_IDS) {
         expect(visibleIds).not.toContain(id);
       }
-    });
-
-    it('pins only the exact section, not prefix lookalikes', () => {
-      const visible = getVisibleNavItems(false, '/analytics-extra');
-      const visibleIds = visible.map((item) => item.id);
-
-      expect(visibleIds).not.toContain('analytics');
     });
   });
 });
