@@ -8,7 +8,7 @@ import { useFlowToast } from "@/components/flowboard/toast";
 import { useLanguage } from "@/i18n/flowboard/context";
 import { formatDateShort } from "@/i18n/flowboard/dates";
 // v2: cover gradient helpers (section-aligned board covers)
-import { DEFAULT_BOARD_COVER, coverBackground } from "@/lib/flowboard/cover";
+import { DEFAULT_BOARD_COVER, coverBackground, GRADIENT_COVER_COLORS } from "@/lib/flowboard/cover";
 
 interface User {
   id: string;
@@ -405,11 +405,12 @@ export default function BoardPage() {
 
   const handleBoardBackground = async (backgroundColor: string) => {
     try {
-      await fetch(`/api/flowboard/boards/${boardId}`, {
+      const res = await fetch(`/api/flowboard/boards/${boardId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ backgroundColor }),
       });
+      if (!res.ok) throw new Error("update failed");
       setBoard((prev) => (prev ? { ...prev, backgroundColor } : prev));
       setShowBackgroundPicker(false);
     } catch {
@@ -590,7 +591,9 @@ export default function BoardPage() {
   /** Last custom (non-palette) color; null when on a palette swatch. */
   const customCoverHex: string | null =
     board?.backgroundColor &&
-    !COVER_SWATCHES.some((s) => s.color === board?.backgroundColor)
+    !COVER_SWATCHES.some(
+      (s) => s.color?.toUpperCase() === board?.backgroundColor?.toUpperCase(),
+    )
       ? board.backgroundColor
       : null;
 
@@ -600,6 +603,14 @@ export default function BoardPage() {
       return { backgroundImage: `url(${board.backgroundImage})`, backgroundSize: "cover" as const };
     if (board?.backgroundColor) return { background: coverBackground(board.backgroundColor) };
     return { background: DEFAULT_BOARD_COVER };
+  };
+
+  // v2: the glassy list panels/add-list button follow the board's own cover
+  // color (falls back to the section tint when the cover is a plain color).
+  const getCoverTint = (): string | undefined => {
+    if (!board?.backgroundColor) return "var(--section-tasks)";
+    const c = board.backgroundColor.trim().toUpperCase();
+    return GRADIENT_COVER_COLORS.has(c) ? c : undefined;
   };
 
   // Helper: get checklist completion for a card
@@ -639,7 +650,7 @@ export default function BoardPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col" style={getBoardStyle()}>
+    <div className="h-screen flex flex-col" style={{ ...getBoardStyle(), ["--tint" as string]: getCoverTint() }}>
       {/* Board header */}
       <header className="h-12 bg-black/15 backdrop-blur-sm flex items-center px-4 gap-3 flex-shrink-0">
         <button onClick={() => router.push("/tasks/boards")} className="text-white/80 hover:text-white p-1">
@@ -1191,8 +1202,13 @@ export default function BoardPage() {
                 Trello-blue default found in the real-data review. */}
             <div className="grid grid-cols-5 gap-2">
               {COVER_SWATCHES.map((bg) => {
+                // The default swatch persists DEFAULT_BOARD_COVER_HEX, so it
+                // is "active" both when the board has no color (renders the
+                // same default cover) and when that hex was picked explicitly.
                 const isActive =
-                  (bg.color === null && !board?.backgroundColor) ||
+                  (bg.color === null &&
+                    (!board?.backgroundColor ||
+                      board.backgroundColor === DEFAULT_BOARD_COVER_HEX)) ||
                   board?.backgroundColor === bg.color;
                 return (
                   <button

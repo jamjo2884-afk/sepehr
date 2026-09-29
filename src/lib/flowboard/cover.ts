@@ -26,9 +26,12 @@ export const DEFAULT_BOARD_COVER =
  * CSS background for a board cover: a vivid gradient for v2 section
  * colors, the raw color otherwise. `${color}66` alpha works because v2
  * colors are always 6-digit hex.
+ *
+ * Match is case-insensitive: the custom color input persists lowercase
+ * hex (e.g. "#7c5cfc"), while the palette constants are uppercase.
  */
 export function coverBackground(color: string): string {
-  return GRADIENT_COVER_COLORS.has(color)
+  return GRADIENT_COVER_COLORS.has(color.trim().toUpperCase())
     ? `linear-gradient(135deg, ${color} 0%, ${color}66 55%, #0B1526 130%)`
     : color;
 }
