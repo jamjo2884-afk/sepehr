@@ -18,18 +18,21 @@ import {
   buildFollowersTrend,
   buildPlatformStats,
   buildPlatformTrends,
+  comparisonMonthRange,
   computeKpiComparison,
   computeKpisForAccounts,
   distinctMonths,
   filterAccounts,
+  comparisonCoverage,
+  hasComparisonData,
   jalaliMonthName,
   metricsInMonthRange,
   monthlyGrowthSeries,
   monthRangeOfPreset,
-  previousMonthRange,
 } from '@/services/social-analytics';
 import type {
   SocialAccount,
+  SocialComparisonBase,
   SocialMetric,
   SocialMonthRange,
   SocialRangePreset,
@@ -67,6 +70,9 @@ export default function AnalyticsPage() {
   );
   const [rangePreset, setRangePreset] = useState<SocialRangePreset>('24m');
   const [customRange, setCustomRange] = useState<SocialMonthRange | null>(null);
+  const [comparisonBase, setComparisonBase] = useState<SocialComparisonBase>(
+    'previous-month',
+  );
   const [brandWarning, setBrandWarning] = useState<string | null>(null);
 
   useEffect(() => {
@@ -132,7 +138,10 @@ export default function AnalyticsPage() {
     return monthRangeOfPreset(rangePreset);
   }, [rangePreset, customRange, availableMonths]);
 
-  const prevRange = useMemo(() => previousMonthRange(range), [range]);
+  const prevRange = useMemo(
+    () => comparisonMonthRange(range, comparisonBase),
+    [range, comparisonBase],
+  );
 
   const filteredAccounts = useMemo(
     () => filterAccounts(accountsAll, selectedBrands, selectedPlatforms),
@@ -158,6 +167,27 @@ export default function AnalyticsPage() {
   const kpiComparison = useMemo(
     () => computeKpiComparison(kpis, prevKpis),
     [kpis, prevKpis],
+  );
+  const filteredAccountIds = useMemo(
+    () => new Set(filteredAccounts.map((a) => a.id)),
+    [filteredAccounts],
+  );
+  const hasPrevData = useMemo(
+    () => hasComparisonData(metricsAll, prevRange, filteredAccountIds),
+    [metricsAll, prevRange, filteredAccountIds],
+  );
+  // پوشش بازه‌ی مبنا: اگر بازه‌ی مقایسه به قبل از اولین داده برسد،
+  // درصد رشد گمراه‌کننده است — برچسب «ناقص (x از y ماه)» جای آن را می‌گیرد.
+  const prevCoverage = useMemo(
+    () => comparisonCoverage(metricsAll, prevRange, filteredAccountIds),
+    [metricsAll, prevRange, filteredAccountIds],
+  );
+  const prevBasisLabel = useMemo(
+    () =>
+      comparisonBase === 'previous-month'
+        ? jalaliMonthName(prevRange.start)
+        : `${jalaliMonthName(prevRange.start)} — ${jalaliMonthName(prevRange.end)}`,
+    [comparisonBase, prevRange],
   );
 
   const brandTrends = useMemo(
@@ -342,6 +372,8 @@ export default function AnalyticsPage() {
         customRange={customRange}
         onCustomRangeChange={handleCustomRangeChange}
         availableMonths={availableMonths}
+        comparisonBase={comparisonBase}
+        onComparisonBaseChange={setComparisonBase}
       />
 
       {!hasRangeData ? (
@@ -362,7 +394,13 @@ export default function AnalyticsPage() {
         <>
           {/* KPI cards */}
           <section>
-            <AnalyticsKpiCards kpis={kpis} comparison={kpiComparison} />
+            <AnalyticsKpiCards
+              kpis={kpis}
+              comparison={kpiComparison}
+              basisLabel={prevBasisLabel}
+              hasComparisonData={hasPrevData}
+              coverage={prevCoverage}
+            />
           </section>
 
           {/* Follower trend */}

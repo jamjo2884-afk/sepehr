@@ -4,8 +4,12 @@ import { useMemo, useState } from 'react';
 import { CalendarRange, Filter } from 'lucide-react';
 import type { SocialPlatform } from '@/types/domain';
 import { SOCIAL_PLATFORM_LABELS } from '@/types/domain';
-import { SOCIAL_RANGE_PRESET_LABELS } from '@/types/social';
-import type { SocialMonthRange, SocialRangePreset } from '@/types/social';
+import { SOCIAL_RANGE_PRESET_LABELS, SOCIAL_COMPARISON_BASE_LABELS } from '@/types/social';
+import type {
+  SocialComparisonBase,
+  SocialMonthRange,
+  SocialRangePreset,
+} from '@/types/social';
 import { jalaliMonthName } from '@/services/social-analytics';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { BrandLogo } from '@/components/common/brand-logo';
@@ -33,7 +37,7 @@ const PRESET_ORDER: Array<Exclude<SocialRangePreset, 'custom'>> = [
   '24m',
 ];
 
-/** Analytical filter bar: brand (multi), platform (multi), month range. */
+/** Analytical filter bar: brand (multi), platform (multi), month range, comparison basis. */
 export function AnalyticsFilterBar({
   brands,
   selectedBrands,
@@ -47,6 +51,8 @@ export function AnalyticsFilterBar({
   onCustomRangeChange,
   availableMonths,
   manageButton,
+  comparisonBase = 'previous-month',
+  onComparisonBaseChange,
 }: {
   brands: string[];
   selectedBrands: string[];
@@ -60,6 +66,9 @@ export function AnalyticsFilterBar({
   onCustomRangeChange: (range: SocialMonthRange) => void;
   availableMonths: string[];
   manageButton?: React.ReactNode;
+  /** مبنای مقایسه‌ی KPI — پیش‌فرض «ماه قبل». */
+  comparisonBase?: SocialComparisonBase;
+  onComparisonBaseChange?: (base: SocialComparisonBase) => void;
 }) {
   const allBrands = selectedBrands.length === 0;
   const allPlatforms = selectedPlatforms.length === 0;
@@ -178,6 +187,30 @@ export function AnalyticsFilterBar({
                 : ''}
             </span>
           )}
+
+          {/* مبنای مقایسه‌ی KPI (فقط وقتی انتخاب‌گر مبنا وجود دارد) */}
+          {onComparisonBaseChange ? (
+            <Select
+              value={comparisonBase}
+              onValueChange={(v) => onComparisonBaseChange(v as SocialComparisonBase)}
+            >
+              <SelectTrigger
+                className="h-9 w-40 text-xs"
+                title="مبنای مقایسه‌ی درصدها و اعداد زیر KPIها"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(
+                  Object.keys(SOCIAL_COMPARISON_BASE_LABELS) as SocialComparisonBase[]
+                ).map((base) => (
+                  <SelectItem key={base} value={base}>
+                    مقایسه با: {SOCIAL_COMPARISON_BASE_LABELS[base]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
         </div>
       </div>
     </div>

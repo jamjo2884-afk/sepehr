@@ -17,17 +17,20 @@ import { buildAccountRows } from '@/services/social.service';
 import {
   buildFollowersTrend,
   buildPlatformStats,
+  comparisonMonthRange,
   computeKpiComparison,
   computeKpisForAccounts,
   distinctMonths,
   filterAccounts,
+  comparisonCoverage,
+  hasComparisonData,
   jalaliMonthName,
   metricsInMonthRange,
   monthRangeOfPreset,
-  previousMonthRange,
 } from '@/services/social-analytics';
 import type {
   SocialAccount,
+  SocialComparisonBase,
   SocialMetric,
   SocialMonthRange,
   SocialRangePreset,
@@ -41,7 +44,7 @@ import { PlatformComparisonTable } from '@/components/social/analytics/platform-
 import { SectionTitle } from '@/components/social/analytics/shared';
 import { SocialPlatformIcon } from '@/components/common/social-platform-icon';
 import { BrandLogo } from '@/components/common/brand-logo';
-import { formatNumber } from '@/utils/persian';
+import { formatNumber, toPersianDigits } from '@/utils/persian';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -60,6 +63,9 @@ export default function AudiencePage() {
   );
   const [rangePreset, setRangePreset] = useState<SocialRangePreset>('24m');
   const [customRange, setCustomRange] = useState<SocialMonthRange | null>(null);
+  const [comparisonBase, setComparisonBase] = useState<SocialComparisonBase>(
+    'previous-month',
+  );
 
   useEffect(() => {
     let active = true;
@@ -123,7 +129,10 @@ export default function AudiencePage() {
     return monthRangeOfPreset(rangePreset);
   }, [rangePreset, customRange, availableMonths]);
 
-  const prevRange = useMemo(() => previousMonthRange(range), [range]);
+  const prevRange = useMemo(
+    () => comparisonMonthRange(range, comparisonBase),
+    [range, comparisonBase],
+  );
 
   const filteredAccounts = useMemo(
     () => filterAccounts(accountsAll, selectedBrands, selectedPlatforms),
@@ -144,6 +153,29 @@ export default function AudiencePage() {
     [kpis, prevKpis],
   );
   const followersComparison = kpiComparison.find((c) => c.key === 'followers');
+  const filteredAccountIds = useMemo(
+    () => new Set(filteredAccounts.map((a) => a.id)),
+    [filteredAccounts],
+  );
+  const hasPrevData = useMemo(
+    () => hasComparisonData(metricsAll, prevRange, filteredAccountIds),
+    [metricsAll, prevRange, filteredAccountIds],
+  );
+  // پوشش بازه‌ی مبنا: اگر بازه‌ی مقایسه به قبل از اولین داده برسد،
+  // درصد رشد گمراه‌کننده است — برچسب «ناقص (x از y ماه)» جای آن را می‌گیرد.
+  const prevCoverage = useMemo(
+    () => comparisonCoverage(metricsAll, prevRange, filteredAccountIds),
+    [metricsAll, prevRange, filteredAccountIds],
+  );
+  const prevCoverageIncomplete =
+    hasPrevData && prevCoverage.covered < prevCoverage.total;
+  const prevBasisLabel = useMemo(
+    () =>
+      comparisonBase === 'previous-month'
+        ? jalaliMonthName(prevRange.start)
+        : `${jalaliMonthName(prevRange.start)} — ${jalaliMonthName(prevRange.end)}`,
+    [comparisonBase, prevRange],
+  );
 
   const aggregateTrend = useMemo(
     () => buildFollowersTrend(filteredAccounts, metricsAll, range),
@@ -289,15 +321,27 @@ export default function AudiencePage() {
         customRange={customRange}
         onCustomRangeChange={handleCustomRangeChange}
         availableMonths={availableMonths}
+        comparisonBase={comparisonBase}
+        onComparisonBaseChange={setComparisonBase}
       />
 
       {/* Audience KPIs */}
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AudienceKpi
           icon={Users}
-          label="کل مخاطبان"
+          label={`کل مخاطبان — ${
+            prevCoverageIncomplete
+              ? `مقایسه با داده‌ی ناقص (${toPersianDigits(String(prevCoverage.covered))} از ${toPersianDigits(String(prevCoverage.total))} ماه)`
+              : hasPrevData
+                ? `نسبت به ${prevBasisLabel}`
+                : 'داده‌ی مقایسه موجود نیست'
+          }`}
           value={formatNumber(kpis.followers)}
-          trend={followersComparison?.changePct ?? 0}
+          trend={
+            hasPrevData && !prevCoverageIncomplete
+              ? followersComparison?.changePct
+              : undefined
+          }
         />
         <AudienceKpi
           icon={LayoutGrid}
