@@ -6,7 +6,7 @@ import { getFinanceDashboardData,
 } from '@/services/finance/finance-analytics.service';
 import { getHumanCostByBrand, getBrandTotalCosts } from '@/services/finance/team-analytics.service';
 import { getSocialAccounts, getSocialMetrics } from '@/services/social.service';
-import { withAuth } from '@/lib/route-auth';
+import { requireModuleView } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
  * budget vs actual, expense breakdown, brand costs, platform
  * efficiency, and scatter data.
  */
-export const GET = withAuth(async (req) => {
+export const GET = requireModuleView('finance')(async (req) => {
   try {
     const { searchParams } = new URL(req.url);
     const brand = searchParams.get('brand') || undefined;

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { getCurrentWorkspace } from '@/lib/workspace';
+import { canEdit } from '@/lib/permissions';
 import { z } from 'zod';
 import { deleteSocialMetric } from '@/services/social.service';
 
@@ -12,7 +14,9 @@ import { deleteSocialMetric } from '@/services/social.service';
  * Returns { ok } — ok=false means the row was missing or its `updated_at`
  * no longer matched (changed/deleted by another process).
  *
- * Future authorization hooks in here (auth is bypassed in the demo).
+ * Workspace gate: the legacy requireAuth only proves a session; membership
+ * is enforced here so a signed-in user with no workspace membership cannot
+ * reach the service layer (RLS would also refuse the row — defense in depth).
  */
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +37,20 @@ export async function DELETE(
 ): Promise<NextResponse> {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json(
+      { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  // Module gate: deleting a metric is an edit-level action on social.
+  if (!canEdit(ws, 'social')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
   const parsed = paramsSchema.safeParse(params);
   if (!parsed.success) {
     return NextResponse.json(

@@ -1,4 +1,4 @@
-import { requireAuth } from '@/lib/route-auth';
+import { requireModuleView } from '@/lib/permissions';
 import { isSyntheticUser } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import { getSocialAccounts, getSocialMetrics } from '@/services/social.service';
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  * This eliminates the need for client-side Supabase queries
  * and reduces the client bundle size.
  */
-export const GET = requireAuth(async (_req, auth): Promise<NextResponse> => {
+export const GET = requireModuleView('social')(async (_req, auth): Promise<NextResponse> => {
   try {
     // A synthetic identity (legacy demo user / guest) has no real Supabase
     // session — since the 2026-09-19 RLS fix such readers get ZERO tenant

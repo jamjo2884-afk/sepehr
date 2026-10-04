@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getBudgets, createBudget } from '@/services/finance/finance.service';
 import { validateBudget } from '@/services/finance/finance-validation';
-import { withAuth } from '@/lib/route-auth';
+import { requireModuleView, requireModuleCreate } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/finance/budgets?brand=...
  */
-export const GET = withAuth(async (req) => {
+export const GET = requireModuleView('finance')(async (req) => {
   try {
     const { searchParams } = new URL(req.url);
     const brandId = searchParams.get('brandId') || undefined;
@@ -26,7 +26,7 @@ export const GET = withAuth(async (req) => {
 /**
  * POST /api/finance/budgets
  */
-export const POST = withAuth(async (req) => {
+export const POST = requireModuleCreate('finance')(async (req) => {
   let body: unknown;
   try {
     body = await req.json();

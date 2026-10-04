@@ -7,7 +7,7 @@ import {
 } from '@/types/domain';
 import type { SocialPlatform } from '@/types/domain';
 import { PLATFORM_METRIC_FIELDS } from '@/constants/social-fields';
-import { withAuth } from '@/lib/route-auth';
+import { requireModuleView } from '@/lib/permissions';
 
 /**
  * GET /api/settings/social
@@ -15,7 +15,7 @@ import { withAuth } from '@/lib/route-auth';
  * Returns per-platform status information for the Social Settings page.
  * Reuses the existing sync overview infrastructure — no duplicate logic.
  */
-export const GET = withAuth(async () => {
+export const GET = requireModuleView('settings')(async () => {
   try {
     const [overview, platformSettings] = await Promise.all([
       getSyncOverview(),

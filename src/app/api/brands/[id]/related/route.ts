@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getCurrentWorkspace } from '@/lib/workspace';
+import { canView } from '@/lib/permissions';
 import { getBrandById } from '@/services/brand.service';
 import { getContents } from '@/services/content.service';
 import { getExpenses, getCampaigns } from '@/services/finance/finance.service';
@@ -35,6 +36,13 @@ export async function GET(
   if (!ws) {
     return NextResponse.json(
       { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  // Cross-module view: requires brands view (the page's home module).
+  if (!canView(ws, 'brands')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
       { status: 403 },
     );
   }

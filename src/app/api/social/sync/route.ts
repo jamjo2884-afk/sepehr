@@ -1,4 +1,4 @@
-import { requireAuth } from "@/lib/route-auth";
+import { requireModuleEdit } from '@/lib/permissions';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { syncSocialAccount } from '@/services/social-sync.service';
@@ -18,7 +18,7 @@ const bodySchema = z.object({
   accountId: z.string().uuid(),
 });
 
-export const POST = requireAuth(async (req: Request): Promise<NextResponse> => {
+export const POST = requireModuleEdit('social')(async (req: Request): Promise<NextResponse> => {
   // Rate limit: 10 syncs per minute
   const ip = getClientIp(req);
   const limit = checkRateLimit(`sync:${ip}`, RATE_LIMITS.sync);

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getBrandPerformance } from '@/services/brand-performance.service';
 import { requireAuth } from '@/lib/auth';
 import { getCurrentWorkspace } from '@/lib/workspace';
+import { canView } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,12 @@ export async function GET(
   if (!ws) {
     return NextResponse.json(
       { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  if (!canView(ws, 'brands')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
       { status: 403 },
     );
   }

@@ -38,6 +38,19 @@ export async function getCurrentUser(): Promise<FlowBoardUser | null> {
     const { isGuestUser } = await import('@/lib/guest-mode');
     if (isGuestUser(mdUser)) return null;
 
+    // Members phase 2: the `tasks` module gate. Every FlowBoard route
+    // funnels through this function, so denying here blocks the whole module
+    // for members without at least view access — before any Prisma query.
+    // Demo mode (synthetic owner) and privileged roles always pass.
+    if (!isDemoMode()) {
+      const { getCurrentWorkspace } = await import('@/lib/workspace');
+      const { canView } = await import('@/lib/permissions');
+      const ws = await getCurrentWorkspace();
+      if (ws && !canView(ws, 'tasks')) {
+        return null; // treated as unauthorized — same contract as guests
+      }
+    }
+
     // In demo mode, use the demo user
     const userId = isDemoMode() ? DEMO_USER_ID : mdUser.id;
     const email = isDemoMode() ? DEMO_USER_EMAIL : mdUser.email;

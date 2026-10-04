@@ -1,4 +1,5 @@
-import { requireAuth } from "@/lib/route-auth";
+import { NextResponse } from 'next/server';
+import { requireModuleCreate } from '@/lib/permissions';
 import { z } from 'zod';
 import { importSocialMetricsRows } from '@/services/social-import/import.service';
 import type { SocialMetricValues } from '@/types/social';
@@ -47,32 +48,24 @@ const bodySchema = z.object({
   rows: z.array(rowSchema).max(5000),
 });
 
-export const POST = requireAuth(async (req: Request): Promise<Response> => {
-  // Rate limit: 5 imports per 5 minutes
+export const POST = requireModuleCreate('social')(
+  async (req: Request): Promise<NextResponse> => {
+    // Rate limit: 5 imports per 5 minutes
   const ip = getClientIp(req);
   const limit = checkRateLimit(`import:${ip}`, RATE_LIMITS.import);
   if (!limit.allowed) {
-    return new Response(JSON.stringify({ error: 'درخواست بیش از حد مجاز است.' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return NextResponse.json({ error: 'درخواست بیش از حد مجاز است.' }, { status: 429 });
   }
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'درخواست نامعتبر است.' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return NextResponse.json({ error: 'درخواست نامعتبر است.' }, { status: 400 });
   }
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return new Response(JSON.stringify({ error: 'دادهٔ ارسالی نامعتبر است.' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return NextResponse.json({ error: 'دادهٔ ارسالی نامعتبر است.' }, { status: 400 });
   }
 
   const rows = parsed.data.rows.map((r) => ({
@@ -113,7 +106,7 @@ export const POST = requireAuth(async (req: Request): Promise<Response> => {
     },
   });
 
-  return new Response(stream, {
+  return new NextResponse(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',

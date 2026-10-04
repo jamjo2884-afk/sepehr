@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { updateCampaign, deleteCampaign, getCampaigns } from '@/services/finance/finance.service';
 import { requireAuth } from '@/lib/auth';
 import { getCurrentWorkspace } from '@/lib/workspace';
+import { canEdit } from '@/lib/permissions';
 import { createNotification } from '@/services/notification.service';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,19 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json(
+      { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  if (!canEdit(ws, 'finance')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   let body: unknown;
   try {
@@ -73,6 +87,19 @@ export async function DELETE(
 ): Promise<NextResponse> {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json(
+      { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  if (!canEdit(ws, 'finance')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   const success = await deleteCampaign(params.id);
   if (!success) {

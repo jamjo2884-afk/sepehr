@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getBrandById, updateBrand, deleteBrand } from '@/services/brand.service';
 import { requireAuth } from '@/lib/auth';
+import { getCurrentWorkspace } from '@/lib/workspace';
+import { canView, canEdit } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +24,19 @@ export async function GET(
 ): Promise<NextResponse> {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json(
+      { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  if (!canView(ws, 'brands')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   const brand = await getBrandById(params.id);
   if (!brand) {
@@ -43,6 +58,19 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json(
+      { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  if (!canEdit(ws, 'brands')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   let body: unknown;
   try {
@@ -80,6 +108,19 @@ export async function DELETE(
 ): Promise<NextResponse> {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json(
+      { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  if (!canEdit(ws, 'brands')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   const success = await deleteBrand(params.id);
   if (!success) {

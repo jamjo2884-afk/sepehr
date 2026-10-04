@@ -7,6 +7,7 @@ import {
 } from '@/services/content.service';
 import { requireAuth } from '@/lib/auth';
 import { getCurrentWorkspace } from '@/lib/workspace';
+import { canView, canEdit } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +69,12 @@ export async function GET(
       { status: 403 },
     );
   }
+  if (!canView(ws, 'content')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   try {
     const content = await getContentById(params.id, ws.workspaceId);
@@ -101,6 +108,12 @@ export async function PATCH(
   if (!ws) {
     return NextResponse.json(
       { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  if (!canEdit(ws, 'content')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
       { status: 403 },
     );
   }

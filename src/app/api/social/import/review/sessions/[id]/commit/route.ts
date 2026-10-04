@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { getCurrentWorkspace } from '@/lib/workspace';
+import { canEdit } from '@/lib/permissions';
 import { commitImport } from '@/services/import-review/import-review.service';
 
 /**
@@ -14,6 +16,17 @@ export async function POST(
 ): Promise<NextResponse> {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json({ error: 'فضای کاری یافت نشد.' }, { status: 403 });
+  }
+  // Commit writes real social accounts + metrics — edit level.
+  if (!canEdit(ws, 'social')) {
+    return NextResponse.json(
+      { error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   const { id } = await params;
   try {

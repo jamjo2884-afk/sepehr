@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getCurrentWorkspace } from '@/lib/workspace';
+import { canView } from '@/lib/permissions';
 import { prisma } from '@/lib/flowboard/db';
 import { resolveActiveWorkspaceId } from '@/lib/flowboard/workspace';
 
@@ -22,6 +23,12 @@ export async function GET(): Promise<NextResponse> {
   if (!ws) {
     return NextResponse.json(
       { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  if (!canView(ws, 'tasks')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
       { status: 403 },
     );
   }

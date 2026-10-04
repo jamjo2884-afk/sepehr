@@ -9,6 +9,7 @@ import { getSocialAccounts, getSocialMetrics } from '@/services/social.service';
 import { buildBrandSocialStatus } from '@/services/brand-status.service';
 import { requireAuth } from '@/lib/auth';
 import { getCurrentWorkspace } from '@/lib/workspace';
+import { canView, canEdit } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,6 +68,12 @@ export async function GET(
   if (!ws) {
     return NextResponse.json(
       { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  if (!canView(ws, 'brands')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
       { status: 403 },
     );
   }
@@ -147,6 +154,12 @@ export async function PUT(
   if (!ws) {
     return NextResponse.json(
       { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  if (!canEdit(ws, 'brands')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
       { status: 403 },
     );
   }

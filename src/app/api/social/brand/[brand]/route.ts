@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isSyntheticUser, requireAuth } from '@/lib/auth';
+import { getCurrentWorkspace } from '@/lib/workspace';
+import { canView } from '@/lib/permissions';
 import {
   getBrandSocialAnalytics,
   getSocialAccounts,
@@ -20,6 +22,25 @@ export async function GET(
 ): Promise<NextResponse> {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+
+  // Workspace gate (PRD Dev Rule 4): legacy requireAuth only checks the
+  // session — membership is enforced here, like withAuth does for the
+  // wrapper-based routes.
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json(
+      { ok: false, error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+
+  // Module gate: the social module must be viewable by this member.
+  if (!canView(ws, 'social')) {
+    return NextResponse.json(
+      { ok: false, error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   // Same gate as /api/social/analytics: a synthetic identity (session-less
   // demo user / guest) reads ZERO tenant rows after the RLS lockdown, so

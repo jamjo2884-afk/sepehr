@@ -1,4 +1,4 @@
-import { requireAuth } from "@/lib/route-auth";
+import { requireModuleEdit } from '@/lib/permissions';
 import { NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { z } from 'zod';
@@ -71,7 +71,7 @@ const bodySchema = z.object({
   values: valueSchema,
 });
 
-export const POST = requireAuth(async (req: Request): Promise<NextResponse> => {
+export const POST = requireModuleEdit('social')(async (req: Request): Promise<NextResponse> => {
   // Rate limit: 20 bulk edits per minute
   const ip = getClientIp(req);
   const limit = checkRateLimit(`bulk-edit:${ip}`, RATE_LIMITS.bulkEdit);

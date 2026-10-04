@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFinanceOverview } from '@/services/finance/finance-analytics.service';
-import { withAuth } from '@/lib/route-auth';
+import { requireModuleView } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
  *
  * Returns the finance overview KPIs (total budget, spent, remaining, etc.).
  */
-export const GET = withAuth(async (req) => {
+export const GET = requireModuleView('finance')(async (req) => {
   try {
     const { searchParams } = new URL(req.url);
     const brandId = searchParams.get('brandId') || undefined;

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { getCurrentWorkspace } from '@/lib/workspace';
+import { canCreate } from '@/lib/permissions';
 import {
   IMPORT_MAX_FILE_BYTES,
   parseImportFile,
@@ -23,6 +25,19 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request): Promise<NextResponse> {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+
+  // Workspace gate: membership is enforced before any session/row is written.
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json({ error: 'فضای کاری یافت نشد.' }, { status: 403 });
+  }
+  // Module gate: creating an import session writes social data.
+  if (!canCreate(ws, 'social')) {
+    return NextResponse.json(
+      { error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   let form: FormData;
   try {

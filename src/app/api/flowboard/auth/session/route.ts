@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/flowboard/auth';
 import { apiSuccess, handleApiError } from '@/lib/flowboard/api-utils';
 import { getCurrentWorkspace } from '@/lib/workspace';
 import { resolveActiveWorkspaceId } from '@/lib/flowboard/workspace';
+import { canView } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,15 @@ export async function GET(_request: NextRequest) {
     // Media Deck's current workspace is the source of truth for the active
     // FlowBoard workspace (falls back to the newest FlowBoard membership).
     const md = await getCurrentWorkspace();
+    // Members phase 2: without tasks view, the session reports no workspaces
+    // so the UI treats the caller as task-less (never another tenant's data).
+    if (md && !canView(md, 'tasks')) {
+      return apiSuccess({
+        user,
+        workspaces: [],
+        activeWorkspaceId: null,
+      });
+    }
     const activeWorkspaceId = await resolveActiveWorkspaceId(
       md?.workspaceId ?? null,
       user.id,

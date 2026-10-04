@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getBrands, createBrand } from '@/services/brand.service';
-import { withAuth } from '@/lib/route-auth';
+import { requireModuleView, requireModuleCreate } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +19,7 @@ const createBrandSchema = z.object({
  * Returns all brands for the current workspace (server-resolved via withAuth,
  * then enforced by brands RLS — defense in depth).
  */
-export const GET = withAuth(async (_req, auth) => {
+export const GET = requireModuleView('brands')(async (_req, auth) => {
   try {
     const brands = await getBrands(auth.workspace.workspaceId);
     return NextResponse.json({ ok: true, brands });
@@ -37,7 +37,7 @@ export const GET = withAuth(async (_req, auth) => {
  *
  * Create a new brand.
  */
-export const POST = withAuth(async (req, auth) => {
+export const POST = requireModuleCreate('brands')(async (req, auth) => {
   let body: unknown;
   try {
     body = await req.json();

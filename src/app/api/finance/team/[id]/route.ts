@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateTeamMember, deleteTeamMember } from '@/services/finance/team.service';
 import { requireAuth } from '@/lib/auth';
+import { getCurrentWorkspace } from '@/lib/workspace';
+import { canEdit } from '@/lib/permissions';
 
 export async function PATCH(
   request: NextRequest,
@@ -8,6 +10,19 @@ export async function PATCH(
 ) {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json(
+      { error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  if (!canEdit(ws, 'finance')) {
+    return NextResponse.json(
+      { error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   try {
     const body = await request.json();
@@ -47,6 +62,19 @@ export async function DELETE(
 ) {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json(
+      { error: 'فضای کاری یافت نشد.' },
+      { status: 403 },
+    );
+  }
+  if (!canEdit(ws, 'finance')) {
+    return NextResponse.json(
+      { error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   try {
     const ok = await deleteTeamMember(params.id);

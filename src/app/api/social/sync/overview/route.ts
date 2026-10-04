@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/route-auth';
+import { requireModuleView } from '@/lib/permissions';
 import { getSyncOverview } from '@/services/social-sync.service';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  * sync health, the latest sync logs, and the latest log per account.
  * Never includes credentials or raw API secrets.
  */
-export const GET = requireAuth(async (): Promise<NextResponse> => {
+export const GET = requireModuleView('social')(async (): Promise<NextResponse> => {
   try {
     const overview = await getSyncOverview();
     return NextResponse.json(overview);

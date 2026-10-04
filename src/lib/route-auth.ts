@@ -56,14 +56,23 @@ export type AuthenticatedRequest = {
   workspace: WorkspaceContext;
 };
 
+/**
+ * The second argument Next.js passes to a route handler (dynamic segment params).
+ * Typed loosely here so wrappers can forward it without knowing each route's
+ * segment names; `params` is a Promise in the app's Next version.
+ */
+export type RouteContext = { params?: Promise<Record<string, string>> };
+
 type RouteHandler = (
   req: Request,
   auth: AuthenticatedRequest,
+  ctx: RouteContext,
 ) => Promise<NextResponse> | NextResponse;
 
 type AuthOnlyHandler = (
   req: Request,
   auth: { user: AuthUser },
+  ctx: RouteContext,
 ) => Promise<NextResponse | Response> | NextResponse | Response;
 
 /**
@@ -71,7 +80,10 @@ type AuthOnlyHandler = (
  * Use for routes that need auth but don't require workspace context.
  */
 export function requireAuth(handler: AuthOnlyHandler) {
-  return async (req: Request): Promise<NextResponse | Response> => {
+  return async (
+    req: Request,
+    ctx: RouteContext = {},
+  ): Promise<NextResponse | Response> => {
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json(
@@ -81,12 +93,12 @@ export function requireAuth(handler: AuthOnlyHandler) {
     }
     const denied = await guestGate(user, req);
     if (denied) return denied;
-    return handler(req, { user });
+    return handler(req, { user }, ctx);
   };
 }
 
 export function withAuth(handler: RouteHandler) {
-  return async (req: Request): Promise<NextResponse> => {
+  return async (req: Request, ctx: RouteContext = {}): Promise<NextResponse> => {
     const user = await getAuthUser();
     if (!user) {
       return NextResponse.json(
@@ -105,7 +117,7 @@ export function withAuth(handler: RouteHandler) {
       );
     }
 
-    return handler(req, { user, workspace });
+    return handler(req, { user, workspace }, ctx);
   };
 }
 
@@ -118,13 +130,13 @@ export function withAuth(handler: RouteHandler) {
  */
 export function requireRole(...roles: string[]) {
   return (handler: RouteHandler) =>
-    withAuth(async (req, auth) => {
+    withAuth(async (req, auth, ctx) => {
       if (!roles.includes(auth.workspace.role)) {
         return NextResponse.json(
           { ok: false, error: 'دسترسی شما برای این عملیات کافی نیست.' },
           { status: 403 },
         );
       }
-      return handler(req, auth);
+      return handler(req, auth, ctx);
     });
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/route-auth';
+import { requireModuleCreate } from '@/lib/permissions';
 import {
   IMPORT_MAX_FILE_BYTES,
   parseImportFile,
@@ -24,7 +24,7 @@ import { normalizeAccountStatus } from '@/services/social-import/normalize';
  * errors and the matched account (or a Persian matching error).
  */
 
-export const POST = requireAuth(async (req: Request): Promise<NextResponse> => {
+export const POST = requireModuleCreate('social')(async (req: Request): Promise<NextResponse> => {
   let form: FormData;
   try {
     form = await req.formData();

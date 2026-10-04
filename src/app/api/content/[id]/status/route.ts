@@ -4,6 +4,7 @@ import { transitionContentStatus } from '@/services/content.service';
 import { createNotification } from '@/services/notification.service';
 import { requireAuth } from '@/lib/auth';
 import { getCurrentWorkspace } from '@/lib/workspace';
+import { canEdit } from '@/lib/permissions';
 import type { ContentStatus } from '@/types/content';
 
 export const dynamic = 'force-dynamic';
@@ -43,7 +44,9 @@ export async function POST(
       { status: 403 },
     );
   }
-  if (!['owner', 'admin', 'editor'].includes(ws.role)) {
+  // Members phase 2: status transitions are edit-level on the content module
+  // (replaces the flat owner/admin/editor role check with the matrix).
+  if (!canEdit(ws, 'content')) {
     return NextResponse.json(
       { ok: false, error: 'دسترسی شما برای تغییر وضعیت محتوا کافی نیست.' },
       { status: 403 },

@@ -9,13 +9,14 @@ import {
   densitySchema,
 } from '@/services/settings/settings.service';
 import { withAuth } from '@/lib/route-auth';
+import { requireModuleView } from '@/lib/permissions';
 
 /**
  * GET /api/settings
  *
  * Returns the authenticated user's settings, or defaults for demo mode.
  */
-export const GET = withAuth(async () => {
+export const GET = requireModuleView('settings')(async () => {
   const result = await getUserSettings();
   return NextResponse.json(result, { status: result.ok ? 200 : 500 });
 });
@@ -34,6 +35,9 @@ const patchSchema = z.object({
  *
  * Partially updates the authenticated user's settings.
  * Merges flat partial fields into the full AppSettings structure.
+ * Note: user preferences (theme, density, notifications) stay withAuth —
+ * they are per-user, not workspace settings. Workspace-level settings (like
+ * guest-mode) remain owner/admin via their own routes.
  */
 export const PATCH = withAuth(async (req) => {
   let body: unknown;

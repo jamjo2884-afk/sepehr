@@ -1,4 +1,4 @@
-import { requireAuth } from "@/lib/route-auth";
+import { requireModuleEdit } from '@/lib/permissions';
 import { NextResponse } from 'next/server';
 import { syncAllConnectedAccounts } from '@/services/social-sync.service';
 
@@ -12,7 +12,7 @@ import { syncAllConnectedAccounts } from '@/services/social-sync.service';
  *
  * Safe output only — no credentials, no raw API errors.
  */
-export const POST = requireAuth(async (): Promise<NextResponse> => {
+export const POST = requireModuleEdit('social')(async (): Promise<NextResponse> => {
   try {
     const result = await syncAllConnectedAccounts();
     // Strip per-account error messages down to codes + generic Persian text

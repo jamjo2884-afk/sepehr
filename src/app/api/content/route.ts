@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getContents, createContent } from '@/services/content.service';
-import { withAuth } from '@/lib/route-auth';
+import { requireModuleView, requireModuleCreate } from '@/lib/permissions';
 import type { ContentStatus } from '@/types/content';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,7 @@ const createContentSchema = z.object({
  * Lists contents of the caller's workspace, newest first, with optional
  * status / brand filters.
  */
-export const GET = withAuth(async (req, auth) => {
+export const GET = requireModuleView('content')(async (req, auth) => {
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status') || undefined;
@@ -56,7 +56,7 @@ export const GET = withAuth(async (req, auth) => {
  *
  * Creates a draft content row in the caller's workspace.
  */
-export const POST = withAuth(async (req, auth) => {
+export const POST = requireModuleCreate('content')(async (req, auth) => {
   let body: unknown;
   try {
     body = await req.json();

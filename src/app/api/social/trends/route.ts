@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from '@/lib/route-auth';
+import { requireModuleView } from '@/lib/permissions';
 import { getBrands } from '@/services/brand.service';
 import { getSocialTrends } from '@/services/social-trends.service';
 import { currentJalaliMonth, jalaliAddMonths } from '@/services/social-analytics';
@@ -26,7 +26,7 @@ const MONTH_RE = /^\d{4}-\d{2}$/;
  * - months      optional lookback window in months (default 24, max 36)
  * - start/end   optional explicit Jalali 'YYYY-MM' bounds (override months)
  */
-export const GET = withAuth(async (req: Request, auth) => {
+export const GET = requireModuleView('social')(async (req: Request, auth) => {
   try {
     const { searchParams } = new URL(req.url);
 

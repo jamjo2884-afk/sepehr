@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { getCurrentWorkspace } from '@/lib/workspace';
+import { canView, canEdit } from '@/lib/permissions';
 import {
   detectAnomaliesForSession,
   detectAnomaliesForRowById,
@@ -20,6 +22,16 @@ export async function GET(
 ) {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json({ error: 'فضای کاری یافت نشد.' }, { status: 403 });
+  }
+  if (!canView(ws, 'social')) {
+    return NextResponse.json(
+      { error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
   try {
     const summary = await detectAnomaliesForSession(params.id);
     return NextResponse.json({ summary });
@@ -45,6 +57,16 @@ export async function PATCH(
 ) {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json({ error: 'فضای کاری یافت نشد.' }, { status: 403 });
+  }
+  if (!canEdit(ws, 'social')) {
+    return NextResponse.json(
+      { error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
   void params; // available for future use (session-scoped validation)
   try {
     const body = await req.json();

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
+import { getCurrentWorkspace } from '@/lib/workspace';
+import { canView, canCreate } from '@/lib/permissions';
 import { z } from 'zod';
 import {
   listImportSessions,
@@ -15,6 +17,16 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request): Promise<NextResponse> {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json({ error: 'فضای کاری یافت نشد.' }, { status: 403 });
+  }
+  if (!canView(ws, 'social')) {
+    return NextResponse.json(
+      { error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   try {
     const url = new URL(req.url);
@@ -41,6 +53,16 @@ const createSchema = z.object({
 export async function POST(req: Request): Promise<NextResponse> {
   const auth = await requireAuth();
   if ('error' in auth) return auth.error;
+  const ws = await getCurrentWorkspace();
+  if (!ws) {
+    return NextResponse.json({ error: 'فضای کاری یافت نشد.' }, { status: 403 });
+  }
+  if (!canCreate(ws, 'social')) {
+    return NextResponse.json(
+      { error: 'دسترسی شما برای این بخش کافی نیست.' },
+      { status: 403 },
+    );
+  }
 
   let body: unknown;
   try {

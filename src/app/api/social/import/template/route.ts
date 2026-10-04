@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/route-auth';
+import { requireModuleView } from '@/lib/permissions';
 import {
   buildCsvTemplate,
   buildXlsxTemplate,
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  * header row + clearly-marked DEMO rows + a column guide sheet (Excel).
  * Demo rows are never importable data — they only show the format.
  */
-export const GET = requireAuth(async (req: Request): Promise<NextResponse> => {
+export const GET = requireModuleView('social')(async (req: Request): Promise<NextResponse> => {
   const url = new URL(req.url);
   const format = url.searchParams.get('format') ?? 'xlsx';
   try {

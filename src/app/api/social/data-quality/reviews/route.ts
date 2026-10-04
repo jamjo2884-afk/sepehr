@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/route-auth';
+import { requireModuleView, requireModuleEdit } from '@/lib/permissions';
 import { z } from 'zod';
 import { SOCIAL_METRIC_FIELDS } from '@/constants/social-fields';
 import {
@@ -49,7 +49,7 @@ const upsertSchema = identitySchema.extend({
 
 export const dynamic = 'force-dynamic';
 
-export const GET = requireAuth(async (): Promise<NextResponse> => {
+export const GET = requireModuleView('social')(async (): Promise<NextResponse> => {
   try {
     const reviews = await getSocialDataQualityReviews();
     return NextResponse.json({ reviews });
@@ -62,7 +62,7 @@ export const GET = requireAuth(async (): Promise<NextResponse> => {
   }
 });
 
-export const POST = requireAuth(async (req: Request): Promise<NextResponse> => {
+export const POST = requireModuleEdit('social')(async (req: Request): Promise<NextResponse> => {
   let body: unknown;
   try {
     body = await req.json();
@@ -91,7 +91,7 @@ export const POST = requireAuth(async (req: Request): Promise<NextResponse> => {
   }
 });
 
-export const DELETE = requireAuth(async (req: Request): Promise<NextResponse> => {
+export const DELETE = requireModuleEdit('social')(async (req: Request): Promise<NextResponse> => {
   let body: unknown;
   try {
     body = await req.json();
