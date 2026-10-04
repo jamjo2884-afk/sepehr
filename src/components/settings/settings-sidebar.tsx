@@ -8,6 +8,7 @@ import {
   Server,
   User,
   UserCheck,
+  Users,
   ChevronLeft,
 } from 'lucide-react';
 import type { SettingsCategory } from '@/types/settings';
@@ -17,6 +18,7 @@ import { cn } from '@/lib/utils';
 const CATEGORY_ICONS: Record<SettingsCategory, React.ElementType> = {
   account: User,
   general: Settings,
+  members: Users,
   guestMode: UserCheck,
   appearance: Palette,
   social: Share2,

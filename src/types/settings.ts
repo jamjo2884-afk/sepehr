@@ -8,6 +8,7 @@
 export type SettingsCategory =
   | 'account'
   | 'general'
+  | 'members'
   | 'guestMode'
   | 'appearance'
   | 'social'
@@ -32,6 +33,12 @@ export const SETTINGS_CATEGORIES: SettingsCategoryInfo[] = [
     id: 'general',
     label: 'عمومی',
     description: 'تنظیمات پایه سیستم و فضای کاری',
+    enabled: true,
+  },
+  {
+    id: 'members',
+    label: 'اعضا و دسترسی',
+    description: 'اعضای فضای کاری، نقش‌ها و دسترسی هر بخش',
     enabled: true,
   },
   {

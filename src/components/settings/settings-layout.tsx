@@ -10,6 +10,7 @@ import { AccountSettings } from '@/components/settings/sections/account-settings
 import { GeneralSettings } from '@/components/settings/sections/general-settings';
 import { AppearanceSettings } from '@/components/settings/sections/appearance-settings';
 import { SocialSettings } from '@/components/settings/sections/social-settings';
+import { MembersSettings } from '@/components/settings/sections/members-settings';
 import { GuestModeSettings } from '@/components/settings/sections/guest-mode-settings';
 import { SystemSettings } from '@/components/settings/sections/system-settings';
 
@@ -42,6 +43,8 @@ export function SettingsLayout() {
         return <AccountSettings />;
       case 'general':
         return <GeneralSettings />;
+      case 'members':
+        return <MembersSettings />;
       case 'guestMode':
         return <GuestModeSettings />;
       case 'appearance':
