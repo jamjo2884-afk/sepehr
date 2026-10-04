@@ -20,6 +20,13 @@ export interface WorkspaceContext {
   workspaceId: string;
   /** The user's role in this workspace. */
   role: string;
+  /**
+   * Per-module access matrix from workspace_members.permissions (Members
+   * phase 2). Raw unknown shape — resolve through moduleAccess() in
+   * lib/permissions, never read directly. Undefined for guest/demo contexts
+   * (guests never pass a module gate anyway).
+   */
+  permissions?: unknown;
 }
 
 const DEMO_WORKSPACE_ID = 'demo-workspace-000';
@@ -71,7 +78,7 @@ export async function getCurrentWorkspace(): Promise<WorkspaceContext | null> {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from('workspace_members')
-      .select('workspace_id, role')
+      .select('workspace_id, role, permissions')
       .eq('user_id', user.id)
       .limit(1)
       .single();
@@ -88,6 +95,7 @@ export async function getCurrentWorkspace(): Promise<WorkspaceContext | null> {
       userId: user.id,
       workspaceId: data.workspace_id,
       role: data.role,
+      permissions: (data as { permissions?: unknown }).permissions ?? {},
     };
   } catch {
     return null;
