@@ -30,6 +30,15 @@ const PUBLIC_PATHS = [
   '/register',
   '/forgot-password',
   '/reset-password',
+  // The invitation landing page must be reachable while signed out: it is the
+  // entry point for someone who does not have an account yet, and it offers the
+  // "create account" button that carries the invite token through to /register.
+  // Without this, middleware bounced anonymous visitors to /login, where the
+  // register link dropped `?next=` and the token was lost — the invitee would
+  // have registered normally and silently received a personal workspace.
+  // Nothing sensitive is served here: the page fetches no invitation data, and
+  // accepting is a POST to /api/workspace/invitations/accept behind requireAuth.
+  '/invite',
 ];
 
 const AUTH_API_PATHS = ['/api/auth'];

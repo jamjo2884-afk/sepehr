@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [joinedViaInvite, setJoinedViaInvite] = useState(false);
 
   const {
     register,
@@ -36,14 +37,24 @@ export default function RegisterPage() {
   const onSubmit = async (values: RegisterValues) => {
     setSubmitError(null);
     try {
+      // `?next=/invite/<token>` means the visitor arrived through an invite
+      // link. The token is handed to signUp() so the database trigger can join
+      // them straight into that workspace instead of creating a personal one.
+      // Read at submit time (not via useSearchParams) so the page needs no
+      // Suspense boundary for static rendering.
+      const next = new URLSearchParams(window.location.search).get('next');
+      const inviteToken = next
+        ? next.match(/^\/invite\/([A-Za-z0-9_-]+)$/)?.[1]
+        : undefined;
+
       const result = await signUp({
         email: values.email,
         password: values.password,
         fullName: values.fullName,
+        inviteToken,
       });
       // Email confirmation disabled → a session is returned; sign in directly.
       if (result.session) {
-        const next = new URLSearchParams(window.location.search).get('next');
         router.replace(
           next && next.startsWith('/') && !next.startsWith('//')
             ? next
@@ -51,6 +62,7 @@ export default function RegisterPage() {
         );
         return;
       }
+      setJoinedViaInvite(Boolean(inviteToken));
       setDone(true);
     } catch (err) {
       const message =
@@ -68,13 +80,22 @@ export default function RegisterPage() {
       <AuthShell title="حساب ساخته شد" subtitle="حساب شما با موفقیت ایجاد شد.">
         <div className="flex flex-col gap-4 text-center">
           <p className="text-sm text-muted-foreground">
-            فضای کاری «Media Deck» برای شما ایجاد شد و نقش «مالک» به شما اختصاص
-            یافت. اکنون می‌توانید وارد شوید.
+            {joinedViaInvite
+              ? 'به فضای کاری دعوت‌کننده پیوستید. اکنون می‌توانید وارد شوید.'
+              : 'فضای کاری «Media Deck» برای شما ایجاد شد و نقش «مالک» به شما اختصاص یافت. اکنون می‌توانید وارد شوید.'}
           </p>
           <Button
             type="button"
             className="h-10 w-full"
-            onClick={() => router.push('/login')}
+            onClick={() =>
+              router.push(
+                joinedViaInvite
+                  ? `/login?next=${encodeURIComponent(
+                      `/invite/${new URLSearchParams(window.location.search).get('next')?.split('/').pop() ?? ''}`,
+                    )}`
+                  : '/login',
+              )
+            }
           >
             ورود به حساب
           </Button>

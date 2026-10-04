@@ -62,13 +62,33 @@ export interface SignUpInput {
   email: string;
   password: string;
   fullName: string;
+  /**
+   * Invite token when the visitor arrived through an invite link
+   * (`/invite/<token>`). It travels in `raw_user_meta_data`, which the
+   * `handle_new_user()` trigger reads: a signup carrying a VALID token joins
+   * only the invited workspace and never gets a personal one (migration
+   * 20261001140000). An invalid/expired token is ignored by the database and
+   * the user gets a normal personal workspace, so passing a stale token is
+   * harmless. Omit it for an ordinary sign-up.
+   */
+  inviteToken?: string;
 }
 
-export async function signUp({ email, password, fullName }: SignUpInput) {
+export async function signUp({
+  email,
+  password,
+  fullName,
+  inviteToken,
+}: SignUpInput) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName } },
+    options: {
+      data: {
+        full_name: fullName,
+        ...(inviteToken ? { invite_token: inviteToken } : {}),
+      },
+    },
   });
   if (error) throw error;
   return data;

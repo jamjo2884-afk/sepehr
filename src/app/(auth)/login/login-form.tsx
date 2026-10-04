@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -33,6 +33,14 @@ function safeNextPath(param: string | null): string | null {
 export function LoginForm() {
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Preserve `?next=` on the "create account" link. Without it, a visitor who
+  // arrived from an invite link and landed on /login?next=/invite/<token>
+  // would lose the token at registration and get a normal personal workspace.
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get('next');
+  const nextForRegister = safeNextPath(nextParam)
+    ? `/register?next=${encodeURIComponent(nextParam as string)}`
+    : '/register';
 
   const {
     register,
@@ -72,7 +80,7 @@ export function LoginForm() {
         <span>
           حساب ندارید؟{' '}
           <Link
-            href="/register"
+            href={nextForRegister}
             className="font-medium text-primary hover:underline"
           >
             ساخت حساب جدید
