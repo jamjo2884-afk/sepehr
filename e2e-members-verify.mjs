@@ -498,6 +498,64 @@ try {
     `status=${auditAsMember.status}`,
   );
 
+  // ── 4b. Invite links come from the configured origin, never the host ─────
+  // Regression: links were once assembled from window.location.origin, so an
+  // owner on a preview deployment copied a preview URL that Vercel's
+  // Deployment Protection gates behind a login.
+  console.log('\n2b. invite link origin is the configured public origin');
+  const linkEmail = `link-${stamp}@example.com`;
+  const inviteLink = await apiSend(
+    '/api/workspace/invitations',
+    ownerCookie.cookie,
+    'POST',
+    { email: linkEmail, role: 'member' },
+  );
+  check(
+    'owner POST /api/workspace/invitations -> 201',
+    inviteLink.status === 201,
+    `status=${inviteLink.status} ${JSON.stringify(inviteLink.body)?.slice(0, 120)}`,
+  );
+
+  const linkUrl = inviteLink.body?.invitation?.acceptUrl ?? '';
+  const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL ?? '';
+  check(
+    'invitation carries an acceptUrl on the record',
+    typeof linkUrl === 'string' && linkUrl.length > 0,
+    `acceptUrl=${JSON.stringify(linkUrl)}`,
+  );
+  check(
+    'acceptUrl is absolute (never a bare path)',
+    linkUrl.startsWith('http://') || linkUrl.startsWith('https://'),
+    `acceptUrl=${linkUrl}`,
+  );
+  check(
+    'acceptUrl uses NEXT_PUBLIC_APP_URL, not the serving host',
+    configuredOrigin !== '' && linkUrl.startsWith(configuredOrigin),
+    `expected origin ${configuredOrigin}, got ${linkUrl}`,
+  );
+  check(
+    'acceptUrl is NOT the preview/protected deployment host',
+    !/sepehr-[a-z0-9]+-jamjo2884-afks-projects\.vercel\.app/i.test(linkUrl),
+    `acceptUrl=${linkUrl}`,
+  );
+
+  const linkHost = linkUrl ? new URL(linkUrl).host : '(none)';
+  const listedInvites = await apiSend(
+    '/api/workspace/invitations',
+    ownerCookie.cookie,
+    'GET',
+  );
+  const listedLink = (listedInvites.body?.invitations ?? []).find(
+    (i) => i.email === linkEmail,
+  );
+  check(
+    'pending invitation in the list carries the same origin',
+    listedLink?.acceptUrl?.startsWith(configuredOrigin) === true,
+    `listed=${listedLink?.acceptUrl}`,
+  );
+  console.log(`   generated link host: ${linkHost}`);
+  console.log(`   invite for cleanup: ${linkEmail}`);
+
   const auditAsOwner = await apiSend(
     '/api/workspace/permissions/audit',
     ownerCookie.cookie,

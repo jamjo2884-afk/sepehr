@@ -320,3 +320,46 @@ CREATE TABLE IF NOT EXISTS workspace_invitations (
 
 کاربری که **قبلاً** حساب دارد و بعداً دعوت را می‌پذیرد، همچنان دو workspace دارد. این با تصمیم فعلی
 (که فقط درباره‌ی «ثبت‌نام از لینک دعوت» بود) خارج از محدوده است و برای حل شدن به workspace-switcher نیاز دارد.
+
+---
+
+## ۷. پایدارسازی لینک دعوت (`NEXT_PUBLIC_APP_URL`)
+
+### ۷.۱ مسئله
+
+لینک دعوت دو جا ساخته می‌شد و هر دو می‌توانستند دامنه‌ی اشتباه بدهند:
+
+- سرویس: `NEXT_PUBLIC_APP_URL` → `NEXT_PUBLIC_SITE_URL` → **`VERCEL_URL`** (هر سه در آن زمان تنظیم نبودند،
+  پس عملاً `VERCEL_URL` همیشه برنده بود).
+- UI: `window.location.origin` در دکمه‌ی کپیِ لیست «در انتظار».
+
+`VERCEL_URL` روی Vercel دامنه‌ی *همان deployment جاری* است؛ برای یک branch build این یک هاست preview است.
+هاست‌های preview پشت **Deployment Protection** هستند، پس گیرنده قبل از رسیدن به اپ به صفحه‌ی
+«عضو شوید در Vercel / وارد حساب Vercel» هدایت می‌شد. `window.location.origin` هم دقیقاً همان نشت را
+داشت: مالکی که روی preview کار می‌کرد، لینک preview را کپی می‌کرد.
+
+### ۷.۲ تصمیم
+
+`NEXT_PUBLIC_APP_URL` تنها منبع لینک است. نه `VERCEL_URL` و نه `window.location.origin`.
+
+**سرور تنها منبع حقیقت است:** فیلد `acceptUrl` روی خود رکورد دعوت قرار گرفت و در پاسخ لیست هم برمی‌گردد.
+دلیل: تکرار نکردن منطق دامنه در کلاینت (دو نسخه که می‌توانستند از هم جدا شوند)، و اینکه `NEXT_PUBLIC_*`
+در کلاینت هنگام build درون‌ریزی می‌شود — پس نسخه‌ی کلاینت تا redeploy کهنه می‌ماند ولی سرور بلافاصله درست است.
+
+**نبود متغیر = خطای صریح، نه لینک خراب:** `createWorkspaceInvitation` **پیش از نوشتن** با
+`not_configured` (HTTP 501) رد می‌شود و `console.error` می‌دهد. این ترتیب عمدی است: ساختن ردیف و شکست
+بعد از آن، یک دعوتِ غیرقابل‌استفاده جا می‌گذاشت. `listWorkspaceInvitations` هم به‌جای لیستی با لینک
+خالی، `not_configured` می‌دهد. `copyLink` در UI لینک خالی را کپی نمی‌کند.
+
+### ۷.۳ پیش‌نیاز استقرار
+
+`NEXT_PUBLIC_APP_URL` باید روی محیط **Production** (و اگر از preview استفاده می‌شود، روی Preview) با
+دامنه‌ی عمومی برنامه تنظیم شود. تا پیش از آن، `POST /api/workspace/invitations` با 501 پاسخ می‌دهد.
+
+### ۷.۴ تأیید عملی
+
+- با `NEXT_PUBLIC_APP_URL=https://sepehr-phi.vercel.app`: لینک تولیدشده `sepehr-phi.vercel.app/invite/<token>`
+  — مستقل از هاستی که سرویس روی آن اجرا می‌شود.
+- تست منفی با `NEXT_PUBLIC_APP_URL` unset و `VERCEL_URL` عمداً ست‌شده روی هاست preview:
+  **501**، صفر سطر یتیم در `workspace_invitations`، و پیام خطای صریح در لاگ.
+- E2E: ۷۵ چک (۶ چک جدید) — همه PASS.
