@@ -57,6 +57,15 @@ export interface WorkspaceInvitation {
   expiresAt: string;
   createdAt: string;
   acceptedAt: string | null;
+  /**
+   * Absolute accept link, built by the server from NEXT_PUBLIC_APP_URL.
+   * '' only when that variable is unset, which callers must treat as an error.
+   *
+   * The link lives on the record precisely so the browser never assembles one
+   * from window.location.origin: an owner looking at a preview deployment would
+   * otherwise copy a preview URL that Vercel's Deployment Protection intercepts.
+   */
+  acceptUrl: string;
 }
 
 export type ServiceErrorCode =
@@ -235,6 +244,12 @@ export async function listWorkspaceMembers(
 export async function listWorkspaceInvitations(
   workspaceId: string,
 ): Promise<ServiceResult<WorkspaceInvitation[]>> {
+  if (!appOrigin()) {
+    return fail(
+      'not_configured',
+      'لینک‌های دعوت در دسترس نیست: تنظیم NEXT_PUBLIC_APP_URL روی محیط استقرار انجام نشده است.',
+    );
+  }
   try {
     const supabase = await getSupabase();
     const { data, error } = await supabase
@@ -263,6 +278,7 @@ export async function listWorkspaceInvitations(
       expiresAt: String(row.expires_at),
       createdAt: String(row.created_at),
       acceptedAt: row.accepted_at ? String(row.accepted_at) : null,
+      acceptUrl: buildAcceptUrl(String(row.token)),
     }));
 
     return ok(invitations);
@@ -418,14 +434,25 @@ export async function removeWorkspaceMember(
  * surfaces the link for the owner to copy and send manually. `create_workspace_invitation`
  * returns only the invitation id, so the row is read back to obtain the token;
  * the SELECT policy permits that for workspace members.
+ *
+ * Refuses up front when no public origin is configured. Creating the row first
+ * and failing afterwards would leave a pending invitation nobody can redeem,
+ * so the misconfiguration is reported before anything is written.
  */
 export async function createWorkspaceInvitation(
   input: { email?: unknown; role?: unknown; permissions?: unknown },
-): Promise<ServiceResult<{ invitation: WorkspaceInvitation; acceptUrl: string }>> {
+): Promise<ServiceResult<{ invitation: WorkspaceInvitation }>> {
   if (!isEmail(input.email)) {
     return fail('invalid_input', 'ایمیل معتبر وارد کنید.');
   }
   const email = String(input.email).trim().toLowerCase();
+
+  if (!appOrigin()) {
+    return fail(
+      'not_configured',
+      'لینک دعوت ساخته نشد: تنظیم NEXT_PUBLIC_APP_URL روی محیط استقرار انجام نشده است.',
+    );
+  }
 
   // Default to the most restricted role — the owner opts into more.
   const role = parseRole(input.role ?? 'member') ?? 'member';
@@ -487,8 +514,8 @@ export async function createWorkspaceInvitation(
         expiresAt: String(row.expires_at),
         createdAt: String(row.created_at),
         acceptedAt: row.accepted_at ? String(row.accepted_at) : null,
+        acceptUrl: buildAcceptUrl(String(row.token)),
       },
-      acceptUrl: buildAcceptUrl(String(row.token)),
     });
   } catch (err) {
     console.warn('[workspace-members] Failed to create invitation:', err);
@@ -553,27 +580,42 @@ export async function revokeWorkspaceInvitation(
  * Invitation link
  * ========================================================================= */
 
-/** Public origin used to build invite links (falls back to a relative path). */
+/**
+ * Public origin used to build invite links.
+ *
+ * ONLY NEXT_PUBLIC_APP_URL is trusted, deliberately. VERCEL_URL is NOT a
+ * fallback: Vercel sets it to the URL of the deployment currently serving the
+ * request, which for a branch build is an ephemeral preview host. Those preview
+ * hosts sit behind Deployment Protection, so a link built from one bounces the
+ * recipient through a Vercel login screen before they ever reach the app. A
+ * single configured origin also means an owner working from a preview build and
+ * an owner working from production produce byte-identical links.
+ *
+ * Returns '' when unset; callers treat that as a hard error rather than
+ * emitting a link that cannot work.
+ */
 function appOrigin(): string {
-  const candidates = [
-    process.env.NEXT_PUBLIC_APP_URL,
-    process.env.NEXT_PUBLIC_SITE_URL,
-    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
-  ];
-  for (const value of candidates) {
-    if (value && value.trim()) return value.trim().replace(/\/+$/, '');
-  }
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, '');
+
+  console.error(
+    `[workspace-members] NEXT_PUBLIC_APP_URL is not set, so invitation links cannot be built. ` +
+      `Set it to the app's public origin (for example https://your-app.vercel.app) ` +
+      `in the deployment environment. VERCEL_URL is intentionally not used as a fallback ` +
+      `because it points at the current deployment, and preview deployments are behind ` +
+      `Vercel Deployment Protection.`,
+  );
   return '';
 }
 
 /**
  * Build the accept-invitation link shown to the owner for manual sharing.
  *
- * Falls back to a root-relative path when no public origin is configured, so a
- * missing env var degrades the link instead of breaking the invite flow.
+ * Returns '' when no public origin is configured. An empty result is a
+ * misconfiguration, not a usable link — callers must surface it instead of
+ * handing the owner a URL that goes nowhere.
  */
 export function buildAcceptUrl(token: string): string {
-  const path = `/invite/${token}`;
   const origin = appOrigin();
-  return origin ? `${origin}${path}` : path;
+  return origin ? `${origin}/invite/${token}` : '';
 }

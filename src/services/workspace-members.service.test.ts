@@ -51,6 +51,7 @@ vi.mock('@/lib/db', () => ({
 import {
   createWorkspaceInvitation,
   listPermissionAudit,
+  listWorkspaceInvitations,
   listWorkspaceMembers,
   removeWorkspaceMember,
   revokeWorkspaceInvitation,
@@ -61,8 +62,13 @@ import {
 const WS = 'ws-1';
 const USER = '11111111-2222-3333-4444-555555555555';
 
+// Invite links are only built from this one variable, so every test that
+// exercises an invite needs it present.
+const APP_URL = 'https://app.example.com';
+
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.NEXT_PUBLIC_APP_URL = APP_URL;
 });
 
 describe('updateMemberAccess — validation', () => {
@@ -295,7 +301,70 @@ describe('createWorkspaceInvitation', () => {
     if (res.ok) {
       // The RPC returns only an id; the token comes from the read-back.
       expect(res.data.invitation.token).toBe('tok-abc');
-      expect(res.data.acceptUrl).toContain('tok-abc');
+      // Accept link lives on the record, built from NEXT_PUBLIC_APP_URL.
+      expect(res.data.invitation.acceptUrl).toContain('tok-abc');
+    }
+  });
+});
+
+describe('invite links require a configured public origin', () => {
+  it('createWorkspaceInvitation refuses BEFORE writing an unredeemable row', async () => {
+    const prev = process.env.NEXT_PUBLIC_APP_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const res = await createWorkspaceInvitation({ email: 'a@b.com' });
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.errorCode).toBe('not_configured');
+      // Nothing was written: no RPC, no read-back.
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(mockFrom).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      if (prev !== undefined) process.env.NEXT_PUBLIC_APP_URL = prev;
+    }
+  });
+
+  it('listWorkspaceInvitations reports not_configured rather than blank links', async () => {
+    const prev = process.env.NEXT_PUBLIC_APP_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const res = await listWorkspaceInvitations(WS);
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.errorCode).toBe('not_configured');
+      expect(mockFrom).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      if (prev !== undefined) process.env.NEXT_PUBLIC_APP_URL = prev;
+    }
+  });
+
+  it('every listed invitation carries an absolute link on the configured origin', async () => {
+    mockFromOnce({
+      data: [
+        {
+          id: 'inv-1',
+          email: 'a@b.com',
+          role: 'member',
+          permissions: {},
+          token: 'tok-one',
+          invited_by: null,
+          status: 'pending',
+          expires_at: '2026-02-01T00:00:00.000Z',
+          created_at: '2026-01-01T00:00:00.000Z',
+          accepted_at: null,
+        },
+      ],
+      error: null,
+    });
+    const res = await listWorkspaceInvitations(WS);
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.data[0].acceptUrl).toBe(`${APP_URL}/invite/tok-one`);
+      // The link is absolute — never a bare path the browser would resolve
+      // against whatever host the owner happens to be looking at.
+      expect(res.data[0].acceptUrl.startsWith('http')).toBe(true);
     }
   });
 });
@@ -328,15 +397,24 @@ describe('revokeWorkspaceInvitation', () => {
 });
 
 describe('buildAcceptUrl', () => {
-  it('falls back to a root-relative path with no public origin configured', () => {
+  it('returns an empty string and logs when no public origin is configured', () => {
     const prev = process.env.NEXT_PUBLIC_APP_URL;
+    const prevVercel = process.env.VERCEL_URL;
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     delete process.env.NEXT_PUBLIC_APP_URL;
-    delete process.env.NEXT_PUBLIC_SITE_URL;
-    delete process.env.VERCEL_URL;
+    // VERCEL_URL must NOT rescue the link: on Vercel it names the current
+    // deployment, and preview hosts sit behind Deployment Protection.
+    process.env.VERCEL_URL = 'sepehr-abc123-jamjo2884-afks-projects.vercel.app';
     try {
-      expect(buildAcceptUrl('abc')).toBe('/invite/abc');
+      expect(buildAcceptUrl('abc')).toBe('');
+      expect(spy).toHaveBeenCalledWith(
+        expect.stringContaining('NEXT_PUBLIC_APP_URL is not set'),
+      );
     } finally {
+      spy.mockRestore();
       if (prev !== undefined) process.env.NEXT_PUBLIC_APP_URL = prev;
+      if (prevVercel === undefined) delete process.env.VERCEL_URL;
+      else process.env.VERCEL_URL = prevVercel;
     }
   });
 
@@ -348,6 +426,22 @@ describe('buildAcceptUrl', () => {
     } finally {
       if (prev === undefined) delete process.env.NEXT_PUBLIC_APP_URL;
       else process.env.NEXT_PUBLIC_APP_URL = prev;
+    }
+  });
+
+  it('ignores a configured SITE_URL — NEXT_PUBLIC_APP_URL is the only source', () => {
+    const prevApp = process.env.NEXT_PUBLIC_APP_URL;
+    const prevSite = process.env.NEXT_PUBLIC_SITE_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    process.env.NEXT_PUBLIC_SITE_URL = 'https://stale.example.com';
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(buildAcceptUrl('abc')).toBe('');
+      spy.mockRestore();
+    } finally {
+      if (prevApp !== undefined) process.env.NEXT_PUBLIC_APP_URL = prevApp;
+      if (prevSite === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
+      else process.env.NEXT_PUBLIC_SITE_URL = prevSite;
     }
   });
 });

@@ -73,6 +73,12 @@ interface WorkspaceInvitation {
   status: 'pending' | 'accepted' | 'revoked' | 'expired';
   token: string;
   expiresAt: string;
+  /**
+   * Absolute accept link, built by the server from NEXT_PUBLIC_APP_URL.
+   * Never assembled here from window.location.origin — an owner on a preview
+   * deployment would copy a URL that Vercel Deployment Protection intercepts.
+   */
+  acceptUrl: string;
 }
 
 interface PermissionAuditEntry {
@@ -252,8 +258,8 @@ export function MembersSettings() {
         toast.error(await readError(res));
         return;
       }
-      const data = (await res.json()) as { acceptUrl?: string };
-      setAcceptUrl(data.acceptUrl ?? null);
+      const data = (await res.json()) as { invitation?: WorkspaceInvitation };
+      setAcceptUrl(data.invitation?.acceptUrl ?? null);
       setInviteEmail('');
       toast.success('دعوت ساخته شد — لینک را کپی و ارسال کنید.');
       await load();
@@ -265,6 +271,14 @@ export function MembersSettings() {
   };
 
   const copyLink = async (url: string) => {
+    // An empty link means the server had no NEXT_PUBLIC_APP_URL to build from.
+    // Copying it would silently put a dead string on the clipboard.
+    if (!url) {
+      toast.error(
+        'لینک دعوت در دسترس نیست؛ تنظیم NEXT_PUBLIC_APP_URL روی محیط استقرار انجام نشده است.',
+      );
+      return;
+    }
     try {
       await navigator.clipboard.writeText(url);
       toast.success('لینک کپی شد.');
@@ -591,15 +605,7 @@ export function MembersSettings() {
                               type="button"
                               size="sm"
                               variant="ghost"
-                              onClick={() =>
-                                void copyLink(
-                                  `${
-                                    typeof window !== 'undefined'
-                                      ? window.location.origin
-                                      : ''
-                                  }/invite/${inv.token}`,
-                                )
-                              }
+                              onClick={() => void copyLink(inv.acceptUrl)}
                             >
                               <Copy className="h-3.5 w-3.5" />
                             </Button>

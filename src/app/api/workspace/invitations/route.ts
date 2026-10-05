@@ -16,6 +16,14 @@ export const dynamic = 'force-dynamic';
  * env vars), so the response carries the accept link for the owner to copy and
  * send manually. The invitation itself is a DB row created by the SECURITY
  * DEFINER create_workspace_invitation() RPC — the client has no INSERT policy.
+ *
+ * The accept link is built SERVER-side from NEXT_PUBLIC_APP_URL and returned on
+ * the invitation record. It is deliberately not assembled in the browser from
+ * window.location.origin: an owner viewing a preview deployment would otherwise
+ * copy a preview URL that Vercel Deployment Protection gates behind a login.
+ *
+ * Returns 501 not_configured if NEXT_PUBLIC_APP_URL is unset — the service
+ * refuses before creating the row, so no unredeemable invitation is left behind.
  */
 export const POST = requireRole('owner', 'admin')(async (req) => {
   let body: unknown;
@@ -39,7 +47,7 @@ export const POST = requireRole('owner', 'admin')(async (req) => {
   }
 
   return NextResponse.json(
-    { ok: true, invitation: result.data.invitation, acceptUrl: result.data.acceptUrl },
+    { ok: true, invitation: result.data.invitation },
     { status: 201 },
   );
 });
