@@ -310,7 +310,12 @@ describe('createWorkspaceInvitation', () => {
 describe('invite links require a configured public origin', () => {
   it('createWorkspaceInvitation refuses BEFORE writing an unredeemable row', async () => {
     const prev = process.env.NEXT_PUBLIC_APP_URL;
+    const prevVercel = process.env.VERCEL_URL;
     delete process.env.NEXT_PUBLIC_APP_URL;
+    // On Vercel this var is always present, so the guard has to hold in exactly
+    // that condition — a bare unset APP_URL would pass even if some fallback
+    // silently rescued the link.
+    process.env.VERCEL_URL = 'sepehr-abc123-jamjo2884-afks-projects.vercel.app';
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       const res = await createWorkspaceInvitation({ email: 'a@b.com' });
@@ -322,12 +327,16 @@ describe('invite links require a configured public origin', () => {
     } finally {
       spy.mockRestore();
       if (prev !== undefined) process.env.NEXT_PUBLIC_APP_URL = prev;
+      if (prevVercel === undefined) delete process.env.VERCEL_URL;
+      else process.env.VERCEL_URL = prevVercel;
     }
   });
 
   it('listWorkspaceInvitations reports not_configured rather than blank links', async () => {
     const prev = process.env.NEXT_PUBLIC_APP_URL;
+    const prevVercel = process.env.VERCEL_URL;
     delete process.env.NEXT_PUBLIC_APP_URL;
+    process.env.VERCEL_URL = 'sepehr-abc123-jamjo2884-afks-projects.vercel.app';
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       const res = await listWorkspaceInvitations(WS);
@@ -337,6 +346,8 @@ describe('invite links require a configured public origin', () => {
     } finally {
       spy.mockRestore();
       if (prev !== undefined) process.env.NEXT_PUBLIC_APP_URL = prev;
+      if (prevVercel === undefined) delete process.env.VERCEL_URL;
+      else process.env.VERCEL_URL = prevVercel;
     }
   });
 
